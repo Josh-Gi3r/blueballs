@@ -1,0 +1,44 @@
+# Blueballs — SCOPE (frozen 2026-08-06)
+
+An MIT-licensed, self-hostable **open-source neobank stack**. Anyone can fork it and launch a
+neobank. Approved by Josh 2026-08-05.
+
+## What we are building
+| Layer | Content |
+|---|---|
+| **API** | 144 endpoints · 27 resource families · one frozen contract (`spec/conventions.md`) |
+| **Library** | 92 modules — 50 build-from-scratch, 40 wrap mature OSS, 2 reference-only |
+| **Site** | Marketing + full API documentation (`src/`) — DONE, matches the Design project |
+| **Products** | 8 — Accounts · Cards · Transfers · Exchange · Vaults · Credit · Business · Ledger |
+| **App flows** | ~80 across 18 domains — **deferred**, not in the current push |
+
+## Non-negotiables
+1. **Self-serve.** Sign up → sandbox key instantly. Unmetered. No human approval, ever.
+2. **Free.** MIT. Self-host for nothing. Any fee only ever attaches to hosted production use.
+3. **Self-hosting is trivial.** Minimal dependencies. One command to run.
+4. **The contract is the product.** Providers are pluggable adapters behind it. No vendor is
+   named in code, docs, commits or artifacts — including the FX adapter.
+5. **Honest states.** Compliance holds, quote expiry, closed rails, tier blocks, refunds and
+   reversals are modelled, not hidden behind a generic error.
+6. **Money is never a float.** Decimal strings plus explicit currency; settlement currency
+   tracked separately from display currency.
+7. **Double-entry or it doesn't post.** Entries that don't sum to zero are rejected.
+
+## Explicitly OUT of scope for this push
+- The ~80 consumer app flows (a separate wave, after the API is real)
+- Any licensed activity — we ship software, not a bank
+- Mobile apps
+- Production-grade KYC vendor integration (hosted-redirect wrapper only)
+
+## Definition of done for the push
+A developer who has never met us can:
+1. Land on the site, read the API, sign up, and get a working key with no human involved
+2. Create a customer, open an account, fund it, send money, and read a balance
+3. Hit every catalogued endpoint and get either a real response or a deliberate `501`
+4. Restart the server and still have their data
+5. Receive a signed webhook when something changes
+6. `git clone`, `npm install`, and run the whole thing locally
+
+## How progress is measured — one number
+**Catalogued endpoints that respond ÷ 144.**
+Task-completion percentages flatter; this one doesn't. Current: **21/144 = 14.6%**.

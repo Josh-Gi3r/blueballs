@@ -1,0 +1,21 @@
+/* Ported from Greenbar v2.dc.html <helmet> block */
+body { margin: 0; background: #E8EAEF; }
+* { box-sizing: border-box; }
+a { color: #14161C; text-decoration: none; }
+a:hover { color: #4E5FA6; }
+input, button, textarea, select { font: inherit; color: inherit; }
+
+@keyframes gb-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* hover/focus helpers (inline styles can't do :hover, so map via classes) */
+.gb-hoverable { transition: color .15s ease, background .15s ease, border-color .15s ease, opacity .15s ease; }
+
+@media (max-width: 980px) {
+  [data-col] { grid-template-columns: 1fr !important; }
+  [data-pad] { padding-left: 22px !important; padding-right: 22px !important; }
+  [data-scroll] { overflow-x: auto; }
+  [data-scroll] > div { min-width: 640px; }
+}

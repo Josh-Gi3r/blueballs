@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.DS_Store
+*.log
