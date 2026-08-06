@@ -56,19 +56,19 @@ const products = [
     code: 'await bb.cards.issue({\n  account: "acc_92f",\n  form: "virtual",\n  limits: { daily: 500_00 }\n});\n\n// → { last4: "4417", state: "active" }' },
   { glyph: "TR", screen: "transfers" as Screen, tag: "TRANSFERS", endpoint: "POST /v2/transfers", title: "Transfers", short: "Local rails, SWIFT and on-chain from one call.",
     body: "Send on SEPA Instant, Faster Payments, ACH, wire or stablecoin rails with a single payload. Blueballs picks the cheapest route that meets your deadline.",
-    rows: [{ k: "RAILS", v: "11" }, { k: "SETTLEMENT", v: "FROM 4 SECONDS" }, { k: "BATCHING", v: "UP TO 10,000" }, { k: "RETURNS", v: "AUTO-RECONCILED" }],
+    rows: [{ k: "RAILS", v: "6" }, { k: "SETTLEMENT", v: "SECONDS ON INSTANT RAILS" }, { k: "CUT-OFFS", v: "QUERYABLE" }, { k: "LEGS", v: "PER-RAIL STATUS" }],
     code: 'await bb.transfers.send({\n  from: "acc_92f",\n  to: { iban: "FR76…" },\n  amount: 2_400_00, rail: "sepa_instant"\n});' },
   { glyph: "FX", screen: "exchange" as Screen, tag: "EXCHANGE", endpoint: "POST /v2/exchange", title: "Exchange", short: "FX and crypto conversion at interbank rates.",
     body: "Convert between currencies and stablecoins at interbank mid plus four basis points. Quotes hold for thirty seconds and settle atomically against the balance.",
-    rows: [{ k: "PAIRS", v: "340+" }, { k: "SPREAD", v: "4 BPS" }, { k: "QUOTE HOLD", v: "30 SECONDS" }, { k: "WEEKEND FX", v: "SUPPORTED" }],
+    rows: [{ k: "PAIRS", v: "30" }, { k: "SPREAD", v: "4 BPS · 85 THIN" }, { k: "QUOTE HOLD", v: "30 SECONDS" }, { k: "EXPIRY", v: "ENFORCED · 409" }],
     code: 'await bb.exchange.quote({\n  from: "USD", to: "EUR",\n  amount: 10_000_00\n});\n\n// → { rate: 0.9234, expires_in: 30 }' },
   { glyph: "VT", screen: "vaults" as Screen, tag: "VAULTS", endpoint: "POST /v2/vaults", title: "Savings vaults", short: "Goal-based savings paying daily interest.",
     body: "Ring-fence money into named vaults with round-ups, recurring deposits and daily accrual. Balances stay withdrawable on demand with no notice period.",
-    rows: [{ k: "RATE", v: "3.9 – 7.2% AER" }, { k: "ACCRUAL", v: "DAILY" }, { k: "ROUND-UPS", v: "OPTIONAL" }, { k: "WITHDRAWAL", v: "INSTANT" }],
+    rows: [{ k: "RATE", v: "3% DEFAULT · SET PER VAULT" }, { k: "ACCRUAL", v: "DAILY" }, { k: "LEDGER", v: "DOUBLE-ENTRY" }, { k: "WITHDRAWAL", v: "ON DEMAND" }],
     code: 'await bb.vaults.create({\n  account: "acc_92f",\n  name: "Deposit",\n  target: 20_000_00, roundups: true\n});' },
   { glyph: "CR", screen: "credit" as Screen, tag: "CREDIT", endpoint: "POST /v2/credit", title: "Credit lines", short: "Overdrafts and collateralised borrowing.",
     body: "Extend revolving credit against deposits or crypto collateral. Limits, pricing and liquidation thresholds are configured per programme, with margin calls delivered by webhook.",
-    rows: [{ k: "COLLATERAL", v: "CASH · BTC · ETH" }, { k: "MAX LTV", v: "62%" }, { k: "APR", v: "FROM 5.9%" }, { k: "CALLS", v: "WEBHOOK + GRACE" }],
+    rows: [{ k: "COLLATERAL", v: "PER LINE" }, { k: "MAX LTV", v: "80% DEFAULT" }, { k: "DRAW", v: "LTV-CAPPED" }, { k: "REPAY", v: "PARTIAL OK" }],
     code: 'await bb.credit.open({\n  account: "acc_92f",\n  limit: 25_000_00,\n  collateral: { asset: "BTC", qty: 0.5 }\n});' },
   { glyph: "BZ", screen: "business" as Screen, tag: "BUSINESS", endpoint: "POST /v2/orgs", title: "Business banking", short: "Teams, roles, approvals and expense rules.",
     body: "Give organisations member roles, spend policies, multi-step approvals and per-team cards. Every action is written to an immutable audit log.",
@@ -80,7 +80,8 @@ const products = [
     code: 'await bb.ledger.statement({\n  account: "acc_92f",\n  from: "2026-07-01", to: "2026-07-31"\n});' },
 ];
 
-const rails = ["SEPA", "SEPA Instant", "Faster Payments", "ACH", "Fedwire", "SWIFT", "CHAPS", "Zengin", "Interac", "PIX", "Visa", "Mastercard", "Base", "Arbitrum"];
+// Only rails the API actually implements — see RAILS in apps/api/src/kernel.js
+const rails = ["SEPA Instant", "SEPA", "Faster Payments", "ACH", "Wire", "PayNow"];
 /* Ticker and platform totals are NOT hardcoded — see useState below, populated
  * from GET /v2/site/stats and GET /v2/rails on mount. This placeholder shows
  * while that load is in flight. */
@@ -91,14 +92,12 @@ const guides = [
   { kind: "RUNBOOK", title: "Self-hosting", body: "Node stdlib + SQLite. No Docker, no external database. pnpm dev and you're running." },
 ];
 const posts = [
-  { date: "26 JUL 2026", title: "Why the ledger is double-entry", excerpt: "Single-entry balances hide reconciliation bugs until withdrawal. Here is what we record instead.", tag: "ENGINEERING" },
-  { date: "19 JUL 2026", title: "Card authorisations in 800ms", excerpt: "How we budget the round trip so your webhook can decide without timing out.", tag: "ENGINEERING" },
-  { date: "12 JUL 2026", title: "SEPA Instant, end to end", excerpt: "What actually happens in the four seconds between call and settlement.", tag: "RAILS" },
-  { date: "05 JUL 2026", title: "What open source costs us", excerpt: "A short account of hosting bills, maintainer hours and where funding comes from.", tag: "NOTES" },
-  { date: "28 JUN 2026", title: "Designing spend policies", excerpt: "Approval chains that stay legible when a company grows past fifty people.", tag: "PRODUCT" },
-  { date: "21 JUN 2026", title: "Reading the statement export", excerpt: "Every column in the CSV, what it means, and how to hand it to an accountant.", tag: "GUIDE" },
-  { date: "14 JUN 2026", title: "Four rails added this month", excerpt: "PIX, Interac, CHAPS and Zengin are live in sandbox and production.", tag: "RELEASE" },
-  { date: "07 JUN 2026", title: "Postmortem: the 40-minute FX outage", excerpt: "A rate provider silently rate-limited us. Timeline, cause and the fix.", tag: "INCIDENT" },
+  { date: "07 AUG 2026", title: "Every number on this site is now real or labelled", excerpt: "We audited our own marketing copy and found eleven invented figures — settled volume, uptime, a star count, an SDK that did not exist. All removed or wired to the live API.", tag: "NOTES" },
+  { date: "07 AUG 2026", title: "One command runs the whole stack", excerpt: "pnpm dev now starts the site and the API together, with no new dependencies. Self-hosting should not need a runbook.", tag: "RELEASE" },
+  { date: "06 AUG 2026", title: "All 144 endpoints implemented", excerpt: "Six resource-family modules built in parallel, each owning one file so they could not collide. Every catalogued endpoint now returns a real response.", tag: "RELEASE" },
+  { date: "06 AUG 2026", title: "Why unbuilt endpoints return 501, not 404", excerpt: "A 404 tells a caller they typed the URL wrong. A deliberate 501 tells them the truth: this is in the contract and not built yet.", tag: "ENGINEERING" },
+  { date: "06 AUG 2026", title: "Durable by default, on the standard library", excerpt: "Storage moved to SQLite through node:sqlite. Zero new dependencies, and your sandbox data survives a restart.", tag: "ENGINEERING" },
+  { date: "06 AUG 2026", title: "We were issuing the same routing number to everyone", excerpt: "Every USD account got one hardcoded ABA and every GBP account one sort code. Now generated per account, with real checksums.", tag: "INCIDENT" },
 ];
 const fields = [
   { label: "01 · NAME", placeholder: "Ada Lovelace" },
@@ -558,7 +557,7 @@ export default function App() {
                 <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>BULLETIN · WEEKLY</div>
                 <h1 style={{ margin: "14px 0 0", fontSize: "clamp(28px, 3.2vw, 42px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Dispatches</h1>
               </div>
-              <div style={{ fontFamily: MONO, fontSize: 11, color: "#7A8296", textAlign: "right", lineHeight: 1.7 }}>VOL. IV · NO. 26<br />ENTRIES 001–008</div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "#7A8296", textAlign: "right", lineHeight: 1.7 }}>BUILD LOG<br />ENTRIES 001–006</div>
             </div>
             <div data-pad style={{ ...card, padding: "10px 32px 26px" }}>
               {posts.map((p, i) => (
