@@ -85,6 +85,13 @@ Only starts once M1.4 lands, so every stub has a home to fill in.
 
 ---
 
+## Known gaps carried into later milestones (disclosed, not hidden)
+- **PDF statements are a base64 plaintext stand-in**, not a real PDF — no PDF library and the JSON response path can't return binary. Fix in M5 (`pdfmake` per the OSS map).
+- **`PersistentMap` caches reads and never invalidates** — two concurrent server processes would diverge. Fine at one process; fix before any horizontal scaling.
+- **Dispute reason codes are invented/generic** (R10/R12/R13/R41), deliberately not any real network's codes.
+- **Card PAN/CVV generated and held in a private collection**, never served — reveal returns only an ephemeral key.
+- **M2 verification sweeps must skip `DELETE /v2/keys`** (revoke-all) or they destroy their own credential.
+
 ## Deferred (agreed, not forgotten)
 - ~80 consumer app flows (own wave after M5)
 - Safeguarding ledger, CoP/VoP responder, clearing files — the regulated moat
@@ -96,4 +103,5 @@ Only starts once M1.4 lands, so every stub has a home to fill in.
 | Date | Endpoints responding | Milestone | Note |
 |---|---|---|---|
 | 2026-08-06 | 21 / 144 (14.6%) | M1 starting | plan v2 frozen; baseline from PM audit |
+| 2026-08-06 | **144 / 144 (100%)** | **M2 COMPLETE** | 5 agents in parallel, 0 collisions, commit 25e0ef4. Verified by lead sweep: 0 × 501, 0 × server errors, money moves end-to-end, data survives restart. |
 | 2026-08-06 | 21 / 144 (14.6%) | M1 complete | Metric unchanged by design — M1 is the credibility floor, not the count. SQLite persistence, real checksum-valid identifiers, and 144/144 legibility (21 real + 123 deliberate 501s, 0 stray 404s) landed. `git log` has its first commit. Ready for M2 fan-out. |
