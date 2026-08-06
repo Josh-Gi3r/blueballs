@@ -3,25 +3,19 @@
 
 import { createServer } from "node:http";
 import { randomBytes, createHash } from "node:crypto";
+import { hashKey } from "./lib.js";
 import {
-  ksuid, toMinor, fromMinor, ApiError, db, hashKey, emit, post, balanceOf,
-} from "./lib.js";
+  ksuid, toMinor, fromMinor, ApiError, db, emit, post, balanceOf,
+  RAILS, RATES, THIN, routes, route, isRegistered, match, need, paginate,
+} from "./kernel.js";
+import { readdir } from "node:fs/promises";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
 import { ibanGenerate, abaGenerate } from "../../../packages/validation/src/index.js";
 
 const PORT = Number(process.env.PORT || 5281);
 const VERSION = "2026-08-06";
 
-/* ---------------- rails registry (real data, queryable) ---------------- */
-const RAILS = {
-  sepa_instant: { id: "sepa_instant", currency: "EUR", speed: "seconds", cutoff: null, weekend: true, min: "0.01", max: "100000.00" },
-  sepa: { id: "sepa", currency: "EUR", speed: "next business day", cutoff: "15:00 CET", weekend: false, min: "0.01", max: "999999.00" },
-  faster_payments: { id: "faster_payments", currency: "GBP", speed: "seconds", cutoff: null, weekend: true, min: "0.01", max: "1000000.00" },
-  ach: { id: "ach", currency: "USD", speed: "1-2 business days", cutoff: "17:00 ET", weekend: false, min: "0.01", max: "25000.00" },
-  wire: { id: "wire", currency: "USD", speed: "same day", cutoff: "16:00 ET", weekend: false, min: "100.00", max: "1000000.00" },
-  paynow: { id: "paynow", currency: "SGD", speed: "seconds", cutoff: null, weekend: true, min: "0.01", max: "200000.00" },
-};
-const RATES = { USD: 1, EUR: 1.083, GBP: 1.271, SGD: 0.742, USDC: 1, MYR: 0.213 };
-const THIN = new Set(["MYR"]);
 
 /* ---------------- helpers ---------------- */
 const json = (res, status, body, extra = {}) => {
@@ -62,11 +56,6 @@ function auth(req) {
   return rec;
 }
 
-function need(body, fields) {
-  const errors = fields.filter((f) => body[f] === undefined || body[f] === "")
-    .map((f) => ({ field: f, message: "is required", code: "missing" }));
-  if (errors.length) throw new ApiError("validation-error", 400, "Some required fields are missing", errors);
-}
 
 /** Idempotency: same key + same body → cached response; same key + different body → 409. */
 async function idempotent(req, body, fn) {
@@ -85,39 +74,7 @@ async function idempotent(req, body, fn) {
   return result;
 }
 
-const paginate = (rows, url) => {
-  const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100);
-  const after = url.searchParams.get("starting_after");
-  let start = 0;
-  if (after) {
-    const i = rows.findIndex((r) => r.id === after);
-    if (i === -1) throw new ApiError("invalid-identifier", 400, `Unknown cursor ${after}`);
-    start = i + 1;
-  }
-  const page = rows.slice(start, start + limit);
-  return { object: "list", data: page, has_more: start + limit < rows.length, next_cursor: page.at(-1)?.id ?? null };
-};
 
-/* ---------------- routes ---------------- */
-const routes = [];
-const route = (method, pattern, handler, opts = {}) =>
-  routes.push({ method, parts: pattern.split("/").filter(Boolean), handler, public: !!opts.public });
-
-const match = (parts, method, path) => {
-  const seg = path.split("/").filter(Boolean);
-  for (const r of routes) {
-    if (r.method !== method || r.parts.length !== seg.length) continue;
-    const params = {};
-    let ok = true;
-    for (let i = 0; i < r.parts.length; i++) {
-      const p = r.parts[i];
-      if (p.startsWith(":")) params[p.slice(1)] = decodeURIComponent(seg[i]);
-      else if (p !== seg[i]) { ok = false; break; }
-    }
-    if (ok) return { r, params };
-  }
-  return null;
-};
 
 /* ---- discovery ---- */
 route("GET", "/v2", () => ({
@@ -410,197 +367,37 @@ route("GET", "/v2/currencies", () => ({
   data: Object.keys(RATES).map((c) => ({ code: c, thin_liquidity: THIN.has(c) })),
 }), { public: true });
 
-/* ---------------- catalogued-but-not-yet-built: deliberate 501s ----------------
- * Every endpoint below exists in src/endpoints.ts (the 144-endpoint catalogue)
- * but has no real handler yet. Registering an explicit 501 (RFC 9457) here means
- * a caller can tell "not built" apart from "wrong URL" (which stays a 404).
- * Stubs are reachable without an API key even where the catalogue marks the eventual
- * route auth:"KEY" — there is no real logic behind auth yet to protect, the full
- * catalogue (incl. which routes need a key) is already public on the docs site, and
- * gating this would just turn 401 into a second, misleading "not built" signal.
- * Real implementations enforce the documented auth as normal — see M2.
- * This block is generated from the catalogue — do not hand-edit; regenerate it
- * as families in M2 get real implementations (and delete their lines below). */
-const notImplemented = (verb, path) => () => {
-  throw new ApiError("not-implemented", 501, `${verb} ${path} is in the catalogue but not implemented yet.`);
-};
 
-/* ---- Auth & API keys (4) ---- */
-route("POST", "/v2/keys", notImplemented("POST", "/v2/keys"), { public: true }); // Issue a new API key
-route("GET", "/v2/keys/:id", notImplemented("GET", "/v2/keys/:id"), { public: true }); // Key detail and scope
-route("DELETE", "/v2/keys/:id", notImplemented("DELETE", "/v2/keys/:id"), { public: true }); // Revoke one key
-route("DELETE", "/v2/keys", notImplemented("DELETE", "/v2/keys"), { public: true }); // Revoke every key — incident response
+/* ---------------- M2 fan-out: auto-load family route modules ----------------
+ * Every file in ./routes/ is imported at boot. A family owns exactly one file
+ * and never edits this one, so parallel work cannot collide. */
+const HERE = dirname(fileURLToPath(import.meta.url));
+try {
+  const files = (await readdir(join(HERE, "routes"))).filter((f) => f.endsWith(".js")).sort();
+  for (const f of files) await import(pathToFileURL(join(HERE, "routes", f)).href);
+  if (files.length) console.log(`  loaded ${files.length} family module(s): ${files.join(", ")}`);
+} catch (e) {
+  if (e.code !== "ENOENT") throw e; // no routes/ dir yet is fine
+}
 
-/* ---- Customers (2) ---- */
-route("PATCH", "/v2/customers/:id", notImplemented("PATCH", "/v2/customers/:id"), { public: true }); // Update a customer
-route("DELETE", "/v2/customers/:id", notImplemented("DELETE", "/v2/customers/:id"), { public: true }); // Soft delete — blocked while accounts exist
-
-/* ---- Onboarding applications (14) ---- */
-route("POST", "/v2/applications", notImplemented("POST", "/v2/applications"), { public: true }); // Start an application
-route("GET", "/v2/applications/:id", notImplemented("GET", "/v2/applications/:id"), { public: true }); // Application with status and decision
-route("GET", "/v2/applications", notImplemented("GET", "/v2/applications"), { public: true }); // List applications
-route("PATCH", "/v2/applications/:id/business", notImplemented("PATCH", "/v2/applications/:id/business"), { public: true }); // Update business details
-route("PATCH", "/v2/applications/:id/individual", notImplemented("PATCH", "/v2/applications/:id/individual"), { public: true }); // Update individual details
-route("POST", "/v2/applications/:id/individuals", notImplemented("POST", "/v2/applications/:id/individuals"), { public: true }); // Add an associated individual
-route("PATCH", "/v2/applications/:id/individuals/:iid", notImplemented("PATCH", "/v2/applications/:id/individuals/:iid"), { public: true }); // Update an individual
-route("DELETE", "/v2/applications/:id/individuals/:iid", notImplemented("DELETE", "/v2/applications/:id/individuals/:iid"), { public: true }); // Remove an individual
-route("POST", "/v2/applications/:id/documents", notImplemented("POST", "/v2/applications/:id/documents"), { public: true }); // Upload a document
-route("GET", "/v2/applications/:id/documents/:did", notImplemented("GET", "/v2/applications/:id/documents/:did"), { public: true }); // Download a document
-route("DELETE", "/v2/applications/:id/documents/:did", notImplemented("DELETE", "/v2/applications/:id/documents/:did"), { public: true }); // Delete a document
-route("POST", "/v2/applications/:id/submit", notImplemented("POST", "/v2/applications/:id/submit"), { public: true }); // Submit for verification
-route("POST", "/v2/applications/:id/attestation", notImplemented("POST", "/v2/applications/:id/attestation"), { public: true }); // Submit an attestation
-route("POST", "/v2/applications/:id/edd", notImplemented("POST", "/v2/applications/:id/edd"), { public: true }); // Create or update enhanced due diligence
-
-/* ---- Accounts (2) ---- */
-route("PATCH", "/v2/accounts/:id", notImplemented("PATCH", "/v2/accounts/:id"), { public: true }); // Update an account
-route("DELETE", "/v2/accounts/:id", notImplemented("DELETE", "/v2/accounts/:id"), { public: true }); // Close an account
-
-/* ---- Receiving details (3) ---- */
-route("POST", "/v2/accounts/:id/details", notImplemented("POST", "/v2/accounts/:id/details"), { public: true }); // Issue receiving details for a rail
-route("GET", "/v2/accounts/:id/details", notImplemented("GET", "/v2/accounts/:id/details"), { public: true }); // List receiving details
-route("GET", "/v2/details/:id", notImplemented("GET", "/v2/details/:id"), { public: true }); // Retrieve one instrument
-
-/* ---- Wallets (6) ---- */
-route("POST", "/v2/wallets", notImplemented("POST", "/v2/wallets"), { public: true }); // Create a wallet
-route("GET", "/v2/wallets/:id", notImplemented("GET", "/v2/wallets/:id"), { public: true }); // Retrieve a wallet
-route("GET", "/v2/wallets", notImplemented("GET", "/v2/wallets"), { public: true }); // List wallets
-route("GET", "/v2/wallets/:id/balances", notImplemented("GET", "/v2/wallets/:id/balances"), { public: true }); // Balances across networks
-route("POST", "/v2/wallets/:id/send", notImplemented("POST", "/v2/wallets/:id/send"), { public: true }); // Send from a wallet
-route("GET", "/v2/wallets/:id/policies", notImplemented("GET", "/v2/wallets/:id/policies"), { public: true }); // Policies attached to a wallet
-
-/* ---- Recipients (3) ---- */
-route("GET", "/v2/recipients/:id", notImplemented("GET", "/v2/recipients/:id"), { public: true }); // Retrieve a recipient
-route("PATCH", "/v2/recipients/:id", notImplemented("PATCH", "/v2/recipients/:id"), { public: true }); // Update a recipient
-route("DELETE", "/v2/recipients/:id", notImplemented("DELETE", "/v2/recipients/:id"), { public: true }); // Delete a recipient
-
-/* ---- Destinations (5) ---- */
-route("POST", "/v2/recipients/:id/destinations", notImplemented("POST", "/v2/recipients/:id/destinations"), { public: true }); // Add a destination
-route("GET", "/v2/destinations/:id", notImplemented("GET", "/v2/destinations/:id"), { public: true }); // Retrieve a destination
-route("PATCH", "/v2/destinations/:id", notImplemented("PATCH", "/v2/destinations/:id"), { public: true }); // Update a destination
-route("DELETE", "/v2/destinations/:id", notImplemented("DELETE", "/v2/destinations/:id"), { public: true }); // Remove a destination
-route("POST", "/v2/destinations/:id/verify", notImplemented("POST", "/v2/destinations/:id/verify"), { public: true }); // Confirmation of Payee name check
-
-/* ---- Quotes & exchange (3) ---- */
-route("POST", "/v2/quotes/:id/execute", notImplemented("POST", "/v2/quotes/:id/execute"), { public: true }); // Execute a held quote
-route("GET", "/v2/rates", notImplemented("GET", "/v2/rates"), { public: true }); // Indicative rate, not lockable
-route("GET", "/v2/pairs", notImplemented("GET", "/v2/pairs"), { public: true }); // Supported pairs and depth
-
-/* ---- Transfers (2) ---- */
-route("POST", "/v2/transfers/:id/cancel", notImplemented("POST", "/v2/transfers/:id/cancel"), { public: true }); // Cancel before funding
-route("GET", "/v2/transfers/:id/legs", notImplemented("GET", "/v2/transfers/:id/legs"), { public: true }); // Legs with their own rail and status
-
-/* ---- Cards (10) ---- */
-route("POST", "/v2/cards", notImplemented("POST", "/v2/cards"), { public: true }); // Issue a virtual or physical card
-route("GET", "/v2/cards/:id", notImplemented("GET", "/v2/cards/:id"), { public: true }); // Card with status and reason
-route("GET", "/v2/cards", notImplemented("GET", "/v2/cards"), { public: true }); // List cards
-route("POST", "/v2/cards/:id/freeze", notImplemented("POST", "/v2/cards/:id/freeze"), { public: true }); // Freeze a card
-route("POST", "/v2/cards/:id/unfreeze", notImplemented("POST", "/v2/cards/:id/unfreeze"), { public: true }); // Unfreeze a card
-route("POST", "/v2/cards/:id/pin", notImplemented("POST", "/v2/cards/:id/pin"), { public: true }); // Get a secure PIN update link
-route("POST", "/v2/cards/:id/reveal", notImplemented("POST", "/v2/cards/:id/reveal"), { public: true }); // Ephemeral key for PCI-safe reveal
-route("PATCH", "/v2/cards/:id/controls", notImplemented("PATCH", "/v2/cards/:id/controls"), { public: true }); // Limits and merchant categories
-route("GET", "/v2/cards/:id/transactions", notImplemented("GET", "/v2/cards/:id/transactions"), { public: true }); // Card transactions
-route("GET", "/v2/cards/:id/statements", notImplemented("GET", "/v2/cards/:id/statements"), { public: true }); // Card statements
-
-/* ---- Authorisations (4) ---- */
-route("GET", "/v2/authorisations/:id", notImplemented("GET", "/v2/authorisations/:id"), { public: true }); // Retrieve an authorisation
-route("GET", "/v2/authorisations", notImplemented("GET", "/v2/authorisations"), { public: true }); // List pending and cleared
-route("POST", "/v2/authorisations/:id/approve", notImplemented("POST", "/v2/authorisations/:id/approve"), { public: true }); // Approve in real time
-route("POST", "/v2/authorisations/:id/decline", notImplemented("POST", "/v2/authorisations/:id/decline"), { public: true }); // Decline in real time
-
-/* ---- Disputes (4) ---- */
-route("POST", "/v2/disputes", notImplemented("POST", "/v2/disputes"), { public: true }); // Raise a dispute
-route("GET", "/v2/disputes/:id", notImplemented("GET", "/v2/disputes/:id"), { public: true }); // Dispute with reason code and deadline
-route("GET", "/v2/disputes", notImplemented("GET", "/v2/disputes"), { public: true }); // List disputes
-route("POST", "/v2/disputes/:id/evidence", notImplemented("POST", "/v2/disputes/:id/evidence"), { public: true }); // Submit evidence
-
-/* ---- Savings vaults (6) ---- */
-route("POST", "/v2/vaults", notImplemented("POST", "/v2/vaults"), { public: true }); // Create a vault
-route("GET", "/v2/vaults/:id", notImplemented("GET", "/v2/vaults/:id"), { public: true }); // Vault and accrued interest
-route("GET", "/v2/vaults", notImplemented("GET", "/v2/vaults"), { public: true }); // List vaults
-route("POST", "/v2/vaults/:id/deposit", notImplemented("POST", "/v2/vaults/:id/deposit"), { public: true }); // Deposit into a vault
-route("POST", "/v2/vaults/:id/withdraw", notImplemented("POST", "/v2/vaults/:id/withdraw"), { public: true }); // Withdraw on demand
-route("DELETE", "/v2/vaults/:id", notImplemented("DELETE", "/v2/vaults/:id"), { public: true }); // Close a vault
-
-/* ---- Credit lines (6) ---- */
-route("POST", "/v2/credit", notImplemented("POST", "/v2/credit"), { public: true }); // Open a credit line
-route("GET", "/v2/credit/:id", notImplemented("GET", "/v2/credit/:id"), { public: true }); // Limit, drawn balance and LTV
-route("GET", "/v2/credit", notImplemented("GET", "/v2/credit"), { public: true }); // List credit lines
-route("POST", "/v2/credit/:id/draw", notImplemented("POST", "/v2/credit/:id/draw"), { public: true }); // Draw down
-route("POST", "/v2/credit/:id/repay", notImplemented("POST", "/v2/credit/:id/repay"), { public: true }); // Repay
-route("PATCH", "/v2/credit/:id/collateral", notImplemented("PATCH", "/v2/credit/:id/collateral"), { public: true }); // Adjust collateral
-
-/* ---- Policies (9) ---- */
-route("POST", "/v2/policies", notImplemented("POST", "/v2/policies"), { public: true }); // Create a policy
-route("GET", "/v2/policies/:id", notImplemented("GET", "/v2/policies/:id"), { public: true }); // Retrieve a policy
-route("GET", "/v2/policies", notImplemented("GET", "/v2/policies"), { public: true }); // List policies
-route("DELETE", "/v2/policies/:id", notImplemented("DELETE", "/v2/policies/:id"), { public: true }); // Delete a policy
-route("POST", "/v2/policies/:id/rules", notImplemented("POST", "/v2/policies/:id/rules"), { public: true }); // Add a rule
-route("PATCH", "/v2/policies/:id/rules/:rid", notImplemented("PATCH", "/v2/policies/:id/rules/:rid"), { public: true }); // Update a rule
-route("DELETE", "/v2/policies/:id/rules/:rid", notImplemented("DELETE", "/v2/policies/:id/rules/:rid"), { public: true }); // Remove a rule
-route("POST", "/v2/policies/:id/attach", notImplemented("POST", "/v2/policies/:id/attach"), { public: true }); // Attach to a resource
-route("POST", "/v2/policies/:id/detach", notImplemented("POST", "/v2/policies/:id/detach"), { public: true }); // Detach from a resource
-
-/* ---- Approval chains (5) ---- */
-route("POST", "/v2/approval-chains", notImplemented("POST", "/v2/approval-chains"), { public: true }); // Create a chain
-route("GET", "/v2/approval-chains/:id", notImplemented("GET", "/v2/approval-chains/:id"), { public: true }); // Retrieve a chain
-route("GET", "/v2/approvals", notImplemented("GET", "/v2/approvals"), { public: true }); // Pending approvals inbox
-route("POST", "/v2/approvals/:id/approve", notImplemented("POST", "/v2/approvals/:id/approve"), { public: true }); // Approve a step
-route("POST", "/v2/approvals/:id/reject", notImplemented("POST", "/v2/approvals/:id/reject"), { public: true }); // Reject a step
-
-/* ---- Organisations (6) ---- */
-route("POST", "/v2/orgs", notImplemented("POST", "/v2/orgs"), { public: true }); // Create an organisation
-route("GET", "/v2/orgs/:id", notImplemented("GET", "/v2/orgs/:id"), { public: true }); // Retrieve an organisation
-route("PATCH", "/v2/orgs/:id", notImplemented("PATCH", "/v2/orgs/:id"), { public: true }); // Update an organisation
-route("POST", "/v2/orgs/:id/members", notImplemented("POST", "/v2/orgs/:id/members"), { public: true }); // Invite a member with a role
-route("GET", "/v2/orgs/:id/members", notImplemented("GET", "/v2/orgs/:id/members"), { public: true }); // List members and roles
-route("DELETE", "/v2/orgs/:id/members/:mid", notImplemented("DELETE", "/v2/orgs/:id/members/:mid"), { public: true }); // Remove a member
-
-/* ---- Ledger & statements (3) ---- */
-route("GET", "/v2/ledger/balances", notImplemented("GET", "/v2/ledger/balances"), { public: true }); // Balances at a point in time
-route("POST", "/v2/statements", notImplemented("POST", "/v2/statements"), { public: true }); // Generate a statement
-route("GET", "/v2/statements/:id", notImplemented("GET", "/v2/statements/:id"), { public: true }); // CSV, PDF or signed JSON
-
-/* ---- Fees (2) ---- */
-route("GET", "/v2/fees/config", notImplemented("GET", "/v2/fees/config"), { public: true }); // Current fee configuration
-route("PUT", "/v2/fees/config", notImplemented("PUT", "/v2/fees/config"), { public: true }); // Set the fee payout destination
-
-/* ---- Rails registry (1) ---- */
-route("GET", "/v2/rails/:id/calendar", notImplemented("GET", "/v2/rails/:id/calendar"), { public: true }); // Business days and holidays
-
-/* ---- QR & payment links (4) ---- */
-route("POST", "/v2/qr/decode", notImplemented("POST", "/v2/qr/decode"), { public: true }); // Decode a merchant or consumer QR
-route("POST", "/v2/qr/generate", notImplemented("POST", "/v2/qr/generate"), { public: true }); // Generate an EMVCo QR payload
-route("POST", "/v2/links", notImplemented("POST", "/v2/links"), { public: true }); // Create a payment link
-route("GET", "/v2/links/:id", notImplemented("GET", "/v2/links/:id"), { public: true }); // Link status and payments
-
-/* ---- Bills & subscriptions (4) ---- */
-route("POST", "/v2/mandates", notImplemented("POST", "/v2/mandates"), { public: true }); // Create a direct debit mandate
-route("GET", "/v2/mandates/:id", notImplemented("GET", "/v2/mandates/:id"), { public: true }); // Mandate status
-route("POST", "/v2/subscriptions", notImplemented("POST", "/v2/subscriptions"), { public: true }); // Create a recurring payment
-route("GET", "/v2/subscriptions", notImplemented("GET", "/v2/subscriptions"), { public: true }); // List subscriptions
-
-/* ---- Webhooks (7) ---- */
-route("POST", "/v2/webhooks", notImplemented("POST", "/v2/webhooks"), { public: true }); // Create a target
-route("GET", "/v2/webhooks/:id", notImplemented("GET", "/v2/webhooks/:id"), { public: true }); // Retrieve a target
-route("GET", "/v2/webhooks", notImplemented("GET", "/v2/webhooks"), { public: true }); // List targets
-route("PATCH", "/v2/webhooks/:id", notImplemented("PATCH", "/v2/webhooks/:id"), { public: true }); // Update a target
-route("DELETE", "/v2/webhooks/:id", notImplemented("DELETE", "/v2/webhooks/:id"), { public: true }); // Delete a target
-route("GET", "/v2/webhooks/:id/deliveries", notImplemented("GET", "/v2/webhooks/:id/deliveries"), { public: true }); // Delivery history
-route("POST", "/v2/webhooks/deliveries/:did/replay", notImplemented("POST", "/v2/webhooks/deliveries/:did/replay"), { public: true }); // Replay a delivery
-
-/* ---- Events (1) ---- */
-route("GET", "/v2/events/:id", notImplemented("GET", "/v2/events/:id"), { public: true }); // Retrieve one event
-
-/* ---- Sandbox (5) ---- */
-route("GET", "/v2/sandbox/scenarios", notImplemented("GET", "/v2/sandbox/scenarios"), { public: true }); // Scenario catalogue
-route("POST", "/v2/sandbox/payments", notImplemented("POST", "/v2/sandbox/payments"), { public: true }); // Simulate an inbound payment
-route("POST", "/v2/sandbox/onboarding", notImplemented("POST", "/v2/sandbox/onboarding"), { public: true }); // Simulate an onboarding transition
-route("POST", "/v2/sandbox/:id/advance", notImplemented("POST", "/v2/sandbox/:id/advance"), { public: true }); // Advance a paused simulation
-route("GET", "/v2/sandbox/:id", notImplemented("GET", "/v2/sandbox/:id"), { public: true }); // Simulation and callback history
-
-/* ---- Reference data (2) ---- */
-route("GET", "/v2/countries", notImplemented("GET", "/v2/countries"), { public: true }); // Supported countries
-route("GET", "/v2/networks", notImplemented("GET", "/v2/networks"), { public: true }); // Supported blockchain networks
+/* ---------------- deliberate 501s, derived from the catalogue ----------------
+ * Anything in src/endpoints.ts without a real handler answers 501, not 404, so a
+ * caller can tell "not built yet" from "wrong URL". Implement a route and its stub
+ * disappears automatically — nothing to hand-maintain. */
+const CATALOGUE = join(HERE, "..", "..", "..", "src", "endpoints.ts");
+let stubbed = 0;
+try {
+  const src = await (await import("node:fs/promises")).readFile(CATALOGUE, "utf8");
+  for (const [, verb, path] of src.matchAll(/verb:\s*"(\w+)",\s*path:\s*"([^"]+)"/g)) {
+    if (isRegistered(verb, path)) continue;
+    route(verb, path, () => {
+      throw new ApiError("not-implemented", 501, `${verb} ${path} is in the catalogue but not implemented yet.`);
+    }, { public: true });
+    stubbed++;
+  }
+} catch (e) {
+  console.warn("  could not read the endpoint catalogue:", e.message);
+}
 
 /* ---------------- request pipeline ---------------- */
 const server = createServer(async (req, res) => {
@@ -609,7 +406,7 @@ const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") return json(res, 204, {});
 
   try {
-    const hit = match(url.pathname, req.method, url.pathname);
+    const hit = match(req.method, url.pathname);
     if (!hit) throw new ApiError("not-found", 404, `No route for ${req.method} ${url.pathname}`);
 
     const body = ["POST", "PATCH", "PUT"].includes(req.method) ? await readBody(req) : {};
@@ -629,6 +426,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
+  console.log(`  ${routes.length - stubbed} implemented · ${stubbed} deliberate 501s · ${routes.length} catalogued`);
   console.log(`
 ╔════════════════════════════════════════════════════════╗
 ║  Blueballs API                                         ║
