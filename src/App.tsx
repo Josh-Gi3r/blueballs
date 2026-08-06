@@ -3,6 +3,7 @@ import { usePath } from "./router";
 import { FAMILIES, TOTAL_ENDPOINTS } from "./endpoints";
 import PhoneScreen, { type Screen } from "./PhoneScreen";
 import { TryIt, KeyIssuer, ApiStatus } from "./TryIt";
+import Journey from "./Journey";
 import { call, getStats, ensureKey, type SiteStats } from "./api";
 
 /* ------------------------------------------------------------------ */
@@ -44,6 +45,7 @@ function H({ as = "div", style, hover, focus, children, onClick, type, ...rest }
 }
 
 const SCREENS: Screen[] = ["accounts", "cards", "transfers", "exchange", "vaults", "credit", "business", "ledger"];
+// products[0..7] have a phone screen; the rest are screen: null and link to the docs.
 
 const products = [
   { glyph: "AC", screen: "accounts" as Screen, tag: "ACCOUNTS", endpoint: "POST /v2/accounts", title: "Accounts", short: "Multi-currency accounts with real IBANs and sortcodes.",
@@ -78,6 +80,36 @@ const products = [
     body: "Every movement lands in a double-entry ledger you can query, stream or export. Statements are produced as CSV, PDF or signed JSON for auditors.",
     rows: [{ k: "MODEL", v: "DOUBLE-ENTRY" }, { k: "EXPORTS", v: "CSV · PDF · JSON" }, { k: "EVENTS", v: "SIGNED WEBHOOKS" }, { k: "RETENTION", v: "10 YEARS" }],
     code: 'await bb.ledger.statement({\n  account: "acc_92f",\n  from: "2026-07-01", to: "2026-07-31"\n});' },
+  // Products with no phone screen of their own — they show on the tiles and the
+  // products page, and link into the docs rather than pinning a hero screen.
+  { glyph: "KY", screen: null, tag: "ONBOARDING", endpoint: "POST /v2/applications", title: "Onboarding & KYC", short: "KYC and KYB with status kept separate from the decision.",
+    body: "Run individual and business onboarding: collect details, add associated individuals, upload documents, submit for verification and record enhanced due diligence. Lifecycle status never collapses into the outcome, so a review still running never looks like a rejection.",
+    rows: [{ k: "ENDPOINTS", v: "14" }, { k: "STATUS", v: "SEPARATE FROM DECISION" }, { k: "DOCUMENTS", v: "UPLOAD · FETCH" }, { k: "EDD", v: "SUPPORTED" }],
+    code: 'await bb.applications.create({\n  customer: "cus_41c",\n  type: "business"\n});\n\n// → { status: "pending", decision: null }' },
+  { glyph: "QR", screen: null, tag: "QR", endpoint: "POST /v2/qr/generate", title: "QR & payment links", short: "EMVCo QR both ways, plus shareable payment links.",
+    body: "Generate a real EMVCo merchant-presented payload with a CRC-16 checksum, decode one back into structured fields, and reject anything tampered with. Static and dynamic both supported, alongside single-use payment links.",
+    rows: [{ k: "STANDARD", v: "EMVCo MPM" }, { k: "CHECKSUM", v: "CRC-16/CCITT" }, { k: "TYPES", v: "STATIC · DYNAMIC" }, { k: "TAMPERING", v: "REJECTED" }],
+    code: 'await bb.qr.generate({\n  merchant: { name: "Coffee Corner" },\n  currency: "SGD", amount: "23.75"\n});' },
+  { glyph: "WL", screen: null, tag: "WALLETS", endpoint: "POST /v2/wallets", title: "Wallets", short: "On-chain balances with policies attached.",
+    body: "Create wallets under a customer, read balances per asset and network, and send with spend policies and approval chains enforced before anything moves.",
+    rows: [{ k: "ENDPOINTS", v: "6" }, { k: "POLICIES", v: "ATTACHABLE" }, { k: "APPROVALS", v: "THRESHOLD-GATED" }, { k: "LEDGER", v: "DOUBLE-ENTRY" }],
+    code: 'await bb.wallets.send({\n  wallet: "wal_7a2",\n  to: "0x8f2c…", amount: "250.00"\n});' },
+  { glyph: "WH", screen: null, tag: "WEBHOOKS", endpoint: "POST /v2/webhooks", title: "Webhooks & events", short: "Signed delivery, a delivery log, and replay.",
+    body: "Register targets and receive HMAC-signed callbacks on every state change. Thirty days of delivery history, and a replay that carries an explicit header so a receiver can tell it from an original.",
+    rows: [{ k: "SIGNING", v: "HMAC-SHA256" }, { k: "HISTORY", v: "30 DAYS" }, { k: "REPLAY", v: "X-WEBHOOK-REPLAY" }, { k: "EVENTS", v: "FULL AUDIT STREAM" }],
+    code: 'await bb.webhooks.create({\n  url: "https://you.dev/hook",\n  events: ["transfer.status_changed"]\n});' },
+  { glyph: "SB", screen: null, tag: "SANDBOX", endpoint: "GET /v2/sandbox/scenarios", title: "Sandbox & failure injection", short: "Force any failure on purpose, then step past it.",
+    body: "A discoverable scenario catalogue covering compliance holds, manual review and unconfirmed payments. Stateful simulations pause mid-flow and wait for an explicit advance, so you can build against failure instead of hoping.",
+    rows: [{ k: "SCENARIOS", v: "CATALOGUED" }, { k: "PAUSE", v: "AWAITING_ADVANCE" }, { k: "IDEMPOTENT", v: "ON SIMULATION ID" }, { k: "CALLBACKS", v: "TRACKED" }],
+    code: 'await bb.sandbox.onboarding({\n  scenario: "onboarding.compliance_hold"\n});\n\n// → { awaiting_advance: true }' },
+  { glyph: "BL", screen: null, tag: "BILLS", endpoint: "POST /v2/mandates", title: "Bills & subscriptions", short: "Direct debit mandates and recurring payments.",
+    body: "Create a mandate, then schedule recurring payments against it. Mandate status is checked before a subscription can be created, so a dead mandate cannot quietly keep charging.",
+    rows: [{ k: "MANDATES", v: "SCHEME-AWARE" }, { k: "SCHEDULE", v: "INTERVAL + NEXT RUN" }, { k: "GUARD", v: "INACTIVE → 409" }, { k: "ENDPOINTS", v: "4" }],
+    code: 'await bb.subscriptions.create({\n  mandate: "mnd_9f4",\n  amount: "12.99", interval: "month"\n});' },
+  { glyph: "RL", screen: null, tag: "RAILS", endpoint: "GET /v2/rails", title: "Rails registry", short: "Cut-offs and calendars as data, not a docs table.",
+    body: "Every rail's currency, speed, cut-off, weekend behaviour and limits are queryable at runtime. Stop hardcoding which rails are open when — ask the API.",
+    rows: [{ k: "RAILS", v: "6" }, { k: "CUT-OFFS", v: "QUERYABLE" }, { k: "CALENDAR", v: "PER RAIL" }, { k: "AUTH", v: "PUBLIC" }],
+    code: 'await bb.rails.get("ach");\n\n// → { cutoff: "17:00 ET",\n//     weekend: false }' },
 ];
 
 // Only rails the API actually implements — see RAILS in apps/api/src/kernel.js
@@ -328,10 +360,10 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {products.map((p) => {
+                  {products.filter((p) => p.screen).map((p) => {
                     const on = p.screen === screen;
                     return (
-                      <H key={p.screen} as="button" onClick={show(p.screen)}
+                      <H key={p.screen} as="button" onClick={show(p.screen!)}
                         style={{ cursor: "pointer", fontSize: 12, fontWeight: 500, padding: "7px 12px", borderRadius: 999, border: `1px solid ${on ? "#5A6DB8" : "#D7DBE4"}`, background: on ? "#5A6DB8" : "#FFFFFF", color: on ? "#FFFFFF" : "#454B5C" }}
                         hover={{ borderColor: "#5A6DB8" }}>{p.title}</H>
                     );
@@ -342,11 +374,11 @@ export default function App() {
             </div>
 
             {/* product tiles */}
-            <div data-col style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            <div className="bb-product-grid">
               {products.map((p) => {
                 const on = p.screen === screen;
                 return (
-                  <H key={p.title} onClick={show(p.screen)}
+                  <H key={p.title} onClick={() => { if (p.screen) show(p.screen)(); else setPage("dev"); }}
                     style={{ background: on ? "#F4F6FB" : "#FFFFFF", border: `1px solid ${on ? "#5A6DB8" : "#D7DBE4"}`, borderRadius: 16, padding: "22px 20px 20px", display: "flex", flexDirection: "column", gap: 9, cursor: "pointer" }}
                     hover={{ borderColor: "#5A6DB8" }}>
                     <div style={{ width: 28, height: 28, borderRadius: 8, background: "#EEF1FA", border: "1px solid #DADFF2", color: "#4E5FA6", fontFamily: MONO, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.glyph}</div>
@@ -403,7 +435,7 @@ export default function App() {
             </div>
             <div className="bb-product-grid">
               {products.map((p) => (
-                <H key={p.title} onClick={() => { setScreen(p.screen); setPinned(true); setPage("home"); }}
+                <H key={p.title} onClick={() => { if (p.screen) { setScreen(p.screen); setPinned(true); setPage("home"); } else { setPage("dev"); } }}
                   style={{ ...card, padding: "22px 22px 20px", display: "flex", flexDirection: "column", gap: 11, cursor: "pointer" }}
                   hover={{ borderColor: "#5A6DB8" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
@@ -422,11 +454,13 @@ export default function App() {
                   </div>
                   <div style={{ marginTop: "auto", paddingTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <span style={{ fontFamily: MONO, fontSize: 10.5, color: "#7A8296" }}>{p.endpoint}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: "#4E5FA6" }}>SEE IT →</span>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: "#4E5FA6" }}>{p.screen ? "SEE IT →" : "DOCS →"}</span>
                   </div>
                 </H>
               ))}
             </div>
+
+            <Journey />
 
             {/* EVERY RESOURCE FAMILY — the full surface, not just the headline eight */}
             <div data-pad style={{ ...card, padding: "34px 34px 30px", marginTop: 4 }}>
