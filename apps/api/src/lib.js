@@ -188,6 +188,11 @@ class PersistentEvents {
   [Symbol.iterator]() { return this._all()[Symbol.iterator](); }
 }
 
+/** Create a durable, Map-shaped collection. Route modules use this instead of
+ *  `new Map()` so new resource types survive a restart like everything else.
+ *  Usage:  const cards = collection("cards");  // then .get/.set/.values() as normal */
+export function collection(name) { return new PersistentMap(name); }
+
 export const db = {
   keys: new PersistentMap("keys"),               // hashedKey -> { id, customer, scope, created_at }
   customers: new PersistentMap("customers"),

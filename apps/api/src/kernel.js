@@ -9,9 +9,9 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { ksuid, toMinor, fromMinor, ApiError, db, emit, post, balanceOf } from "./lib.js";
+import { ksuid, toMinor, fromMinor, ApiError, db, emit, post, balanceOf, collection } from "./lib.js";
 
-export { ksuid, toMinor, fromMinor, ApiError, db, emit, post, balanceOf, randomBytes };
+export { ksuid, toMinor, fromMinor, ApiError, db, emit, post, balanceOf, collection, randomBytes };
 
 /* ---------------- reference tables ---------------- */
 export const RAILS = {
