@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 /* Faithful port of `PhoneScreen.dc.html`.
    One prop: screen — accounts | cards | transfers | exchange | vaults | credit | business | ledger */
@@ -20,8 +20,6 @@ const knob = (on: boolean): CSSProperties => ({
   width: 19, height: 19, borderRadius: 999, background: "#FFFFFF",
 });
 
-const BARS = [38, 44, 41, 52, 48, 55, 50, 46, 58, 61, 54, 49, 57, 63, 60, 55, 66, 70, 64, 59, 68, 74, 71, 78];
-
 const accounts = [
   { sym: "€", name: "EUR main", sub: "DE89 3704 •••• 4417", amount: "€18,402.10" },
   { sym: "£", name: "GBP account", sub: "04-00-72 •••• 8823", amount: "£3,109.55" },
@@ -37,11 +35,6 @@ const rails = [
   { name: "SEPA Instant", sub: "Arrives in seconds", fee: "Free", sel: true },
   { name: "SWIFT", sub: "1–2 business days", fee: "€6.00", sel: false },
   { name: "USDC · Base", sub: "Arrives in ~20 seconds", fee: "€0.40", sel: false },
-];
-const quoteRows = [
-  { k: "Rate", v: "1 EUR = 0.85216 GBP" },
-  { k: "Spread (4 bps)", v: "€4.00" },
-  { k: "Arrives", v: "Instantly" },
 ];
 const vaultRules = [
   { title: "Round up spare change", sub: "To the nearest €1", on: true },
@@ -66,11 +59,101 @@ const entries = [
   { date: "14/07", name: "Card settlement", acct: "DR 6100 / CR 1001", amount: "− €321.28", color: "#14161C" },
 ];
 
-export default function PhoneScreen({ screen = "accounts" }: { screen?: Screen }) {
+export type FxQuote = {
+  rate: string; spread_bps: number; settlement: string; expires_at: string;
+  receives: { amount: string; currency: string };
+};
+
+const fmt = (v: string | number) =>
+  Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** The FROM amount every live quote below is priced against — kept in sync with
+ *  the POST /v2/quotes call App.tsx fires for this same amount. */
+const FX_SAMPLE_EUR = 10000;
+
+/** Live exchange screen: a real quote from POST /v2/quotes, not a rate table. */
+function ExchangeScreen({ fxQuote, fxErr }: { fxQuote?: FxQuote | null; fxErr?: boolean }) {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!fxQuote) { setSecondsLeft(null); return; }
+    const tick = () => setSecondsLeft(Math.max(0, Math.round((Date.parse(fxQuote.expires_at) - Date.now()) / 1000)));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [fxQuote]);
+
+  const spreadEur = fxQuote ? (FX_SAMPLE_EUR * fxQuote.spread_bps) / 10000 : null;
+  const expired = secondsLeft !== null && secondsLeft <= 0;
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ padding: "14px 20px 8px", fontSize: 19, fontWeight: 600, letterSpacing: "-0.03em" }}>Exchange</div>
+      <div style={{ padding: "4px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ ...white, borderRadius: 16, padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", color: "#7A8296" }}><span>FROM</span><span>BAL €18,402.10</span></div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+            <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em" }}>{fmt(FX_SAMPLE_EUR)}</div>
+            <div style={{ border: "1px solid #DDE1E8", borderRadius: 999, padding: "7px 13px", fontFamily: MONO, fontSize: 12 }}>EUR ▾</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", margin: "-18px 0", position: "relative", zIndex: 1 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 999, background: "#FFFFFF", border: "1px solid #DDE1E8", display: "flex", alignItems: "center", justifyContent: "center", color: "#5A6DB8" }}>⇅</div>
+        </div>
+        <div style={{ ...white, borderRadius: 16, padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", color: "#7A8296" }}>
+            <span>TO</span><span>{fxQuote ? `MID + ${fxQuote.spread_bps} BPS` : "MID + BPS"}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+            <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em", color: "#4E5FA6" }}>
+              {fxQuote ? fmt(fxQuote.receives.amount) : fxErr ? "—" : "…"}
+            </div>
+            <div style={{ border: "1px solid #DDE1E8", borderRadius: 999, padding: "7px 13px", fontFamily: MONO, fontSize: 12 }}>GBP ▾</div>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: "12px 20px 4px", display: "flex", flexDirection: "column", gap: 7 }}>
+        {fxQuote ? (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>Rate</span><span style={{ color: "#14161C" }}>1 EUR = {fxQuote.rate} GBP</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>Spread ({fxQuote.spread_bps} bps)</span><span style={{ color: "#14161C" }}>€{spreadEur!.toFixed(2)}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>Arrives</span><span style={{ color: "#14161C" }}>{fxQuote.settlement === "instant" ? "Instantly" : "When matched"}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>Quote expires</span><span style={{ color: expired ? "#B4453C" : "#14161C" }}>{expired ? "expired" : `${secondsLeft}s`}</span></div>
+          </>
+        ) : fxErr ? (
+          <div style={{ fontSize: 12.5, color: "#B4453C" }}>Could not reach the API for a live quote. Is it running on :5290?</div>
+        ) : (
+          <div style={{ fontSize: 12.5, color: "#7A8296" }}>Fetching a real quote from POST /v2/quotes…</div>
+        )}
+      </div>
+      <div style={{ margin: "10px 20px 0", ...white, borderRadius: 16, padding: "13px 16px", fontSize: 11.5, lineHeight: 1.55, color: "#5B6376" }}>
+        This card is the literal response of <span style={{ fontFamily: MONO }}>POST /v2/quotes</span> for €{fmt(FX_SAMPLE_EUR)} → GBP, called live when this page loaded.
+      </div>
+      <div style={{ marginTop: "auto", padding: "14px 20px 22px" }}>
+        <div style={{ background: expired ? "#DDE1E8" : "#5A6DB8", color: expired ? "#7A8296" : "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
+          {fxQuote ? (expired ? "Quote expired · re-quote" : `Convert · rate holds ${secondsLeft}s`) : "Convert"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PhoneScreen({ screen = "accounts", fxQuote, fxErr }: {
+  screen?: Screen; fxQuote?: FxQuote | null; fxErr?: boolean;
+}) {
+  const isLive = screen === "exchange" && !!fxQuote;
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ width: 328, border: "1px solid #C9CEDA", borderRadius: 44, background: "#14161C", padding: 10, boxShadow: "0 18px 40px rgba(20,22,28,0.16)" }}>
         <div style={{ background: "#F4F5F8", borderRadius: 35, overflow: "hidden", height: 660, display: "flex", flexDirection: "column", position: "relative" }}>
+
+          {/* Honesty label — every screen here is a mock-up except Exchange once a
+              real quote has loaded, which is called out with LIVE instead. */}
+          <div style={{
+            position: "absolute", top: 14, right: 14, zIndex: 2,
+            fontFamily: MONO, fontSize: 9, letterSpacing: "0.12em", padding: "3px 8px", borderRadius: 999,
+            background: isLive ? "#E7F3EC" : "#F0F1F5", color: isLive ? "#2E7D53" : "#7A8296",
+            border: `1px solid ${isLive ? "#BEE3CE" : "#DDE1E8"}`,
+          }}>{isLive ? "LIVE QUOTE" : "ILLUSTRATIVE"}</div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 24px 4px", fontSize: 12, fontWeight: 600, letterSpacing: "-0.01em" }}>
             <span>9:41</span>
@@ -197,46 +280,9 @@ export default function PhoneScreen({ screen = "accounts" }: { screen?: Screen }
             </div>
           )}
 
-          {/* ---------- EXCHANGE ---------- */}
+          {/* ---------- EXCHANGE — wired to a real POST /v2/quotes result ---------- */}
           {screen === "exchange" && (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px 8px", fontSize: 19, fontWeight: 600, letterSpacing: "-0.03em" }}>Exchange</div>
-              <div style={{ padding: "4px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ ...white, borderRadius: 16, padding: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", color: "#7A8296" }}><span>FROM</span><span>BAL €18,402.10</span></div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-                    <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em" }}>10,000</div>
-                    <div style={{ border: "1px solid #DDE1E8", borderRadius: 999, padding: "7px 13px", fontFamily: MONO, fontSize: 12 }}>EUR ▾</div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", justifyContent: "center", margin: "-18px 0", position: "relative", zIndex: 1 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 999, background: "#FFFFFF", border: "1px solid #DDE1E8", display: "flex", alignItems: "center", justifyContent: "center", color: "#5A6DB8" }}>⇅</div>
-                </div>
-                <div style={{ ...white, borderRadius: 16, padding: 16 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", color: "#7A8296" }}><span>TO</span><span>MID + 4 BPS</span></div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-                    <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em", color: "#4E5FA6" }}>8,521.63</div>
-                    <div style={{ border: "1px solid #DDE1E8", borderRadius: 999, padding: "7px 13px", fontFamily: MONO, fontSize: 12 }}>GBP ▾</div>
-                  </div>
-                </div>
-              </div>
-              <div style={{ padding: "12px 20px 4px", display: "flex", flexDirection: "column", gap: 7 }}>
-                {quoteRows.map((q) => (
-                  <div key={q.k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>{q.k}</span><span style={{ color: "#14161C" }}>{q.v}</span></div>
-                ))}
-              </div>
-              <div style={{ margin: "10px 20px 0", ...white, borderRadius: 16, padding: "14px 16px" }}>
-                <div style={{ ...label, letterSpacing: "0.14em", marginBottom: 10 }}>EUR / GBP · 30 DAYS</div>
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 52 }}>
-                  {BARS.map((h, i) => (
-                    <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 2, background: i > 19 ? "#5A6DB8" : "#DDE3F2" }} />
-                  ))}
-                </div>
-              </div>
-              <div style={{ marginTop: "auto", padding: "14px 20px 22px" }}>
-                <div style={{ background: "#5A6DB8", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Convert · rate holds 30s</div>
-              </div>
-            </div>
+            <ExchangeScreen fxQuote={fxQuote} fxErr={fxErr} />
           )}
 
           {/* ---------- VAULTS ---------- */}

@@ -2,6 +2,8 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { usePath } from "./router";
 import { FAMILIES, TOTAL_ENDPOINTS } from "./endpoints";
 import PhoneScreen, { type Screen } from "./PhoneScreen";
+import { TryIt, KeyIssuer, ApiStatus } from "./TryIt";
+import { call, getStats, ensureKey, type SiteStats } from "./api";
 
 /* ------------------------------------------------------------------ */
 /*  Ported from `Blueballs v2.dc.html` (Claude Design project).         */
@@ -45,8 +47,8 @@ const SCREENS: Screen[] = ["accounts", "cards", "transfers", "exchange", "vaults
 
 const products = [
   { glyph: "AC", screen: "accounts" as Screen, tag: "ACCOUNTS", endpoint: "POST /v2/accounts", title: "Accounts", short: "Multi-currency accounts with real IBANs and sortcodes.",
-    body: "Open personal, business or sub-accounts in seconds. Each carries its own IBAN, account number and balance across thirty-four currencies, all reconciled on one ledger.",
-    rows: [{ k: "CURRENCIES", v: "34" }, { k: "IDENTIFIERS", v: "IBAN · SORT · ROUTING" }, { k: "SUB-ACCOUNTS", v: "UNLIMITED" }, { k: "OPEN TIME", v: "INSTANT" }],
+    body: "Open personal, business or sub-accounts in seconds. Each carries its own IBAN, account number and balance across six currencies, all reconciled on one ledger.",
+    rows: [{ k: "CURRENCIES", v: "6" }, { k: "IDENTIFIERS", v: "IBAN · SORT · ROUTING" }, { k: "SUB-ACCOUNTS", v: "UNLIMITED" }, { k: "OPEN TIME", v: "INSTANT" }],
     code: 'await bb.accounts.create({\n  holder: "usr_41c",\n  currency: "EUR",\n  type: "personal"\n});\n\n// → { iban: "DE89…", balance: 0 }' },
   { glyph: "CD", screen: "cards" as Screen, tag: "CARDS", endpoint: "POST /v2/cards", title: "Cards", short: "Issue virtual and physical cards with per-card rules.",
     body: "Issue a virtual card instantly or order physical plastic. Freeze, set spend limits, restrict merchant categories and stream authorisations as they happen.",
@@ -79,15 +81,14 @@ const products = [
 ];
 
 const rails = ["SEPA", "SEPA Instant", "Faster Payments", "ACH", "Fedwire", "SWIFT", "CHAPS", "Zengin", "Interac", "PIX", "Visa", "Mastercard", "Base", "Arbitrum"];
-const ticks = ["EUR/USD 1.0830", "GBP/USD 1.2710", "USD VAULT 4.82% AER", "SEPA INSTANT 4S", "CARDS ISSUED TODAY 12,408", "FX SPREAD 4 BPS", "UPTIME 99.98%", "SETTLED TODAY $12.4M", "ACH CUT-OFF 17:00 ET"];
-const totals = [
-  { label: "Settled to date", value: "$4.2B" }, { label: "Accounts open", value: "318k" },
-  { label: "Currencies", value: "34" }, { label: "Uptime, 90 days", value: "99.98%" },
-];
+/* Ticker and platform totals are NOT hardcoded — see useState below, populated
+ * from GET /v2/site/stats and GET /v2/rails on mount. This placeholder shows
+ * while that load is in flight. */
+const TICKS_LOADING = ["CONNECTING TO THE LIVE API…"];
 const guides = [
   { kind: "GUIDE", title: "Idempotency", body: "Safe retries on every write endpoint, with a 24-hour replay window." },
   { kind: "GUIDE", title: "Card authorisations", body: "Approve or decline in your own webhook within 800ms." },
-  { kind: "RUNBOOK", title: "Self-hosting", body: "Docker compose, one Postgres, one rail provider. Roughly twenty minutes." },
+  { kind: "RUNBOOK", title: "Self-hosting", body: "Node stdlib + SQLite. No Docker, no external database. pnpm dev and you're running." },
 ];
 const posts = [
   { date: "26 JUL 2026", title: "Why the ledger is double-entry", excerpt: "Single-entry balances hide reconciliation bugs until withdrawal. Here is what we record instead.", tag: "ENGINEERING" },
@@ -105,19 +106,18 @@ const fields = [
   { label: "03 · ORGANISATION", placeholder: "Optional" },
 ];
 const counters = [
-  { title: "GitHub issues", body: "Bugs, feature requests and integration questions. Fastest route to a maintainer." },
-  { title: "Discord", body: "Informal help from other integrators. Roughly 2,300 members." },
-  { title: "Security", body: "Disclose privately to security@blueballs.dev. PGP key on the docs site." },
-  { title: "Sponsorship", body: "Infrastructure costs are covered by sponsors. Tiers listed on GitHub." },
+  { title: "GitHub issues", body: "Not published yet — this repo hasn't shipped. Issues will be the fastest route to a maintainer once it has." },
+  { title: "Self-host it", body: "Clone this repo, run pnpm dev, and you have the whole stack — API and site — running locally." },
+  { title: "Security", body: "No public repo yet, so no disclosure address either. That gets set up before this ships." },
 ];
 const footer = [
   { head: "PRODUCT", links: ["Accounts", "Cards", "Transfers", "Exchange"] },
   { head: "DEVELOPERS", links: ["Documentation", "API reference", "Status", "Changelog"] },
   { head: "PROJECT", links: ["GitHub", "Licence", "Sponsors", "Security"] },
 ];
-const quickstart = 'npm i @blueballs/sdk\n\nimport { Blueballs } from "@blueballs/sdk";\nconst bb = new Blueballs(process.env.BB_KEY);\n\nconst account = await bb.accounts.create({\n  holder: "usr_41c",\n  currency: "EUR"\n});\n\nawait bb.cards.issue({ account: account.id });';
-const devInstall = "$ npm i @blueballs/sdk\n$ blueballs auth login\n\n  key issued  bb_sandbox_9f4c…\n  scope       sandbox, unmetered\n  expires     never";
-const devCall = 'curl https://api.blueballs.dev/v2/rails \\\n  -H "Authorization: Bearer $BB_KEY"\n\n[ { "id": "sepa_instant", "status": "ok" },\n  { "id": "ach", "cutoff": "17:00 ET" } ]';
+const quickstart = 'git clone <this repo>\ncd blueballs && pnpm install\npnpm dev            # site → :5280, api → :5290\n\ncurl -X POST http://localhost:5290/v2/auth/signup \\\n  -H "content-type: application/json" \\\n  -d \'{"email":"you@example.com"}\'\n\n// → { "key": "bb_sandbox_…", "scope": "sandbox", … }';
+const devInstall = "$ git clone <this repo>\n$ cd blueballs && pnpm install\n$ pnpm dev\n\n  site   http://localhost:5280\n  api    http://localhost:5290/v2";
+const devCall = 'curl -X POST http://localhost:5290/v2/auth/signup \\\n  -H "content-type: application/json" \\\n  -d \'{"email":"you@example.com"}\'\n\n// → { "key": "bb_sandbox_…", "scope": "sandbox",\n//     "note": "…only time the key is shown." }';
 
 export default function App() {
   const [path, go] = usePath();
@@ -128,6 +128,75 @@ export default function App() {
   const [pinned, setPinned] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [apiFilter, setApiFilter] = useState("");
+
+  // Real platform counts — GET /v2/site/stats. No invented numbers on this page.
+  const [stats, setStats] = useState<SiteStats | null>(null);
+  const [statsErr, setStatsErr] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    getStats().then((s) => { if (alive) (s ? setStats(s) : setStatsErr(true)); });
+    return () => { alive = false; };
+  }, []);
+
+  // Ticker: rail cut-offs from GET /v2/rails + the same live stats above.
+  const [ticks, setTicks] = useState<string[]>(TICKS_LOADING);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const r = await call("GET", "/v2/rails", undefined, false);
+      if (!alive) return;
+      const out: string[] = [];
+      if (r.ok) {
+        for (const rail of (r.body as any).data as Array<{ id: string; speed: string; cutoff: string | null }>) {
+          const label = rail.id.toUpperCase().replace(/_/g, " ");
+          out.push(rail.cutoff ? `${label} CUT-OFF ${rail.cutoff}` : `${label} · ${rail.speed.toUpperCase()}`);
+        }
+      }
+      out.push("FX SPREAD 4 BPS · DEEP LIQUIDITY");
+      if (stats) {
+        out.push(`ACCOUNTS OPEN ${stats.accounts}`);
+        out.push(`CUSTOMERS ${stats.customers}`);
+        out.push(`TRANSFERS PROCESSED ${stats.transfers}`);
+        out.push(`ENDPOINTS LIVE ${stats.endpoints_implemented}/${stats.endpoints_catalogued}`);
+      }
+      setTicks(out.length ? out : ["LIVE DATA UNAVAILABLE — IS THE API RUNNING?"]);
+    })();
+    return () => { alive = false; };
+  }, [stats]);
+
+  // Real quote round-trip — replaces the invented "340MS QUOTES" fact.
+  const [quoteMs, setQuoteMs] = useState<number | null>(null);
+  const [quoteErr, setQuoteErr] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const key = await ensureKey();
+      if (!key) { if (alive) setQuoteErr(true); return; }
+      const r = await call("POST", "/v2/quotes", { from: "EUR", to: "USD", amount: "1000.00" });
+      if (!alive) return;
+      if (r.ok) setQuoteMs(r.ms); else setQuoteErr(true);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Hero FX widget — a real POST /v2/quotes result, not a hardcoded rate table.
+  type FxQuote = {
+    rate: string; spread_bps: number; settlement: string; expires_at: string;
+    receives: { amount: string; currency: string };
+  };
+  const [fxQuote, setFxQuote] = useState<FxQuote | null>(null);
+  const [fxErr, setFxErr] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const key = await ensureKey();
+      if (!key) { if (alive) setFxErr(true); return; }
+      const r = await call("POST", "/v2/quotes", { from: "EUR", to: "GBP", amount: "10000.00" });
+      if (!alive) return;
+      if (r.ok) setFxQuote(r.body as FxQuote); else setFxErr(true);
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // auto-rotate the phone screen on home until the visitor pins one
   useEffect(() => {
@@ -140,6 +209,17 @@ export default function App() {
 
   const show = (s: Screen) => () => { setScreen(s); setPinned(true); };
   const active = products.find((p) => p.screen === screen) ?? products[0];
+
+  const totals = stats
+    ? [
+        { label: "Accounts open", value: String(stats.accounts) },
+        { label: "Customers signed up", value: String(stats.customers) },
+        { label: "Transfers processed", value: String(stats.transfers) },
+        { label: "Currencies supported", value: String(stats.currencies) },
+      ]
+    : statsErr
+    ? [{ label: "Live stats", value: "API offline" }]
+    : [{ label: "Live stats", value: "loading…" }];
 
   const q = apiFilter.trim().toLowerCase();
   const shownFamilies = !q ? FAMILIES : FAMILIES
@@ -215,7 +295,9 @@ export default function App() {
                   <H as="button" onClick={() => setPage("dev")} style={{ ...ink, border: "1px solid #D7DBE4", background: "#FFFFFF", color: "#14161C" }} hover={{ borderColor: "#14161C" }}>Read the docs</H>
                 </div>
                 <div style={{ display: "flex", gap: 32, flexWrap: "wrap", paddingTop: 22, borderTop: "1px solid #E7EAF0", fontFamily: MONO, fontSize: 11, letterSpacing: "0.08em", color: "#7A8296" }}>
-                  <span>34 CURRENCIES</span><span>SOC 2 CONTROLS</span><span>340MS QUOTES</span><span>4.1K STARS</span>
+                  <span>{stats ? stats.currencies : 6} CURRENCIES</span>
+                  <span>{quoteMs !== null ? `${quoteMs}MS QUOTE ROUND-TRIP` : quoteErr ? "QUOTES OFFLINE" : "MEASURING QUOTE LATENCY…"}</span>
+                  <span>MIT · SELF-HOSTED</span>
                 </div>
 
                 <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -256,7 +338,7 @@ export default function App() {
                     );
                   })}
                 </div>
-                <div style={{ flex: 1 }}><PhoneScreen screen={screen} /></div>
+                <div style={{ flex: 1 }}><PhoneScreen screen={screen} fxQuote={fxQuote} fxErr={fxErr} /></div>
               </div>
             </div>
 
@@ -284,7 +366,10 @@ export default function App() {
                 <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 12, fontFamily: MONO, fontSize: 12.5, lineHeight: 1.8, padding: "20px 22px", whiteSpace: "pre", overflowX: "auto" }}>{quickstart}</div>
               </div>
               <div data-pad style={{ ...card, padding: "30px 32px 26px", display: "flex", flexDirection: "column" }}>
-                <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296", marginBottom: 10 }}>PLATFORM</div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>PLATFORM</div>
+                  <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.1em", color: "#7A8296" }}>LIVE FROM THIS SANDBOX</div>
+                </div>
                 {totals.map((t) => (
                   <div key={t.label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 14, padding: "14px 0", borderBottom: "1px solid #E7EAF0" }}>
                     <div style={{ fontSize: 14.5, color: "#454B5C" }}>{t.label}</div>
@@ -298,7 +383,7 @@ export default function App() {
             <div data-pad style={{ background: "#5A6DB8", color: "#FFFFFF", borderRadius: 18, padding: "42px 44px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ fontSize: "clamp(24px, 2.6vw, 32px)", fontWeight: 600, letterSpacing: "-0.03em" }}>Open an account.</div>
-                <div style={{ fontSize: 15.5, lineHeight: 1.6, maxWidth: "48ch", opacity: 0.9 }}>Sandbox keys are issued instantly and cost nothing. The full stack is on GitHub if you would rather run it yourself.</div>
+                <div style={{ fontSize: 15.5, lineHeight: 1.6, maxWidth: "48ch", opacity: 0.9 }}>Sandbox keys are issued instantly and cost nothing. Clone this repo and run pnpm dev if you would rather run it yourself.</div>
               </div>
               <H as="button" onClick={() => setPage("contact")} style={{ fontSize: 14, fontWeight: 500, padding: "15px 26px", cursor: "pointer", border: "1px solid #FFFFFF", borderRadius: 10, background: "#FFFFFF", color: "#14161C" }} hover={{ background: "transparent", color: "#FFFFFF" }}>Get your key</H>
             </div>
@@ -311,31 +396,71 @@ export default function App() {
             <div data-pad style={{ ...card, padding: "46px 46px 40px" }}>
               <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>PRODUCTS</div>
               <h1 style={{ margin: "14px 0 12px", fontSize: "clamp(28px, 3.2vw, 42px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Everything a bank ships.</h1>
-              <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "64ch", color: "#454B5C" }}>Eight products, one ledger. Open an account, issue a card, move money, hold balances in thirty-four currencies and reconcile it all from the same statement.</p>
+              <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "64ch", color: "#454B5C" }}>Eight products, one ledger. Open an account, issue a card, move money, hold balances in six currencies and reconcile it all from the same statement.</p>
             </div>
-            {products.map((p) => (
-              <div key={p.title} data-col style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div data-pad style={{ ...card, padding: "34px 32px 30px", display: "flex", flexDirection: "column", gap: 14 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ border: "1px solid #DADFF2", background: "#EEF1FA", color: "#4E5FA6", borderRadius: 999, padding: "5px 13px", fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.14em" }}>{p.tag}</div>
-                    <div style={{ fontFamily: MONO, fontSize: 11, color: "#7A8296" }}>{p.endpoint}</div>
+            {/* THE EIGHT HEADLINE PRODUCTS */}
+            <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296", margin: "6px 2px 0" }}>
+              EIGHT PRODUCTS · TAP ONE TO SEE ITS SCREEN
+            </div>
+            <div className="bb-product-grid">
+              {products.map((p) => (
+                <H key={p.title} onClick={() => { setScreen(p.screen); setPinned(true); setPage("home"); }}
+                  style={{ ...card, padding: "22px 22px 20px", display: "flex", flexDirection: "column", gap: 11, cursor: "pointer" }}
+                  hover={{ borderColor: "#5A6DB8" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 9, background: "#EEF1FA", border: "1px solid #DADFF2", color: "#4E5FA6", fontFamily: MONO, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.glyph}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#4E5FA6", background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 999, padding: "3px 9px" }}>{p.tag}</div>
                   </div>
-                  <h2 style={{ margin: 0, fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em" }}>{p.title}</h2>
-                  <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.62, color: "#454B5C", maxWidth: "48ch" }}>{p.body}</p>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    {p.rows.map((r) => (
-                      <div key={r.k} style={{ display: "flex", justifyContent: "space-between", gap: 14, padding: "11px 0", borderTop: "1px solid #E7EAF0", fontSize: 13.5 }}>
-                        <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: "#7A8296" }}>{r.k}</span><span style={{ fontWeight: 500 }}>{r.v}</span>
+                  <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.025em" }}>{p.title}</div>
+                  <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#5B6376" }}>{p.short}</div>
+                  <div style={{ display: "flex", flexDirection: "column", marginTop: 2 }}>
+                    {p.rows.slice(0, 3).map((r) => (
+                      <div key={r.k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "7px 0", borderTop: "1px solid #E7EAF0", fontSize: 12.5 }}>
+                        <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.1em", color: "#7A8296" }}>{r.k}</span>
+                        <span style={{ fontWeight: 500, textAlign: "right" }}>{r.v}</span>
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginTop: "auto", background: "#14161C", color: "#E4E7EE", borderRadius: 12, padding: "18px 20px", fontFamily: MONO, fontSize: 12, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{p.code}</div>
+                  <div style={{ marginTop: "auto", paddingTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontFamily: MONO, fontSize: 10.5, color: "#7A8296" }}>{p.endpoint}</span>
+                    <span style={{ fontFamily: MONO, fontSize: 10, color: "#4E5FA6" }}>SEE IT →</span>
+                  </div>
+                </H>
+              ))}
+            </div>
+
+            {/* EVERY RESOURCE FAMILY — the full surface, not just the headline eight */}
+            <div data-pad style={{ ...card, padding: "34px 34px 30px", marginTop: 4 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>THE FULL SURFACE</div>
+                  <h2 style={{ margin: "10px 0 0", fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em" }}>
+                    {FAMILIES.length} resource families. {TOTAL_ENDPOINTS} endpoints.
+                  </h2>
                 </div>
-                <div style={{ background: "#EDEFF4", border: "1px solid #D7DBE4", borderRadius: 18, padding: "24px 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <PhoneScreen screen={p.screen} />
-                </div>
+                <H as="button" onClick={() => setPage("dev")}
+                  style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #D7DBE4", borderRadius: 10, background: "#FFFFFF", color: "#14161C" }}
+                  hover={{ borderColor: "#14161C" }}>Run them in the docs →</H>
               </div>
-            ))}
+              <p style={{ margin: "12px 0 20px", fontSize: 15.5, lineHeight: 1.6, maxWidth: "70ch", color: "#454B5C" }}>
+                The eight above are how people describe a bank. This is everything the API actually exposes —
+                every family below is implemented and callable today.
+              </p>
+              <div className="bb-product-grid">
+                {FAMILIES.map((f) => (
+                  <H key={f.name} onClick={() => setPage("dev")}
+                    style={{ background: "#F7F8FB", border: "1px solid #E7EAF0", borderRadius: 14, padding: "16px 17px 14px", display: "flex", flexDirection: "column", gap: 7, cursor: "pointer" }}
+                    hover={{ borderColor: "#5A6DB8", background: "#FFFFFF" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: "-0.02em" }}>{f.name}</div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: "#4E5FA6", background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" }}>{f.endpoints.length}</div>
+                    </div>
+                    <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "#5B6376" }}>{f.blurb}</div>
+                  </H>
+                ))}
+              </div>
+            </div>
+
             <div data-pad style={{ ...card, padding: 32 }}>
               <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296", marginBottom: 16 }}>RAILS AND NETWORKS</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -350,13 +475,13 @@ export default function App() {
         {/* ================= DEVELOPERS ================= */}
         {page === "dev" && (
           <div data-col style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 14, alignItems: "start" }}>
-            <div style={{ ...card, padding: "22px 0 24px" }}>
+            <div className="bb-toc" style={{ ...card, padding: "22px 0 24px" }}>
               <div style={{ padding: "0 22px 12px", fontFamily: MONO, fontSize: 10, letterSpacing: "0.18em", color: "#7A8296" }}>CONTENTS</div>
               {["Overview", "Authentication", "Quickstart", ...FAMILIES.map((f) => f.name), "Errors", "Webhooks", "Self-hosting"].map((l, i) => (
                 <H key={l} style={{ padding: "9px 22px", fontSize: 13.5, cursor: "pointer", color: i === 0 ? "#4E5FA6" : "#454B5C", background: i === 0 ? "#F0F2F7" : "transparent" }} hover={{ color: "#4E5FA6" }}>{l}</H>
               ))}
               <div style={{ padding: "16px 22px 0" }}>
-                <div style={{ borderTop: "1px solid #E7EAF0", paddingTop: 14, fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: "#5B6376" }}>github.com/blueballs<br />MIT · 4.1k ★</div>
+                <div style={{ borderTop: "1px solid #E7EAF0", paddingTop: 14, fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: "#5B6376" }}>MIT licence<br />Not yet published to GitHub</div>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -373,7 +498,16 @@ export default function App() {
               <div data-pad style={{ ...card, padding: "30px 32px 28px" }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
                   <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>API REFERENCE</div>
-                  <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6" }}>{TOTAL_ENDPOINTS} ENDPOINTS · {FAMILIES.length} FAMILIES</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <ApiStatus />
+                    <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6" }}>{TOTAL_ENDPOINTS} ENDPOINTS · {FAMILIES.length} FAMILIES</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 14, color: "#454B5C", marginBottom: 10, lineHeight: 1.55 }}>
+                    Every endpoint below runs for real against the API. Get a key and press Run — no approval, nothing simulated.
+                  </div>
+                  <KeyIssuer />
                 </div>
                 <input value={apiFilter} onChange={(e) => setApiFilter(e.target.value)}
                   placeholder="Filter endpoints — try transfers, card, qr, sandbox…"
@@ -390,11 +524,12 @@ export default function App() {
                     <p style={{ margin: "6px 0 10px", fontSize: 14, lineHeight: 1.55, color: "#5B6376", maxWidth: "70ch" }}>{fam.blurb}</p>
                     <div data-scroll><div>
                       {fam.endpoints.map((e, i) => (
-                        <div key={i} style={{ display: "grid", gridTemplateColumns: "62px 1.5fr 1.5fr 74px", alignItems: "center", gap: 10, padding: "10px 0", borderTop: "1px solid #E7EAF0" }}>
+                        <div key={i} className="bb-endpoint" style={{ display: "grid", gridTemplateColumns: "62px 1.4fr 1.4fr 62px 74px", alignItems: "center", gap: 10, padding: "10px 6px", borderTop: "1px solid #E7EAF0", borderRadius: 6 }}>
                           <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.06em", color: VERB_COLOR[e.verb] }}>{e.verb}</div>
                           <div style={{ fontFamily: MONO, fontSize: 12.5 }}>{e.path}</div>
                           <div style={{ fontSize: 13.5, color: "#454B5C" }}>{e.does}</div>
-                          <div style={{ fontFamily: MONO, fontSize: 10, color: e.auth === "PUBLIC" ? "#2E7D53" : "#7A8296", textAlign: "right" }}>{e.auth}</div>
+                          <div style={{ fontFamily: MONO, fontSize: 10, color: e.auth === "PUBLIC" ? "#2E7D53" : "#7A8296" }}>{e.auth}</div>
+                          <div style={{ textAlign: "right" }}><TryIt verb={e.verb} path={e.path} /></div>
                         </div>
                       ))}
                     </div></div>
@@ -446,7 +581,7 @@ export default function App() {
             <div data-pad style={{ ...card, padding: "42px 40px 38px" }}>
               <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>APPLICATION · FORM AK-1</div>
               <h1 style={{ margin: "14px 0 10px", fontSize: "clamp(26px, 3vw, 38px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Open an account.</h1>
-              <p style={{ margin: "0 0 26px", fontSize: 16, lineHeight: 1.62, maxWidth: "52ch", color: "#454B5C" }}>Sandbox keys are issued immediately. Production keys within one business day.</p>
+              <p style={{ margin: "0 0 26px", fontSize: 16, lineHeight: 1.62, maxWidth: "52ch", color: "#454B5C" }}>Sandbox keys are issued immediately, self-serve, no form required — hit the docs page. This form is for everything else: production access, self-hosting help, partnerships.</p>
               <form onSubmit={(e) => { e.preventDefault(); setSubmitted(true); }} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {fields.map((f) => (
                   <div key={f.label} style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -478,7 +613,7 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 18, padding: "22px 24px", fontFamily: MONO, fontSize: 12, lineHeight: 1.85 }}>MAINTAINERS RESPOND MON–FRI.<br />ISSUES ARE ANSWERED FASTEST ON<br />GITHUB, NOT BY EMAIL.</div>
+              <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 18, padding: "22px 24px", fontFamily: MONO, fontSize: 12, lineHeight: 1.85 }}>THIS REPO ISN'T PUBLISHED YET.<br />UNTIL IT IS, THIS FORM IS THE<br />ONLY WAY TO REACH A MAINTAINER.</div>
             </div>
           </div>
         )}

@@ -386,9 +386,11 @@ try {
  * disappears automatically — nothing to hand-maintain. */
 const CATALOGUE = join(HERE, "..", "..", "..", "src", "endpoints.ts");
 let stubbed = 0;
+let cataloguedCount = 0;
 try {
   const src = await (await import("node:fs/promises")).readFile(CATALOGUE, "utf8");
   for (const [, verb, path] of src.matchAll(/verb:\s*"(\w+)",\s*path:\s*"([^"]+)"/g)) {
+    cataloguedCount++;
     if (isRegistered(verb, path)) continue;
     route(verb, path, () => {
       throw new ApiError("not-implemented", 501, `${verb} ${path} is in the catalogue but not implemented yet.`);
@@ -398,6 +400,22 @@ try {
 } catch (e) {
   console.warn("  could not read the endpoint catalogue:", e.message);
 }
+
+/* ---------------- site stats: real counts for the marketing site ----------------
+ * Not part of the 144-endpoint catalogue — this exists so the front end can show
+ * genuine numbers (accounts open, endpoints live, etc.) instead of invented ones.
+ * Public: these are aggregate counts, not any single customer's data. */
+const ENDPOINTS_IMPLEMENTED = cataloguedCount - stubbed;
+const ENDPOINTS_CATALOGUED = cataloguedCount;
+route("GET", "/v2/site/stats", () => ({
+  accounts: db.accounts.size,
+  customers: db.customers.size,
+  transfers: db.transfers.size,
+  currencies: Object.keys(RATES).length,
+  rails: Object.keys(RAILS).length,
+  endpoints_implemented: ENDPOINTS_IMPLEMENTED,
+  endpoints_catalogued: ENDPOINTS_CATALOGUED,
+}), { public: true });
 
 /* ---------------- request pipeline ---------------- */
 const server = createServer(async (req, res) => {

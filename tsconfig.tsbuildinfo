@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/phonescreen.tsx","./src/endpoints.ts","./src/main.tsx","./src/router.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/phonescreen.tsx","./src/tryit.tsx","./src/api.ts","./src/endpoints.ts","./src/main.tsx","./src/router.ts"],"version":"5.9.3"}

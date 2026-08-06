@@ -19,3 +19,29 @@ input, button, textarea, select { font: inherit; color: inherit; }
   [data-scroll] { overflow-x: auto; }
   [data-scroll] > div { min-width: 640px; }
 }
+
+/* ---- docs sidebar: stays with you while the reference scrolls ---- */
+.bb-toc {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.bb-toc::-webkit-scrollbar { width: 8px; }
+.bb-toc::-webkit-scrollbar-thumb { background: #D7DBE4; border-radius: 999px; }
+.bb-toc::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- products: 1 → 2 → 3 → 4 across, by width ---- */
+.bb-product-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 700px)  { .bb-product-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1040px) { .bb-product-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1360px) { .bb-product-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* ---- endpoint rows: whole row is the affordance ---- */
+.bb-endpoint { cursor: pointer; }
+.bb-endpoint:hover { background: #F7F8FB; }

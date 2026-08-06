@@ -3,9 +3,11 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Greenbar — open-source neobank front end (blueballs)",
+  "description": "Blueballs — an open-source, self-hostable neobank stack (site + API)",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
+    "dev:site": "vite",
+    "dev:api": "node apps/api/src/server.js",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
