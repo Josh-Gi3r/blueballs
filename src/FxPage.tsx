@@ -165,6 +165,8 @@ function RouteBuilder() {
     return () => { alive = false; clearTimeout(t); };
   }, [from, to, amount]);
 
+  const undeliverable = route?.settlement?.deliverable === false;
+
   const sel: CSSProperties = { fontFamily: MONO, fontSize: 13, padding: "9px 12px", borderRadius: 10, border: "1px solid #DDE1E8", background: "#FFFFFF" };
 
   return (
@@ -217,12 +219,20 @@ function RouteBuilder() {
               );
             })}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", background: "#14161C", color: "#E4E7EE", borderRadius: 14, padding: "16px 20px", marginTop: 12 }}>
-            <div style={{ fontSize: 14 }}>{route.note}</div>
+          {/* When a leg cannot actually be delivered, the headline number must not
+              read like a quote you could act on. Same figure, stated as indicative. */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", background: undeliverable ? "#3A2A28" : "#14161C", color: "#E4E7EE", borderRadius: 14, padding: "16px 20px", marginTop: 12 }}>
+            <div style={{ fontSize: 14 }}>
+              {undeliverable
+                ? "Indicative only — this route cannot be completed end to end."
+                : route.note}
+            </div>
             <div style={{ display: "flex", gap: 24 }}>
               <div>
-                <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#8B93A6" }}>THEY RECEIVE</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "#94A3E0", fontVariantNumeric: "tabular-nums" }}>{route.receives.amount} {route.receives.currency}</div>
+                <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#8B93A6" }}>
+                  {undeliverable ? "WOULD RECEIVE" : "THEY RECEIVE"}
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: undeliverable ? "#C99A93" : "#94A3E0", fontVariantNumeric: "tabular-nums", textDecoration: undeliverable ? "line-through" : "none" }}>{route.receives.amount} {route.receives.currency}</div>
               </div>
               <div>
                 <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#8B93A6" }}>TOTAL</div>

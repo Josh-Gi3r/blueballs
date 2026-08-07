@@ -25,6 +25,7 @@ export const FAMILIES: Family[] = [
       { verb: "PATCH", path: "/v2/customers/:id", does: "Update a customer", auth: "KEY" },
       { verb: "DELETE", path: "/v2/customers/:id", does: "Soft delete — blocked while accounts exist", auth: "KEY" },
       { verb: "GET", path: "/v2/customers/:id/capabilities", does: "Per-rail status and outstanding requirements", auth: "KEY" },
+      { verb: "POST", path: "/v2/customers/:id/verify", does: "Resolve verification in the sandbox without waiting on a queue", auth: "KEY" },
     ],
   },
   {
@@ -54,6 +55,7 @@ export const FAMILIES: Family[] = [
       { verb: "GET", path: "/v2/accounts", does: "List accounts", auth: "KEY" },
       { verb: "PATCH", path: "/v2/accounts/:id", does: "Update an account", auth: "KEY" },
       { verb: "DELETE", path: "/v2/accounts/:id", does: "Close an account", auth: "KEY" },
+      { verb: "POST", path: "/v2/accounts/:id/credit", does: "Credit an account directly — sandbox funding", auth: "KEY" },
     ],
   },
   {
@@ -118,6 +120,9 @@ export const FAMILIES: Family[] = [
       { verb: "GET", path: "/v2/fx/depth", does: "Aggregate resting depth — never maker identity", auth: "PUBLIC" },
       { verb: "GET", path: "/v2/fx/price", does: "Imbalance-derived price for a corridor", auth: "PUBLIC" },
       { verb: "GET", path: "/v2/fx/pricing-model", does: "The constants and formula, so any quote can be rechecked", auth: "PUBLIC" },
+      { verb: "POST", path: "/v2/fx/rfq", does: "A firm price for your own size, binding for a window — the integrator tier", auth: "KEY" },
+      { verb: "GET", path: "/v2/fx/rfq", does: "Your firm quotes, and nobody else's", auth: "KEY" },
+      { verb: "POST", path: "/v2/fx/rfq/:id/accept", does: "Execute at the locked rate even if the corridor has moved", auth: "KEY" },
       { verb: "POST", path: "/v2/fx/intents", does: "Submit a signed swap intent as maker or taker", auth: "KEY" },
       { verb: "GET", path: "/v2/fx/intents", does: "Your intents", auth: "KEY" },
       { verb: "POST", path: "/v2/fx/intents/:id/cancel", does: "Cancel a resting intent", auth: "KEY" },
@@ -167,6 +172,7 @@ export const FAMILIES: Family[] = [
       { verb: "GET", path: "/v2/authorisations", does: "List pending and cleared", auth: "KEY" },
       { verb: "POST", path: "/v2/authorisations/:id/approve", does: "Approve in real time", auth: "KEY" },
       { verb: "POST", path: "/v2/authorisations/:id/decline", does: "Decline in real time", auth: "KEY" },
+      { verb: "POST", path: "/v2/cards/:id/authorisations", does: "Simulate an authorisation against a card", auth: "KEY" },
     ],
   },
   {
