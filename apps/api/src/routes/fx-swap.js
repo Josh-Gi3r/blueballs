@@ -425,3 +425,163 @@ route("GET", "/v2/fx/pricing-model", () => ({
   ],
   note: "Deterministic. Same book state always yields the same price, so any quote you were given can be recomputed and checked.",
 }), { public: true });
+
+/* =========================================================================
+ * RFQ — the middle disclosure tier
+ *
+ * Three tiers exist, and they are set by who is asking, not by a plan:
+ *
+ *   public      GET /v2/fx/depth   aggregate depth only, no identity, no orders
+ *   integrator  POST /v2/fx/rfq    a FIRM price for your own size, held for a window
+ *   private     GET /v2/fx/intents your own orders, and never anyone else's
+ *
+ * The middle tier is what a bank integrating this rail actually needs: it cannot
+ * quote its own customers off a rate that might move between the quote and the
+ * click. So it asks for a price at a size, and that price is binding for a window.
+ *
+ * What an RFQ reveals is strictly more than aggregate depth — it tells you the
+ * executable rate at your size, which is the shape of the book at that depth — and
+ * strictly less than the book: no maker identity, no other participants' orders,
+ * nothing about flow that is not yours.
+ *
+ * Honouring a firm price is principal risk. If the corridor moves against us inside
+ * the window we pay the difference; if it moves our way we keep it. That is what
+ * "firm" costs, and it is why the window is short and the size is capped by the
+ * same appetite that governs the principal leg.
+ * ========================================================================= */
+
+const rfqs = collection("fxRfqs");
+const RFQ_WINDOW_MS = 60_000;
+/** A firm price is worth paying for: it is the operator, not the taker, carrying
+ *  the movement inside the window. */
+const RFQ_FIRMNESS_BPS = 2;
+
+route("POST", "/v2/fx/rfq", ({ body, key }) => {
+  need(body, ["account", "from", "to", "amount"]);
+  const acc = db.accounts.get(body.account);
+  if (!acc) throw new ApiError("not-found", 404, `No account ${body.account}`);
+
+  const cus = db.customers.get(acc.customer);
+  if (!cus || cus.decision !== "approved") {
+    throw new ApiError("tier-insufficient", 403, "Counterparties must be verified before they can provide or take liquidity");
+  }
+  if (cus.type !== "business") {
+    throw new ApiError("tier-insufficient", 403,
+      "Firm quotes are the integrator tier — they commit the operator's balance sheet for a window, so they are served to verified business customers. Use POST /v2/fx/quote for an indicative price.");
+  }
+
+  const from = String(body.from).toUpperCase(), to = String(body.to).toUpperCase();
+  if (!isStable(from) || !isStable(to)) {
+    throw new ApiError("validation-error", 400, "Swap legs must both be stablecoins — use /v2/ramps to cross fiat");
+  }
+  if (from === to) throw new ApiError("validation-error", 400, "from and to must differ");
+
+  const size = toMinor(body.amount);
+  const pair = pairKey(from, to);
+  const priced = priceNow(from, to, size);
+
+  // A firm quote consumes the same appetite the principal leg does — we cannot
+  // promise a price we would not be willing to fill.
+  const pq = principalQuote(appetiteFor(pair), principalPosition(from), size, priced.spread_bps);
+  if (!pq.available) {
+    throw new ApiError("conflict", 409,
+      `No firm price available for that size right now: ${pq.reason}. The indicative price stands at POST /v2/fx/quote, or rest a maker order and wait for a counterparty.`);
+  }
+
+  const bps = pq.spread_bps + RFQ_FIRMNESS_BPS;
+  const mid = midOf(from) / midOf(to);
+  const receives = BigInt(Math.floor(Number(size) * mid * (1 - bps / 10000)));
+
+  const r = {
+    id: ksuid("rfq"),
+    account: acc.id, customer: acc.customer,
+    counterparty: pseudonym(acc.customer),
+    pair, from, to,
+    amount: { amount: body.amount, currency: from },
+    receives: { amount: fromMinor(receives), currency: to },
+    locked_bps: Math.round(bps * 100) / 100,
+    firm: true,
+    status: "open",
+    expires_at: new Date(Date.now() + RFQ_WINDOW_MS).toISOString(),
+    created_at: now(), owner: key.id,
+  };
+  rfqs.set(r.id, r);
+  emit("fx.rfq.quoted", { id: r.id, pair, locked_bps: r.locked_bps });
+
+  return {
+    ...r,
+    disclosure: "firm-quote",
+    // the extra disclosure this tier buys, and its explicit limit
+    depth_at_your_size: {
+      liquidity: priced.liquidity,
+      imbalance: priced.imbalance,
+      indicative_bps: priced.spread_bps,
+      firmness_bps: RFQ_FIRMNESS_BPS,
+    },
+    note: "Binding for the window. Accept it with POST /v2/fx/rfq/{id}/accept and you " +
+          "get exactly this rate even if the corridor has moved. Maker identity and " +
+          "other participants' orders are not disclosed at any tier.",
+  };
+});
+
+route("GET", "/v2/fx/rfq", ({ key, url }) => {
+  const rows = [...rfqs.values()].filter((r) => r.owner === key.id);
+  const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100);
+  return { object: "list", disclosure: "own-quotes", data: rows.slice(0, limit), has_more: rows.length > limit };
+});
+
+route("POST", "/v2/fx/rfq/:id/accept", ({ params, key }) => {
+  const r = rfqs.get(params.id);
+  if (!r) throw new ApiError("not-found", 404, `No quote ${params.id}`);
+  if (r.owner !== key.id) throw new ApiError("forbidden", 403, "Not your quote");
+  if (r.status !== "open") throw new ApiError("conflict", 409, `Quote ${r.id} is already ${r.status}`);
+  if (Date.parse(r.expires_at) <= Date.now()) {
+    r.status = "expired";
+    rfqs.set(r.id, r);
+    throw new ApiError("conflict", 409, "That quote has expired — ask for another. A firm price is only firm for its window.");
+  }
+
+  const size = toMinor(r.amount.amount);
+  if (balanceOf(r.account, r.from) < size) {
+    throw new ApiError("insufficient-balance", 400,
+      `Account holds ${fromMinor(balanceOf(r.account, r.from))} ${r.from}`);
+  }
+
+  // Fill as principal at the LOCKED rate — not at whatever the corridor is doing
+  // now. Any drift inside the window is the operator's, which is the whole point.
+  const intent = {
+    id: ksuid("int"),
+    account: r.account, customer: r.customer, counterparty: r.counterparty,
+    from: r.from, to: r.to,
+    amount: r.amount.amount, remaining: size.toString(),
+    min_receive: r.receives.amount,
+    mode: "taker", status: "open", rfq: r.id,
+    expires_at: r.expires_at, created_at: now(), owner: key.id,
+  };
+  intents.set(intent.id, intent);
+
+  const out = toMinor(r.receives.amount);
+  settle(intent, `principal:${r.to}`, size, out, "principal", r.locked_bps);
+
+  intent.remaining = "0";
+  intent.status = "filled";
+  intents.set(intent.id, intent);
+
+  const live = priceNow(r.from, r.to, size);
+  r.status = "accepted";
+  r.accepted_at = now();
+  r.intent = intent.id;
+  rfqs.set(r.id, r);
+  emit("fx.rfq.accepted", { id: r.id, intent: intent.id });
+
+  return {
+    ...r,
+    filled: true,
+    received: r.receives,
+    honoured_at_bps: r.locked_bps,
+    corridor_now_bps: live.spread_bps,
+    // stated plainly rather than quietly pocketed either way
+    drift_bps: Math.round((live.spread_bps - r.locked_bps) * 100) / 100,
+    note: "Filled at the locked rate. Movement inside the window sat with the operator, not with you.",
+  };
+});
