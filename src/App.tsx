@@ -5,7 +5,7 @@ import PhoneScreen, { type Screen } from "./PhoneScreen";
 import Device from "./Device";
 import { TryIt, KeyIssuer, ApiStatus } from "./TryIt";
 import Journey from "./Journey";
-import StablecoinFx from "./StablecoinFx";
+import FxPage from "./FxPage";
 import { call, getStats, ensureKey, type SiteStats } from "./api";
 
 /* ------------------------------------------------------------------ */
@@ -19,13 +19,13 @@ const VERB_COLOR: Record<string, string> = {
   GET: "#2E7D53", POST: "#4E5FA6", PATCH: "#B0761E", PUT: "#B0761E", DELETE: "#B4453C",
 };
 
-type Page = "home" | "products" | "dev" | "blog" | "contact";
+type Page = "home" | "products" | "fx" | "dev" | "blog" | "contact";
 const PATH_TO_PAGE: Record<string, Page> = {
-  "/": "home", "/products": "products", "/developers": "dev",
+  "/": "home", "/products": "products", "/fx": "fx", "/developers": "dev",
   "/bulletin": "blog", "/contact": "contact",
 };
 const PAGE_TO_PATH: Record<Page, string> = {
-  home: "/", products: "/products", dev: "/developers", blog: "/bulletin", contact: "/contact",
+  home: "/", products: "/products", fx: "/fx", dev: "/developers", blog: "/bulletin", contact: "/contact",
 };
 
 /* Hover/focus wrapper — inline styles can't express :hover. */
@@ -266,7 +266,7 @@ export default function App() {
   const card: CSSProperties = { background: "#FFFFFF", border: "1px solid #D7DBE4", borderRadius: 18 };
   const ink: CSSProperties = { fontSize: 14, fontWeight: 500, padding: "14px 24px", cursor: "pointer", border: "1px solid #14161C", borderRadius: 10, background: "#14161C", color: "#FFFFFF" };
   const nav: { key: Page; label: string }[] = [
-    { key: "home", label: "Home" }, { key: "products", label: "Products" },
+    { key: "home", label: "Home" }, { key: "products", label: "Products" }, { key: "fx", label: "Stablecoin FX" },
     { key: "dev", label: "Developers" }, { key: "blog", label: "Bulletin" },
   ];
 
@@ -478,7 +478,19 @@ export default function App() {
               ))}
             </div>
 
-            <StablecoinFx />
+            <H onClick={() => setPage("fx")}
+              style={{ ...card, padding: "26px 28px 24px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}
+              hover={{ borderColor: "#5A6DB8" }}>
+              <div>
+                <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>STABLECOIN FX</div>
+                <div style={{ fontSize: 21, fontWeight: 600, letterSpacing: "-0.025em", margin: "8px 0 6px" }}>One spread, not three.</div>
+                <div style={{ fontSize: 14.5, lineHeight: 1.55, color: "#5B6376", maxWidth: "60ch" }}>
+                  Ramps are 1:1, only the corridor is priced, and the price derives itself from imbalance.
+                  Drag the thermostat, build a route, work out what providing liquidity pays.
+                </div>
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6", whiteSpace: "nowrap" }}>OPEN THE FX PAGE →</div>
+            </H>
 
             <Journey />
 
@@ -524,6 +536,8 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {page === "fx" && <FxPage />}
 
         {/* ================= DEVELOPERS ================= */}
         {page === "dev" && (

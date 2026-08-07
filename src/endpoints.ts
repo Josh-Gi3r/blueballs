@@ -117,6 +117,7 @@ export const FAMILIES: Family[] = [
       { verb: "GET", path: "/v2/ramps", does: "Ramp history", auth: "KEY" },
       { verb: "GET", path: "/v2/fx/depth", does: "Aggregate resting depth — never maker identity", auth: "PUBLIC" },
       { verb: "GET", path: "/v2/fx/price", does: "Imbalance-derived price for a corridor", auth: "PUBLIC" },
+      { verb: "GET", path: "/v2/fx/pricing-model", does: "The constants and formula, so any quote can be rechecked", auth: "PUBLIC" },
       { verb: "POST", path: "/v2/fx/intents", does: "Submit a signed swap intent as maker or taker", auth: "KEY" },
       { verb: "GET", path: "/v2/fx/intents", does: "Your intents", auth: "KEY" },
       { verb: "POST", path: "/v2/fx/intents/:id/cancel", does: "Cancel a resting intent", auth: "KEY" },

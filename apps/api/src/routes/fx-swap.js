@@ -35,6 +35,7 @@ import {
 } from "../kernel.js";
 import { isStable, midOf, CORRIDORS } from "../assets.js";
 import { priceCorridor, principalQuote, DEFAULT_APPETITE } from "../pricing.js";
+import * as PRICING from "../pricing.js";
 import { creditProviders } from "./fx-lp.js";
 
 const intents = collection("fxIntents");   // signed, unmatched
@@ -401,3 +402,26 @@ route("PUT", "/v2/fx/appetite", ({ body }) => {
   emit("fx.appetite.updated", a);
   return a;
 });
+
+/* ------------------------------------------------------------------ */
+/* The pricing model itself — constants and formula, published.        */
+/* A client can run the identical arithmetic and get the identical     */
+/* number. Publishing this is what makes the pricing checkable rather  */
+/* than something you have to take on trust.                           */
+/* ------------------------------------------------------------------ */
+route("GET", "/v2/fx/pricing-model", () => ({
+  base_bps: PRICING.BASE_BPS,
+  max_skew_bps: PRICING.MAX_SKEW_BPS,
+  rebate_threshold: PRICING.REBATE_THRESHOLD,
+  max_rebate_bps: PRICING.MAX_REBATE_BPS,
+  thin_depth: PRICING.THIN_DEPTH,
+  formula: [
+    "imbalance = (depth_with_flow - depth_against_flow) / total_depth",
+    "impact    = min(1, size / depth_against_flow)",
+    "spread    = base + max_skew * max(0, imbalance) + max_skew * 0.4 * impact",
+    "if imbalance < -rebate_threshold:",
+    "  strength = min(1, (|imbalance| - threshold) / (1 - threshold))",
+    "  rebate   = max_rebate * strength;  spread = max(0, base - rebate)",
+  ],
+  note: "Deterministic. Same book state always yields the same price, so any quote you were given can be recomputed and checked.",
+}), { public: true });
