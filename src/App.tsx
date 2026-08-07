@@ -2,8 +2,10 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { usePath } from "./router";
 import { FAMILIES, TOTAL_ENDPOINTS } from "./endpoints";
 import PhoneScreen, { type Screen } from "./PhoneScreen";
+import Device from "./Device";
 import { TryIt, KeyIssuer, ApiStatus } from "./TryIt";
 import Journey from "./Journey";
+import StablecoinFx from "./StablecoinFx";
 import { call, getStats, ensureKey, type SiteStats } from "./api";
 
 /* ------------------------------------------------------------------ */
@@ -45,7 +47,7 @@ function H({ as = "div", style, hover, focus, children, onClick, type, ...rest }
 }
 
 const SCREENS: Screen[] = ["accounts", "cards", "transfers", "exchange", "vaults", "credit", "business", "ledger"];
-// products[0..7] have a phone screen; the rest are screen: null and link to the docs.
+// Every product renders its own phone screen alongside the call behind it.
 
 const products = [
   { glyph: "AC", screen: "accounts" as Screen, tag: "ACCOUNTS", endpoint: "POST /v2/accounts", title: "Accounts", short: "Multi-currency accounts with real IBANs and sortcodes.",
@@ -82,31 +84,31 @@ const products = [
     code: 'await bb.ledger.statement({\n  account: "acc_92f",\n  from: "2026-07-01", to: "2026-07-31"\n});' },
   // Products with no phone screen of their own — they show on the tiles and the
   // products page, and link into the docs rather than pinning a hero screen.
-  { glyph: "KY", screen: null, tag: "ONBOARDING", endpoint: "POST /v2/applications", title: "Onboarding & KYC", short: "KYC and KYB with status kept separate from the decision.",
+  { glyph: "KY", screen: "signup" as Screen, tag: "ONBOARDING", endpoint: "POST /v2/applications", title: "Onboarding & KYC", short: "KYC and KYB with status kept separate from the decision.",
     body: "Run individual and business onboarding: collect details, add associated individuals, upload documents, submit for verification and record enhanced due diligence. Lifecycle status never collapses into the outcome, so a review still running never looks like a rejection.",
     rows: [{ k: "ENDPOINTS", v: "14" }, { k: "STATUS", v: "SEPARATE FROM DECISION" }, { k: "DOCUMENTS", v: "UPLOAD · FETCH" }, { k: "EDD", v: "SUPPORTED" }],
     code: 'await bb.applications.create({\n  customer: "cus_41c",\n  type: "business"\n});\n\n// → { status: "pending", decision: null }' },
-  { glyph: "QR", screen: null, tag: "QR", endpoint: "POST /v2/qr/generate", title: "QR & payment links", short: "EMVCo QR both ways, plus shareable payment links.",
+  { glyph: "QR", screen: "deposit-onchain" as Screen, tag: "QR", endpoint: "POST /v2/qr/generate", title: "QR & payment links", short: "EMVCo QR both ways, plus shareable payment links.",
     body: "Generate a real EMVCo merchant-presented payload with a CRC-16 checksum, decode one back into structured fields, and reject anything tampered with. Static and dynamic both supported, alongside single-use payment links.",
     rows: [{ k: "STANDARD", v: "EMVCo MPM" }, { k: "CHECKSUM", v: "CRC-16/CCITT" }, { k: "TYPES", v: "STATIC · DYNAMIC" }, { k: "TAMPERING", v: "REJECTED" }],
     code: 'await bb.qr.generate({\n  merchant: { name: "Coffee Corner" },\n  currency: "SGD", amount: "23.75"\n});' },
-  { glyph: "WL", screen: null, tag: "WALLETS", endpoint: "POST /v2/wallets", title: "Wallets", short: "On-chain balances with policies attached.",
+  { glyph: "WL", screen: "deposit-onchain" as Screen, tag: "WALLETS", endpoint: "POST /v2/wallets", title: "Wallets", short: "On-chain balances with policies attached.",
     body: "Create wallets under a customer, read balances per asset and network, and send with spend policies and approval chains enforced before anything moves.",
     rows: [{ k: "ENDPOINTS", v: "6" }, { k: "POLICIES", v: "ATTACHABLE" }, { k: "APPROVALS", v: "THRESHOLD-GATED" }, { k: "LEDGER", v: "DOUBLE-ENTRY" }],
     code: 'await bb.wallets.send({\n  wallet: "wal_7a2",\n  to: "0x8f2c…", amount: "250.00"\n});' },
-  { glyph: "WH", screen: null, tag: "WEBHOOKS", endpoint: "POST /v2/webhooks", title: "Webhooks & events", short: "Signed delivery, a delivery log, and replay.",
+  { glyph: "WH", screen: "deposit-pending" as Screen, tag: "WEBHOOKS", endpoint: "POST /v2/webhooks", title: "Webhooks & events", short: "Signed delivery, a delivery log, and replay.",
     body: "Register targets and receive HMAC-signed callbacks on every state change. Thirty days of delivery history, and a replay that carries an explicit header so a receiver can tell it from an original.",
     rows: [{ k: "SIGNING", v: "HMAC-SHA256" }, { k: "HISTORY", v: "30 DAYS" }, { k: "REPLAY", v: "X-WEBHOOK-REPLAY" }, { k: "EVENTS", v: "FULL AUDIT STREAM" }],
     code: 'await bb.webhooks.create({\n  url: "https://you.dev/hook",\n  events: ["transfer.status_changed"]\n});' },
-  { glyph: "SB", screen: null, tag: "SANDBOX", endpoint: "GET /v2/sandbox/scenarios", title: "Sandbox & failure injection", short: "Force any failure on purpose, then step past it.",
+  { glyph: "SB", screen: "card-declined" as Screen, tag: "SANDBOX", endpoint: "GET /v2/sandbox/scenarios", title: "Sandbox & failure injection", short: "Force any failure on purpose, then step past it.",
     body: "A discoverable scenario catalogue covering compliance holds, manual review and unconfirmed payments. Stateful simulations pause mid-flow and wait for an explicit advance, so you can build against failure instead of hoping.",
     rows: [{ k: "SCENARIOS", v: "CATALOGUED" }, { k: "PAUSE", v: "AWAITING_ADVANCE" }, { k: "IDEMPOTENT", v: "ON SIMULATION ID" }, { k: "CALLBACKS", v: "TRACKED" }],
     code: 'await bb.sandbox.onboarding({\n  scenario: "onboarding.compliance_hold"\n});\n\n// → { awaiting_advance: true }' },
-  { glyph: "BL", screen: null, tag: "BILLS", endpoint: "POST /v2/mandates", title: "Bills & subscriptions", short: "Direct debit mandates and recurring payments.",
+  { glyph: "BL", screen: "funded-home" as Screen, tag: "BILLS", endpoint: "POST /v2/mandates", title: "Bills & subscriptions", short: "Direct debit mandates and recurring payments.",
     body: "Create a mandate, then schedule recurring payments against it. Mandate status is checked before a subscription can be created, so a dead mandate cannot quietly keep charging.",
     rows: [{ k: "MANDATES", v: "SCHEME-AWARE" }, { k: "SCHEDULE", v: "INTERVAL + NEXT RUN" }, { k: "GUARD", v: "INACTIVE → 409" }, { k: "ENDPOINTS", v: "4" }],
     code: 'await bb.subscriptions.create({\n  mandate: "mnd_9f4",\n  amount: "12.99", interval: "month"\n});' },
-  { glyph: "RL", screen: null, tag: "RAILS", endpoint: "GET /v2/rails", title: "Rails registry", short: "Cut-offs and calendars as data, not a docs table.",
+  { glyph: "RL", screen: "deposit-rails" as Screen, tag: "RAILS", endpoint: "GET /v2/rails", title: "Rails registry", short: "Cut-offs and calendars as data, not a docs table.",
     body: "Every rail's currency, speed, cut-off, weekend behaviour and limits are queryable at runtime. Stop hardcoding which rails are open when — ask the API.",
     rows: [{ k: "RAILS", v: "6" }, { k: "CUT-OFFS", v: "QUERYABLE" }, { k: "CALENDAR", v: "PER RAIL" }, { k: "AUTH", v: "PUBLIC" }],
     code: 'await bb.rails.get("ach");\n\n// → { cutoff: "17:00 ET",\n//     weekend: false }' },
@@ -429,22 +431,32 @@ export default function App() {
               <h1 style={{ margin: "14px 0 12px", fontSize: "clamp(28px, 3.2vw, 42px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Everything a bank ships.</h1>
               <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "64ch", color: "#454B5C" }}>Eight products, one ledger. Open an account, issue a card, move money, hold balances in six currencies and reconcile it all from the same statement.</p>
             </div>
-            {/* THE EIGHT HEADLINE PRODUCTS */}
             <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296", margin: "6px 2px 0" }}>
-              EIGHT PRODUCTS · TAP ONE TO SEE ITS SCREEN
+              {products.length} PRODUCTS · EACH WITH ITS SCREEN AND THE CALL BEHIND IT
             </div>
-            <div className="bb-product-grid">
+            <div className="bb-screen-grid">
               {products.map((p) => (
-                <H key={p.title} onClick={() => { if (p.screen) { setScreen(p.screen); setPinned(true); setPage("home"); } else { setPage("dev"); } }}
-                  style={{ ...card, padding: "22px 22px 20px", display: "flex", flexDirection: "column", gap: 11, cursor: "pointer" }}
-                  hover={{ borderColor: "#5A6DB8" }}>
+                <div key={p.title} style={{ ...card, padding: "20px 20px 18px", display: "flex", flexDirection: "column", gap: 13 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                    <div style={{ width: 30, height: 30, borderRadius: 9, background: "#EEF1FA", border: "1px solid #DADFF2", color: "#4E5FA6", fontFamily: MONO, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.glyph}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: 9, background: "#EEF1FA", border: "1px solid #DADFF2", color: "#4E5FA6", fontFamily: MONO, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.glyph}</div>
+                      <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.025em" }}>{p.title}</div>
+                    </div>
                     <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#4E5FA6", background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 999, padding: "3px 9px" }}>{p.tag}</div>
                   </div>
-                  <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.025em" }}>{p.title}</div>
+
                   <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#5B6376" }}>{p.short}</div>
-                  <div style={{ display: "flex", flexDirection: "column", marginTop: 2 }}>
+
+                  {/* the screen itself */}
+                  {/* PhoneScreen ships its own device frame and status bar — never wrap it in another */}
+                  <div style={{ background: "#EDEFF4", border: "1px solid #D7DBE4", borderRadius: 14, padding: "16px 0" }}>
+                    <div className="bb-screen-scale">
+                      <Device id={p.screen} fxQuote={fxQuote} fxErr={fxErr} />
+                    </div>
+                  </div>
+
+                  {/* specs */}
+                  <div style={{ display: "flex", flexDirection: "column" }}>
                     {p.rows.slice(0, 3).map((r) => (
                       <div key={r.k} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "7px 0", borderTop: "1px solid #E7EAF0", fontSize: 12.5 }}>
                         <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.1em", color: "#7A8296" }}>{r.k}</span>
@@ -452,13 +464,21 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginTop: "auto", paddingTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+
+                  {/* the call behind this screen */}
+                  <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 12, padding: "14px 16px", fontFamily: MONO, fontSize: 11.5, lineHeight: 1.8, whiteSpace: "pre", overflowX: "auto" }}>{p.code}</div>
+
+                  <div style={{ marginTop: "auto", paddingTop: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <span style={{ fontFamily: MONO, fontSize: 10.5, color: "#7A8296" }}>{p.endpoint}</span>
-                    <span style={{ fontFamily: MONO, fontSize: 10, color: "#4E5FA6" }}>{p.screen ? "SEE IT →" : "DOCS →"}</span>
+                    <H as="button" onClick={() => setPage("dev")}
+                      style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.08em", color: "#4E5FA6", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                      hover={{ color: "#14161C" }}>RUN IT →</H>
                   </div>
-                </H>
+                </div>
               ))}
             </div>
+
+            <StablecoinFx />
 
             <Journey />
 

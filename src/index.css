@@ -45,3 +45,27 @@ input, button, textarea, select { font: inherit; color: inherit; }
 /* ---- endpoint rows: whole row is the affordance ---- */
 .bb-endpoint { cursor: pointer; }
 .bb-endpoint:hover { background: #F7F8FB; }
+
+/* ---- product cards each carry their own phone screen ---- */
+.bb-screen-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 760px)  { .bb-screen-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1180px) { .bb-screen-grid { grid-template-columns: repeat(3, 1fr); } }
+
+/* scale the full 328×682 device down to fit inside a product card.
+   Height must fit the WHOLE device (682 * 0.6 ≈ 410) or it crops. */
+.bb-screen-scale {
+  width: 100%;
+  height: 410px;              /* 682 × 0.6 = 409.2, rounded up — hugs the device exactly */
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+.bb-screen-scale > * {
+  transform: scale(0.6);
+  transform-origin: top center;
+  flex: none;
+}

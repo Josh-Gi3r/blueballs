@@ -106,6 +106,29 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
+    name: "Stablecoin FX", blurb: "Three legs, priced honestly. The ramps are 1:1 — only the corridor between them carries a spread.",
+    endpoints: [
+      { verb: "GET", path: "/v2/assets", does: "Every fiat and stablecoin, and what each redeems against", auth: "PUBLIC" },
+      { verb: "GET", path: "/v2/corridors", does: "Corridor depth, spread and settlement per pair", auth: "PUBLIC" },
+      { verb: "POST", path: "/v2/fx/quote", does: "Price one leg — on-ramp, corridor or off-ramp", auth: "KEY" },
+      { verb: "POST", path: "/v2/fx/route", does: "The full cross-border route, leg by leg", auth: "KEY" },
+      { verb: "POST", path: "/v2/ramps/on", does: "Fiat in, stablecoin minted 1:1", auth: "KEY" },
+      { verb: "POST", path: "/v2/ramps/off", does: "Stablecoin redeemed 1:1 back to fiat", auth: "KEY" },
+      { verb: "GET", path: "/v2/ramps", does: "Ramp history", auth: "KEY" },
+      { verb: "GET", path: "/v2/fx/depth", does: "Aggregate resting depth — never maker identity", auth: "PUBLIC" },
+      { verb: "GET", path: "/v2/fx/price", does: "Imbalance-derived price for a corridor", auth: "PUBLIC" },
+      { verb: "POST", path: "/v2/fx/intents", does: "Submit a signed swap intent as maker or taker", auth: "KEY" },
+      { verb: "GET", path: "/v2/fx/intents", does: "Your intents", auth: "KEY" },
+      { verb: "POST", path: "/v2/fx/intents/:id/cancel", does: "Cancel a resting intent", auth: "KEY" },
+      { verb: "GET", path: "/v2/fx/fills", does: "Settled fills, counterparties pseudonymous", auth: "KEY" },
+      { verb: "POST", path: "/v2/fx/net", does: "Net the corridor and settle the residual", auth: "KEY" },
+      { verb: "GET", path: "/v2/fx/batches", does: "Netting runs", auth: "KEY" },
+      { verb: "GET", path: "/v2/fx/appetite", does: "Principal backstop limits", auth: "KEY" },
+      { verb: "PUT", path: "/v2/fx/appetite", does: "Set the backstop limit for a corridor", auth: "KEY" },
+
+    ],
+  },
+  {
     name: "Transfers", blurb: "One transfer, an ordered list of legs. Status is derived from the legs, never guessed.",
     endpoints: [
       { verb: "POST", path: "/v2/transfers", does: "Send on any rail", auth: "KEY" },
