@@ -539,10 +539,10 @@ const COUNTRIES = [
 route("GET", "/v2/countries", () => ({ object: "list", data: COUNTRIES }), { public: true });
 
 const NETWORKS = [
-  { id: "base", name: "Base", chain_id: 8453, native_currency: "ETH", supports: ["USDC"] },
-  { id: "ethereum", name: "Ethereum", chain_id: 1, native_currency: "ETH", supports: ["USDC"] },
-  { id: "polygon", name: "Polygon", chain_id: 137, native_currency: "MATIC", supports: ["USDC"] },
-  { id: "arbitrum", name: "Arbitrum One", chain_id: 42161, native_currency: "ETH", supports: ["USDC"] },
-  { id: "solana", name: "Solana", chain_id: null, native_currency: "SOL", supports: ["USDC"] },
+  { id: "base", name: "Base", chain_id: 8453, native_currency: "ETH", supports: ["USDX"] },
+  { id: "ethereum", name: "Ethereum", chain_id: 1, native_currency: "ETH", supports: ["USDX"] },
+  { id: "polygon", name: "Polygon", chain_id: 137, native_currency: "MATIC", supports: ["USDX"] },
+  { id: "arbitrum", name: "Arbitrum One", chain_id: 42161, native_currency: "ETH", supports: ["USDX"] },
+  { id: "solana", name: "Solana", chain_id: null, native_currency: "SOL", supports: ["USDX"] },
 ];
 route("GET", "/v2/networks", () => ({ object: "list", data: NETWORKS }), { public: true });

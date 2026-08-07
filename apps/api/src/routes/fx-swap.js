@@ -35,6 +35,7 @@ import {
 } from "../kernel.js";
 import { isStable, midOf, CORRIDORS } from "../assets.js";
 import { priceCorridor, principalQuote, DEFAULT_APPETITE } from "../pricing.js";
+import { creditProviders } from "./fx-lp.js";
 
 const intents = collection("fxIntents");   // signed, unmatched
 const fills = collection("fxFills");       // matched, settled
@@ -254,6 +255,17 @@ function settle(intent, counterAccount, inMinor, outMinor, source, bps) {
     { account: counterAccount, currency: intent.to, amount: -outMinor },
   ], `swap ${intent.id} ${source} leg-out`);
 
+  // The spread the taker paid is real money. Book it explicitly so it can be shared
+  // with whoever provided the liquidity, rather than vanishing into a rounding gap.
+  const gross = BigInt(Math.floor(Number(inMinor) * (midOf(intent.from) / midOf(intent.to))));
+  const spread = gross - outMinor;
+  if (spread > 0n) {
+    post([
+      { account: counterAccount, currency: intent.to, amount: -spread },
+      { account: `spread:${pairKey(intent.from, intent.to)}`, currency: intent.to, amount: spread },
+    ], `spread ${intent.id} ${source}`);
+  }
+
   const f = {
     id: ksuid("fil"), intent: intent.id, source,
     pair: pairKey(intent.from, intent.to),
@@ -266,6 +278,16 @@ function settle(intent, counterAccount, inMinor, outMinor, source, bps) {
   };
   fills.set(f.id, f);
   emit("fx.fill.settled", { id: f.id, pair: f.pair, source });
+
+  // pay the providers whose liquidity made this fill possible
+  if (spread > 0n) {
+    const credited = creditProviders(pairKey(intent.from, intent.to), intent.to, spread, f.id);
+    if (credited.length) {
+      f.spread_shared_with = credited.length;
+      f.spread = fromMinor(spread);
+      fills.set(f.id, f);
+    }
+  }
 }
 
 route("GET", "/v2/fx/intents", ({ url, key }) => {

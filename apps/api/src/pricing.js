@@ -31,7 +31,7 @@ export const THIN_DEPTH = 100_000;
 
 /**
  * @param resting  { [pair]: minorUnits } resting depth per direction, e.g.
- *                 { "USDC/EURC": 2_000_00n, "EURC/USDC": 200_00n }
+ *                 { "USDX/EURX": 2_000_00n, "EURX/USDX": 200_00n }
  * @param from,to  the direction being priced
  * @param sizeMinor the taker's size — large orders eat depth and pay for it
  */

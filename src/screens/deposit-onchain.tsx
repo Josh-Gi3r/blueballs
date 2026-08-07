@@ -4,7 +4,7 @@ import type { ScreenMeta } from "./registry";
 /* On-chain deposit: network selector, wallet address with copy affordance, and a
    deterministic QR block grid (no QR library — hand-drawn finder patterns plus a
    hash-derived fill, same "no dependency" spirit as the CRC-16 QR codec in
-   apps/api/src/routes/payments.js). Networks and USDC support match NETWORKS in
+   apps/api/src/routes/payments.js). Networks and USDX support match NETWORKS in
    apps/api/src/routes/platform.js; wallet shape matches POST /v2/wallets in
    apps/api/src/routes/business.js. Visual language copied from PhoneScreen.tsx. */
 
@@ -12,7 +12,7 @@ const MONO = "'IBM Plex Mono', monospace";
 const label: CSSProperties = { fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296" };
 const white: CSSProperties = { background: "#FFFFFF", border: "1px solid #E3E6EE" };
 
-// Matches NETWORKS in apps/api/src/routes/platform.js — all support USDC.
+// Matches NETWORKS in apps/api/src/routes/platform.js — all support USDX.
 const networks = [
   { id: "base", name: "Base", sel: true },
   { id: "ethereum", name: "Ethereum", sel: false },
@@ -66,7 +66,7 @@ export default function DepositOnchain() {
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "14px 20px 10px", display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 17, color: "#7A8296" }}>←</span>
-        <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.03em" }}>Deposit USDC</div>
+        <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.03em" }}>Deposit USDX</div>
       </div>
 
       <div style={{ padding: "0 20px 10px", display: "flex", gap: 7, overflow: "auto" }}>
@@ -96,7 +96,7 @@ export default function DepositOnchain() {
       </div>
 
       <div style={{ margin: "12px 20px 0", background: "#FBEFEC", border: "1px solid #F0D3CC", borderRadius: 14, padding: "13px 15px", fontSize: 12, lineHeight: 1.55, color: "#8A4636" }}>
-        Only send USDC on Base to this address. Any other asset or network sent here cannot be recovered.
+        Only send USDX on Base to this address. Any other asset or network sent here cannot be recovered.
       </div>
 
       <div style={{ marginTop: "auto", padding: "14px 20px 22px", background: "#FFFFFF", borderTop: "1px solid #E3E6EE", fontSize: 11.5, color: "#7A8296", textAlign: "center" }}>
@@ -110,8 +110,8 @@ export const meta: ScreenMeta = {
   id: "deposit-onchain",
   journey: "funding",
   title: "On-chain deposit",
-  blurb: "A wallet per customer, addressable per network — deposit USDC straight from a chain instead of a bank rail.",
+  blurb: "A wallet per customer, addressable per network — deposit USDX straight from a chain instead of a bank rail.",
   endpoint: "POST /v2/wallets",
   code:
-    'await bb.wallets.create({\n  customer: "cus_41c",\n  currency: "USDC",\n  network: "base"\n});\n\n// → { address: "0x8f2c1a9b…e2cd40",\n//     network: "base", balance: { amount: "0.00" } }',
+    'await bb.wallets.create({\n  customer: "cus_41c",\n  currency: "USDX",\n  network: "base"\n});\n\n// → { address: "0x8f2c1a9b…e2cd40",\n//     network: "base", balance: { amount: "0.00" } }',
 };

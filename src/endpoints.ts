@@ -125,6 +125,12 @@ export const FAMILIES: Family[] = [
       { verb: "GET", path: "/v2/fx/batches", does: "Netting runs", auth: "KEY" },
       { verb: "GET", path: "/v2/fx/appetite", does: "Principal backstop limits", auth: "KEY" },
       { verb: "PUT", path: "/v2/fx/appetite", does: "Set the backstop limit for a corridor", auth: "KEY" },
+      { verb: "POST", path: "/v2/fx/lp", does: "Commit liquidity to a corridor — bank or member", auth: "KEY" },
+      { verb: "GET", path: "/v2/fx/lp", does: "Your positions and what they have earned", auth: "KEY" },
+      { verb: "GET", path: "/v2/fx/lp/earnings", does: "Spread earned, fill by fill", auth: "KEY" },
+      { verb: "POST", path: "/v2/fx/lp/:id/withdraw", does: "Pull liquidity back out", auth: "KEY" },
+      { verb: "GET", path: "/v2/fx/lp/pools", does: "Aggregate committed liquidity per corridor", auth: "PUBLIC" },
+
 
     ],
   },

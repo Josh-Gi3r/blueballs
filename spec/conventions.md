@@ -26,7 +26,7 @@ Every mutable resource also accepts a caller-supplied `client_reference_id`.
 ## Money
 Never a float. Always a decimal **string** plus an explicit currency.
 ```json
-{ "amount": "2400.00", "currency": "EUR", "settlement_currency": "USDC" }
+{ "amount": "2400.00", "currency": "EUR", "settlement_currency": "USDX" }
 ```
 `settlement_currency` is separate from `currency` and MUST stay separate — collapsing them is
 what produces a UI claiming a user spent dollars when they spent a stablecoin.

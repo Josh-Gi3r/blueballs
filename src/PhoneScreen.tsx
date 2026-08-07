@@ -34,7 +34,7 @@ const txns = [
 const rails = [
   { name: "SEPA Instant", sub: "Arrives in seconds", fee: "Free", sel: true },
   { name: "SWIFT", sub: "1–2 business days", fee: "€6.00", sel: false },
-  { name: "USDC · Base", sub: "Arrives in ~20 seconds", fee: "€0.40", sel: false },
+  { name: "USDX · Base", sub: "Arrives in ~20 seconds", fee: "€0.40", sel: false },
 ];
 const vaultRules = [
   { title: "Round up spare change", sub: "To the nearest €1", on: true },

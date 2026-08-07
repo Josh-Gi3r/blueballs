@@ -36,7 +36,7 @@ const crcHex = (str) => crc16ccitt(str).toString(16).toUpperCase().padStart(4, "
  * EMVCo Merchant Presented QR — minimal TLV codec.
  * ===================================================================== */
 
-/** ISO 4217 numeric codes for the currencies this sandbox supports. USDC has
+/** ISO 4217 numeric codes for the currencies this sandbox supports. USDX has
  *  no ISO 4217 numeric code (it isn't a fiat currency), so it can't legally
  *  populate EMVCo tag 53 — QR generate rejects it rather than fake a code. */
 const ISO4217_NUMERIC = { USD: "840", EUR: "978", GBP: "826", SGD: "702", MYR: "458" };

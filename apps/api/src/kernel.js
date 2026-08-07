@@ -22,7 +22,7 @@ export const RAILS = {
   wire: { id: "wire", currency: "USD", speed: "same day", cutoff: "16:00 ET", weekend: false, min: "100.00", max: "1000000.00" },
   paynow: { id: "paynow", currency: "SGD", speed: "seconds", cutoff: null, weekend: true, min: "0.01", max: "200000.00" },
 };
-export const RATES = { USD: 1, EUR: 1.083, GBP: 1.271, SGD: 0.742, USDC: 1, MYR: 0.213 };
+export const RATES = { USD: 1, EUR: 1.083, GBP: 1.271, SGD: 0.742, USDX: 1, MYR: 0.213 };
 export const THIN = new Set(["MYR"]);
 
 /* ---------------- route registry ---------------- */

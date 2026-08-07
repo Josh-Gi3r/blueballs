@@ -15,6 +15,11 @@
  *  costs one spread instead of three and settles in seconds.
  *
  *  Issuers are pluggable — this file is configuration, not a dependency on anyone.
+ *
+ *  TICKERS HERE ARE ILLUSTRATIVE. USDX / EURX / SGDX / MYRX are placeholders for a
+ *  reference implementation. Whoever deploys this maps them to the real tokens and
+ *  issuers they actually clear with. We deliberately do not ship real tickers — the
+ *  stack should not imply an endorsement of, or dependency on, any particular issuer.
  */
 
 export const FIAT = {
@@ -28,10 +33,10 @@ export const FIAT = {
 /** Each stablecoin names the fiat it redeems against and who stands behind it.
  *  `issuer` is a label you configure — swap it for whoever you actually clear with. */
 export const STABLECOINS = {
-  USDC: { code: "USDC", name: "USD stablecoin", peg: "USD", decimals: 6, issuer: "issuer-a", networks: ["base", "ethereum"], redeemable: true },
-  EURC: { code: "EURC", name: "EUR stablecoin", peg: "EUR", decimals: 6, issuer: "issuer-a", networks: ["base", "ethereum"], redeemable: true },
-  XSGD: { code: "XSGD", name: "SGD stablecoin", peg: "SGD", decimals: 6, issuer: "issuer-b", networks: ["ethereum"], redeemable: true },
-  MYRT: { code: "MYRT", name: "MYR stablecoin", peg: "MYR", decimals: 6, issuer: "issuer-c", networks: ["ethereum"], redeemable: true },
+  USDX: { code: "USDX", name: "USD stablecoin", peg: "USD", decimals: 6, issuer: "issuer-a", networks: ["base", "ethereum"], redeemable: true },
+  EURX: { code: "EURX", name: "EUR stablecoin", peg: "EUR", decimals: 6, issuer: "issuer-a", networks: ["base", "ethereum"], redeemable: true },
+  SGDX: { code: "SGDX", name: "SGD stablecoin", peg: "SGD", decimals: 6, issuer: "issuer-b", networks: ["ethereum"], redeemable: true },
+  MYRX: { code: "MYRX", name: "MYR stablecoin", peg: "MYR", decimals: 6, issuer: "issuer-c", networks: ["ethereum"], redeemable: true },
 };
 
 export const isFiat = (c) => !!FIAT[c];
@@ -55,14 +60,14 @@ export const midOf = (c) => MID[isStable(c) ? pegOf(c) : c] ?? null;
 /** Corridor depth. A corridor is a stablecoin pair — the only leg that carries FX.
  *  `depth` is what a taker can fill right now; it is what drives the skew below. */
 export const CORRIDORS = {
-  "USDC/EURC": { depth: "2400000.00", base_bps: 4 },
-  "EURC/USDC": { depth: "2400000.00", base_bps: 4 },
-  "USDC/XSGD": { depth: "610000.00", base_bps: 6 },
-  "XSGD/USDC": { depth: "610000.00", base_bps: 6 },
-  "EURC/XSGD": { depth: "180000.00", base_bps: 12 },
-  "XSGD/EURC": { depth: "180000.00", base_bps: 12 },
-  "USDC/MYRT": { depth: "94000.00", base_bps: 85 },
-  "MYRT/USDC": { depth: "31000.00", base_bps: 85 },
+  "USDX/EURX": { depth: "2400000.00", base_bps: 4 },
+  "EURX/USDX": { depth: "2400000.00", base_bps: 4 },
+  "USDX/SGDX": { depth: "610000.00", base_bps: 6 },
+  "SGDX/USDX": { depth: "610000.00", base_bps: 6 },
+  "EURX/SGDX": { depth: "180000.00", base_bps: 12 },
+  "SGDX/EURX": { depth: "180000.00", base_bps: 12 },
+  "USDX/MYRX": { depth: "94000.00", base_bps: 85 },
+  "MYRX/USDX": { depth: "31000.00", base_bps: 85 },
 };
 
 /** Issuer fee on a 1:1 ramp, in bps. This is NOT FX — it is the cost of minting or
