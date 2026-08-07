@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { call } from "./api";
+import { call, ensureKey } from "./api";
 
 const MONO = "'IBM Plex Mono', monospace";
 const card: CSSProperties = { background: "#FFFFFF", border: "1px solid #D7DBE4", borderRadius: 18 };
@@ -144,11 +144,16 @@ function RouteBuilder() {
     let alive = true;
     setErr(null);
     const t = setTimeout(() => {
-      call("POST", "/v2/fx/route", { from, to, amount }).then((r) => {
-        if (!alive) return;
-        if (r.ok) setRoute(r.body);
-        else setErr((r.body as any)?.detail ?? r.error ?? "Could not price that route");
-      });
+      // Pricing a route is an authenticated call, and a visitor arriving straight
+      // at /fx has never been through the docs page. Issue them a sandbox key on
+      // the spot — the demo is meant to work for anyone with the link.
+      ensureKey()
+        .then(() => call("POST", "/v2/fx/route", { from, to, amount }))
+        .then((r) => {
+          if (!alive) return;
+          if (r.ok) setRoute(r.body);
+          else setErr((r.body as any)?.detail ?? r.error ?? "Could not price that route");
+        });
     }, 250);
     return () => { alive = false; clearTimeout(t); };
   }, [from, to, amount]);
