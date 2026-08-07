@@ -14,6 +14,9 @@ import { call, getStats, ensureKey, type SiteStats } from "./api";
 /*  before editing this file.                                           */
 /* ------------------------------------------------------------------ */
 
+/** Stable dom id for a family section, so the contents list can actually reach it. */
+const docSlug = (name: string) => "doc-fam-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
 const MONO = "'IBM Plex Mono', monospace";
 const VERB_COLOR: Record<string, string> = {
   GET: "#2E7D53", POST: "#4E5FA6", PATCH: "#B0761E", PUT: "#B0761E", DELETE: "#B4453C",
@@ -544,15 +547,27 @@ export default function App() {
           <div data-col style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 14, alignItems: "start" }}>
             <div className="bb-toc" style={{ ...card, padding: "22px 0 24px" }}>
               <div style={{ padding: "0 22px 12px", fontFamily: MONO, fontSize: 10, letterSpacing: "0.18em", color: "#7A8296" }}>CONTENTS</div>
-              {["Overview", "Authentication", "Quickstart", ...FAMILIES.map((f) => f.name), "Errors", "Webhooks", "Self-hosting"].map((l, i) => (
-                <H key={l} style={{ padding: "9px 22px", fontSize: 13.5, cursor: "pointer", color: i === 0 ? "#4E5FA6" : "#454B5C", background: i === 0 ? "#F0F2F7" : "transparent" }} hover={{ color: "#4E5FA6" }}>{l}</H>
+              {/* Every entry here points at a section that exists on this page. A
+                  contents list of things that aren't below it is decoration, not
+                  navigation. */}
+              {[{ label: "Overview", id: "doc-overview" },
+                { label: "API reference", id: "doc-api" },
+                ...FAMILIES.map((f) => ({ label: f.name, id: docSlug(f.name) })),
+                { label: "Guides & runbooks", id: "doc-guides" }].map((item) => (
+                <H key={item.id}
+                  // "smooth" silently no-ops on a long jump in some engines — verified
+                  // here, it moved 0px while "auto" moved the full 9,939. A contents
+                  // list that doesn't move the page is the bug we are fixing.
+                  onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: "auto", block: "start" })}
+                  style={{ padding: "9px 22px", fontSize: 13.5, cursor: "pointer", color: "#454B5C" }}
+                  hover={{ color: "#4E5FA6", background: "#F0F2F7" }}>{item.label}</H>
               ))}
               <div style={{ padding: "16px 22px 0" }}>
-                <div style={{ borderTop: "1px solid #E7EAF0", paddingTop: 14, fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: "#5B6376" }}>MIT licence<br />Not yet published to GitHub</div>
+                <div style={{ borderTop: "1px solid #E7EAF0", paddingTop: 14, fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: "#5B6376" }}>MIT licence<br />Repository private while it stabilises</div>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div data-pad style={{ ...card, padding: "42px 40px 36px" }}>
+              <div id="doc-overview" data-pad style={{ ...card, padding: "42px 40px 36px", scrollMarginTop: 90 }}>
                 <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>DEVELOPER MANUAL · REV 2.4</div>
                 <h1 style={{ margin: "14px 0 12px", fontSize: "clamp(26px, 3vw, 38px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Start moving money.</h1>
                 <p style={{ margin: 0, fontSize: 16.5, lineHeight: 1.62, maxWidth: "58ch", color: "#454B5C" }}>One base URL, one bearer token, JSON in and out. Sandbox keys are unmetered and every endpoint mirrors production semantics.</p>
@@ -562,7 +577,7 @@ export default function App() {
                 <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 18, padding: "24px 26px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{devCall}</div>
               </div>
 
-              <div data-pad style={{ ...card, padding: "30px 32px 28px" }}>
+              <div id="doc-api" data-pad style={{ ...card, padding: "30px 32px 28px", scrollMarginTop: 90 }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
                   <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>API REFERENCE</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -583,7 +598,7 @@ export default function App() {
                   <div style={{ padding: "26px 0", color: "#7A8296", fontSize: 14.5 }}>Nothing matches “{apiFilter}”.</div>
                 )}
                 {shownFamilies.map((fam) => (
-                  <div key={fam.name} style={{ marginTop: 26 }}>
+                  <div key={fam.name} id={docSlug(fam.name)} style={{ marginTop: 26, scrollMarginTop: 90 }}>
                     <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                       <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: "-0.02em" }}>{fam.name}</h3>
                       <span style={{ fontFamily: MONO, fontSize: 10.5, color: "#7A8296" }}>{fam.endpoints.length} ENDPOINTS</span>
@@ -604,7 +619,7 @@ export default function App() {
                 ))}
               </div>
 
-              <div data-col style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+              <div id="doc-guides" data-col style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, scrollMarginTop: 90 }}>
                 {guides.map((g) => (
                   <H key={g.title} style={{ ...card, borderRadius: 16, padding: 22, display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }} hover={{ borderColor: "#5A6DB8" }}>
                     <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296" }}>{g.kind}</div>
