@@ -368,7 +368,7 @@ function LpCalculator() {
 
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
-/* 0. The comparison. Everything below this is proof; this is the claim. */
+/* 0. The comparison. Three ways, not two — the middle one is the point.        */
 /* ------------------------------------------------------------------ */
 function Contrast() {
   const [live, setLive] = useState<any>(null);
@@ -378,38 +378,62 @@ function Contrast() {
       .then((r) => r.ok && setLive(r.body));
   }, []);
 
-  const col: CSSProperties = { padding: "22px 24px 20px", borderRadius: 14 };
-  const lbl: CSSProperties = { fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", marginBottom: 12 };
-  const row: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, padding: "7px 0", fontSize: 13.5 };
+  const ROWS = ["What actually crosses the border", "Who prices the FX", "What you're quoted up front", "Arrives"];
+  const COLS = [
+    {
+      label: "A BANK TRANSFER",
+      tone: "plain" as const,
+      cells: ["Money, bank to bank", "2–4 banks, each in turn", "Not the final number", "Days, after cut-offs"],
+    },
+    {
+      label: "A STABLECOIN ON THE OLD RAIL",
+      tone: "warn" as const,
+      cells: ["Money, bank to bank — still", "The banks underneath, still", "Not the final number", "Days, after cut-offs"],
+    },
+    {
+      label: "A STABLECOIN THAT ACTUALLY CROSSES",
+      tone: "dark" as const,
+      cells: [
+        "The token itself, on-chain",
+        "One corridor, once",
+        live ? `${live.total_spread_bps} bps — the final number` : "…",
+        live?.settlement?.end_to_end_seconds != null ? fmtWindow(live.settlement.end_to_end_seconds) : "…",
+      ],
+    },
+  ];
+
+  const bg = { plain: "#F7F8FA", warn: "#FBF7F0", dark: "#14161C" };
+  const bd = { plain: "1px solid #DDE1E8", warn: "1px solid #E8DCC4", dark: "1px solid #14161C" };
+  const fg = { plain: "#5A6274", warn: "#6B5B3E", dark: "#C8CEDA" };
+  const strong = { plain: "#454B5C", warn: "#8A6D33", dark: "#FFFFFF" };
+  const rule = { plain: "#E7EAF0", warn: "#EFE4D0", dark: "#262A33" };
 
   return (
-    <div data-col style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-      <div style={{ ...col, background: "#F7F8FA", border: "1px solid #DDE1E8", color: "#5A6274" }}>
-        <div style={{ ...lbl, color: "#8B93A6" }}>SENDING €10,000 TO SINGAPORE TODAY</div>
-        <div style={{ ...row, borderTop: "1px solid #E7EAF0" }}><span>Banks it passes through</span><strong style={{ color: "#454B5C" }}>2–4</strong></div>
-        <div style={{ ...row, borderTop: "1px solid #E7EAF0" }}><span>Who prices the FX</span><strong style={{ color: "#454B5C" }}>each of them</strong></div>
-        <div style={{ ...row, borderTop: "1px solid #E7EAF0" }}><span>What you're quoted up front</span><strong style={{ color: "#454B5C" }}>not the final number</strong></div>
-        <div style={{ ...row, borderTop: "1px solid #E7EAF0" }}><span>Arrives</span><strong style={{ color: "#454B5C" }}>days, after cut-offs</strong></div>
+    <>
+      <div data-col style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+        {COLS.map((c) => (
+          <div key={c.label} style={{ padding: "20px 20px 18px", borderRadius: 14, background: bg[c.tone], border: bd[c.tone], color: fg[c.tone] }}>
+            <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.13em", marginBottom: 12, minHeight: 24, color: c.tone === "dark" ? "#8B93A6" : undefined }}>
+              {c.label}
+            </div>
+            {c.cells.map((cell, i) => (
+              <div key={ROWS[i]} style={{ borderTop: `1px solid ${rule[c.tone]}`, padding: "9px 0" }}>
+                <div style={{ fontSize: 11.5, opacity: 0.75, marginBottom: 2 }}>{ROWS[i]}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: i === 2 && c.tone === "dark" ? "#94A3E0" : strong[c.tone], fontVariantNumeric: "tabular-nums" }}>
+                  {cell}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
-
-      <div style={{ ...col, background: "#14161C", color: "#C8CEDA" }}>
-        <div style={{ ...lbl, color: "#8B93A6" }}>THE SAME PAYMENT, HERE</div>
-        <div style={{ ...row, borderTop: "1px solid #262A33" }}><span>Banks it passes through</span><strong style={{ color: "#FFFFFF" }}>none</strong></div>
-        <div style={{ ...row, borderTop: "1px solid #262A33" }}><span>Who prices the FX</span><strong style={{ color: "#FFFFFF" }}>one corridor, once</strong></div>
-        <div style={{ ...row, borderTop: "1px solid #262A33" }}>
-          <span>What you're quoted up front</span>
-          <strong style={{ color: "#94A3E0", fontVariantNumeric: "tabular-nums" }}>
-            {live ? `${live.total_spread_bps} bps — the final number` : "…"}
-          </strong>
-        </div>
-        <div style={{ ...row, borderTop: "1px solid #262A33" }}>
-          <span>Arrives</span>
-          <strong style={{ color: "#FFFFFF" }}>
-            {live?.settlement?.end_to_end_seconds != null ? fmtWindow(live.settlement.end_to_end_seconds) : "…"}
-          </strong>
-        </div>
-      </div>
-    </div>
+      <p style={{ margin: "18px 0 0", fontSize: 15, lineHeight: 1.6, maxWidth: "68ch", color: "#454B5C" }}>
+        The middle one is where most of the industry is. Issuing a stablecoin does not by itself
+        move anything — if the crossing still happens bank to bank underneath, the customer pays
+        the same as they always did. <strong style={{ fontWeight: 600 }}>The saving comes from
+        changing the rail, not from wrapping the old one in a token.</strong>
+      </p>
+    </>
   );
 }
 
