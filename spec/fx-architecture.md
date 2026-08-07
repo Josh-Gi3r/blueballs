@@ -54,7 +54,7 @@ Because every participant is verified, we can do what a permissionless venue can
 | Tier | Sees | Status |
 |---|---|---|
 | **Public** | aggregated netted depth per corridor, price levels, no identity, no per-order rows | ✅ `GET /v2/fx/depth` |
-| **Permissioned** | a bank integrator gets firm quotes for its own flow (RFQ) | ❌ **not built** |
+| **Permissioned** | a bank integrator gets firm quotes for its own flow (RFQ) | ✅ `POST /v2/fx/rfq` |
 | **Private** | a maker sees only their own orders | ✅ |
 | **Engine only** | the full L3 book | ✅ |
 
@@ -144,13 +144,33 @@ a same-direction batch nets to zero saving, and the number should be read that w
    speculative LPs at all, and at what spread.
 4. **Edge leg-risk.** ⚠️ **The swap is atomic; the fiat ramps are not atomic with it.** Fiat
    can land while a mint fails, or the rate can move between the two ramps. Someone bears
-   that gap. Options: issuer guarantee, an escrow window, or a locked quote held across the
-   whole route. **Not yet modelled in code.**
+   that gap.
+
+   **Now modelled, not yet decided.** The gap is represented rather than assumed away:
+   `RAIL_SETTLEMENT` in `assets.js` carries a real time-to-irrevocability per rail
+   (SEPA instant 10s … ACH 5 days), `POST /v2/fx/route` reports `route_atomic: false`
+   alongside `corridor_leg_atomic: true`, and both the route and every ramp name who
+   carries the movement. It also now refuses to imply a route it cannot deliver — a
+   currency with no configured rail comes back `deliverable: false`, which is what
+   caught USD→MYR quoting 85 bps for an off-ramp that does not exist.
+
+   **The commercial decision is still yours**, and it is configuration
+   (`FX_RAMP_GAP_POLICY`), not a hardcoded promise:
+
+   | policy | who carries the movement | what it costs you |
+   |---|---|---|
+   | `taker` *(default)* | the customer | nothing; the rate is struck at swap time, and we say so |
+   | `issuer` | the stablecoin issuer guarantees mint at sent-time rate | only real if your issuer has actually agreed |
+   | `operator` | you escrow and eat the movement | a treasury position you must fund and size |
+   | `route` | locked across all three legs at quote time | you carry it for the length of the slowest rail |
+
+   The default is `taker` because it is the only one that promises nothing we have not
+   been configured to deliver. Pick another and the API text changes with it.
 
 ## Not built yet
 
-- **RFQ tier** (§4) — firm quotes for a bank integrator's own flow
-- **Edge leg-risk handling** (open decision 4) — the atomicity gap at the ramps
+- **Edge leg-risk** — the gap is now modelled and disclosed (open decision 4); which party
+  absorbs it is a config choice still to be made
 - **Self-hostable indexer** — resting-book aggregation, which quote-probing cannot reach
 - **Batch auction** — discrete clearing windows; would let the book be lit safely. Proposed,
   not agreed.

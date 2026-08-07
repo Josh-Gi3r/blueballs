@@ -2,7 +2,7 @@
  *  Owned by this file. See ../assets.js for the model. */
 
 import { route, ApiError, need, toMinor, fromMinor, ksuid, db, post, balanceOf, emit, collection, now } from "../kernel.js";
-import { FIAT, STABLECOINS, isFiat, isStable, legKind, priceLeg, routeFor, CORRIDORS, midOf } from "../assets.js";
+import { FIAT, STABLECOINS, isFiat, isStable, legKind, priceLeg, routeFor, CORRIDORS, midOf, rampSettlement, RAMP_GAP_POLICY } from "../assets.js";
 
 const ramps = collection("ramps");
 
@@ -90,6 +90,35 @@ route("POST", "/v2/fx/route", ({ body }) => {
     legs: priced,
     total_spread_bps: totalBps,
     note: "One spread, not three. The ramps are 1:1 — only the corridor is priced.",
+    // Cost and time are different claims. The ramps cost nothing; they are not
+    // instant, and they are not atomic with the corridor leg between them.
+    settlement: (() => {
+      const inb = rampSettlement(from), outb = rampSettlement(to);
+      const worst = [inb, outb]
+        .filter((x) => x.window_seconds != null)
+        .reduce((a, b) => (a.window_seconds >= b.window_seconds ? a : b), { window_seconds: 0 });
+      // A currency with no configured rail cannot be ramped, so quoting a price for
+      // that leg would be a promise we cannot keep. Say which end is missing.
+      const blocked = [
+        inb.rail ? null : from,
+        outb.rail ? null : to,
+      ].filter(Boolean);
+      return {
+        on_ramp: inb, off_ramp: outb,
+        deliverable: blocked.length === 0,
+        ...(blocked.length ? {
+          blocked_on: blocked,
+          blocked_reason: `No settlement rail is configured for ${blocked.join(" or ")}, so that leg cannot be delivered. The corridor price above is indicative only.`,
+        } : {}),
+        end_to_end_seconds: blocked.length ? null : (worst.window_seconds ?? null),
+        corridor_leg_atomic: true,
+        route_atomic: false,
+        rate_risk_borne_by: RAMP_GAP_POLICY,
+        note: "The corridor leg settles atomically — both sides post together or neither does. " +
+              "The fiat ramps either side ride external rails and do not, so the route as a whole is not atomic. " +
+              "The rate is struck when the corridor leg executes.",
+      };
+    })(),
     expires_at: new Date(Date.now() + 30000).toISOString(),
   };
 });
@@ -125,6 +154,20 @@ route("POST", "/v2/ramps/on", ({ body, key }) => {
     to: { amount: body.amount, currency: to },
     rate: "1.000000", spread_bps: 0,
     issuer: STABLECOINS[to].issuer, status: "settled", created_at: now(), owner: key.id,
+    // The mint is 1:1 and carries no FX. What it does carry is time: the fiat leg
+    // rides an external rail, and the swap it feeds is priced when the swap runs,
+    // not when the money was sent. Say so rather than implying they are atomic.
+    settlement: (() => {
+      const s = rampSettlement(acc.currency);
+      return {
+        rail: s.rail, basis: s.basis, window_seconds: s.window_seconds,
+        atomic_with_swap: false,
+        rate_risk_borne_by: RAMP_GAP_POLICY,
+        note: RAMP_GAP_POLICY === "taker"
+          ? "The corridor rate is struck when you swap, not when this ramp was requested. Over the rail's window it can move, and that movement is yours."
+          : `Movement across the ramp window is carried by: ${RAMP_GAP_POLICY}.`,
+      };
+    })(),
   };
   ramps.set(r.id, r);
   emit("ramp.settled", r);

@@ -75,6 +75,56 @@ export const CORRIDORS = {
 export const RAMP_BPS = 0;
 
 /**
+ * How long a fiat rail actually takes to become irrevocable.
+ *
+ * This is the honest edge of the whole design. The corridor leg is atomic — both
+ * sides of a swap post in one ledger transaction or neither does. The RAMPS ARE NOT
+ * ATOMIC WITH IT: fiat arrives on somebody else's rail, on that rail's schedule, and
+ * between the money landing and the token existing there is a window. Someone bears
+ * that window. Pretending it is instant does not remove the risk, it just hides who
+ * is carrying it.
+ *
+ * `window_seconds` is time to irrevocability, not time to appear in a balance.
+ */
+export const RAIL_SETTLEMENT = {
+  sepa_instant:   { window_seconds: 10,     basis: "irrevocable on receipt" },
+  paynow:         { window_seconds: 10,     basis: "irrevocable on receipt" },
+  faster_payments:{ window_seconds: 120,    basis: "irrevocable, subject to recall window" },
+  wire:           { window_seconds: 3600,   basis: "same-day, irrevocable once posted" },
+  sepa:           { window_seconds: 86400,  basis: "next business day" },
+  ach:            { window_seconds: 432000, basis: "settles T+1, returnable for up to 5 business days" },
+};
+
+/** The fastest rail a currency can actually use, which is the one that bounds the gap. */
+export function rampSettlement(fiat) {
+  const rails = FIAT[fiat]?.rails ?? [];
+  const known = rails.map((r) => RAIL_SETTLEMENT[r]).filter(Boolean);
+  if (!known.length) {
+    return { window_seconds: null, basis: "no supported rail — this currency cannot be ramped", rail: null };
+  }
+  const best = known.reduce((a, b) => (a.window_seconds <= b.window_seconds ? a : b));
+  return { ...best, rail: rails[known.indexOf(best)] };
+}
+
+/**
+ * Who carries the rate movement between a ramp and the swap it feeds.
+ *
+ * There is no neutral default here — it is a commercial decision, so it is
+ * configuration rather than a hardcoded promise:
+ *
+ *   taker      (default) the customer carries their own rate risk across the gap.
+ *              The rate is quoted when the swap executes, not when the fiat is sent.
+ *              We promise nothing we have not been configured to promise.
+ *   issuer     the stablecoin issuer guarantees mint at the sent-time rate.
+ *              Only real if your issuer has actually agreed to it.
+ *   operator   you escrow the difference and eat the movement — a treasury position
+ *              you must fund and size.
+ *   route      the whole three-leg route is locked at quote time (see the RFQ tier),
+ *              which means you carry it for the length of the slowest rail.
+ */
+export const RAMP_GAP_POLICY = process.env.FX_RAMP_GAP_POLICY || "taker";
+
+/**
  * Price a leg.
  *
  * Ramps are 1:1 by construction — no spread, because no currency is being changed.

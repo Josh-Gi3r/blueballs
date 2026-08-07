@@ -2,6 +2,13 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { call, ensureKey } from "./api";
 
 const MONO = "'IBM Plex Mono', monospace";
+/** Rail windows span 10 seconds to five days — show whichever unit reads honestly. */
+const fmtWindow = (sec: number) =>
+  sec < 90 ? `${sec} seconds`
+    : sec < 5400 ? `${Math.round(sec / 60)} minutes`
+      : sec < 172800 ? `${Math.round(sec / 3600)} hours`
+        : `${Math.round(sec / 86400)} days`;
+
 const card: CSSProperties = { background: "#FFFFFF", border: "1px solid #D7DBE4", borderRadius: 18 };
 
 type Model = {
@@ -223,6 +230,31 @@ function RouteBuilder() {
               </div>
             </div>
           </div>
+          {/* Cost and time are different claims. The corridor is atomic; the fiat
+              ramps either side are not, and a corridor with no rail cannot be
+              delivered at all — the page says so rather than quoting past it. */}
+          {route.settlement && (
+            <div style={{
+              marginTop: 10, padding: "12px 16px", borderRadius: 12, fontSize: 13, lineHeight: 1.5,
+              border: `1px solid ${route.settlement.deliverable === false ? "#E7C9C9" : "#DDE1E8"}`,
+              background: route.settlement.deliverable === false ? "#FCF6F5" : "#F7F8FA",
+              color: route.settlement.deliverable === false ? "#8C3A34" : "#5A6274",
+            }}>
+              {route.settlement.deliverable === false ? (
+                <><strong>Not deliverable end to end.</strong> {route.settlement.blocked_reason}</>
+              ) : (
+                <>
+                  <strong>Atomic in the middle, not at the edges.</strong>{" "}
+                  The corridor leg settles atomically. The ramps ride{" "}
+                  <span style={{ fontFamily: MONO }}>{route.settlement.on_ramp?.rail}</span> and{" "}
+                  <span style={{ fontFamily: MONO }}>{route.settlement.off_ramp?.rail}</span>
+                  {route.settlement.end_to_end_seconds != null && <> — about {fmtWindow(route.settlement.end_to_end_seconds)} end to end</>}
+                  . The rate is struck when the corridor leg runs, and that movement is carried by{" "}
+                  <span style={{ fontFamily: MONO }}>{route.settlement.rate_risk_borne_by}</span>.
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
