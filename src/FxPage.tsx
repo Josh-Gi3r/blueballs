@@ -367,6 +367,52 @@ function LpCalculator() {
 }
 
 /* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+/* 0. The comparison. Everything below this is proof; this is the claim. */
+/* ------------------------------------------------------------------ */
+function Contrast() {
+  const [live, setLive] = useState<any>(null);
+  useEffect(() => {
+    ensureKey()
+      .then(() => call("POST", "/v2/fx/route", { from: "EUR", to: "SGD", amount: "10000.00" }))
+      .then((r) => r.ok && setLive(r.body));
+  }, []);
+
+  const col: CSSProperties = { padding: "22px 24px 20px", borderRadius: 14 };
+  const lbl: CSSProperties = { fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", marginBottom: 12 };
+  const row: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, padding: "7px 0", fontSize: 13.5 };
+
+  return (
+    <div data-col style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div style={{ ...col, background: "#F7F8FA", border: "1px solid #DDE1E8", color: "#5A6274" }}>
+        <div style={{ ...lbl, color: "#8B93A6" }}>SENDING €10,000 TO SINGAPORE TODAY</div>
+        <div style={{ ...row, borderTop: "1px solid #E7EAF0" }}><span>Banks it passes through</span><strong style={{ color: "#454B5C" }}>2–4</strong></div>
+        <div style={{ ...row, borderTop: "1px solid #E7EAF0" }}><span>Who prices the FX</span><strong style={{ color: "#454B5C" }}>each of them</strong></div>
+        <div style={{ ...row, borderTop: "1px solid #E7EAF0" }}><span>What you're quoted up front</span><strong style={{ color: "#454B5C" }}>not the final number</strong></div>
+        <div style={{ ...row, borderTop: "1px solid #E7EAF0" }}><span>Arrives</span><strong style={{ color: "#454B5C" }}>days, after cut-offs</strong></div>
+      </div>
+
+      <div style={{ ...col, background: "#14161C", color: "#C8CEDA" }}>
+        <div style={{ ...lbl, color: "#8B93A6" }}>THE SAME PAYMENT, HERE</div>
+        <div style={{ ...row, borderTop: "1px solid #262A33" }}><span>Banks it passes through</span><strong style={{ color: "#FFFFFF" }}>none</strong></div>
+        <div style={{ ...row, borderTop: "1px solid #262A33" }}><span>Who prices the FX</span><strong style={{ color: "#FFFFFF" }}>one corridor, once</strong></div>
+        <div style={{ ...row, borderTop: "1px solid #262A33" }}>
+          <span>What you're quoted up front</span>
+          <strong style={{ color: "#94A3E0", fontVariantNumeric: "tabular-nums" }}>
+            {live ? `${live.total_spread_bps} bps — the final number` : "…"}
+          </strong>
+        </div>
+        <div style={{ ...row, borderTop: "1px solid #262A33" }}>
+          <span>Arrives</span>
+          <strong style={{ color: "#FFFFFF" }}>
+            {live?.settlement?.end_to_end_seconds != null ? fmtWindow(live.settlement.end_to_end_seconds) : "…"}
+          </strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FxPage() {
   const [model, setModel] = useState<Model | null>(null);
   const [corridors, setCorridors] = useState<any[] | null>(null);
@@ -381,12 +427,17 @@ export default function FxPage() {
       <div data-pad style={{ ...card, padding: "46px 46px 40px" }}>
         <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>STABLECOIN FX</div>
         <h1 style={{ margin: "14px 0 12px", fontSize: "clamp(28px, 3.2vw, 42px)", fontWeight: 600, letterSpacing: "-0.035em" }}>
-          Correspondent banking, without the correspondent.
+          A payment abroad is priced by every bank it touches.
         </h1>
-        <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "68ch", color: "#454B5C" }}>
-          Money goes in on a local rail, becomes a stablecoin 1:1, crosses once, and comes out on
-          a local rail the other side. Three legs, one spread, seconds instead of days. Everything
-          on this page is live — drag it, change it, check the arithmetic.
+        <p style={{ margin: "0 0 26px", fontSize: 17, lineHeight: 1.62, maxWidth: "62ch", color: "#454B5C" }}>
+          This replaces that chain with one corridor. Money leaves on a local rail, becomes a
+          stablecoin 1:1, crosses once, and lands on a local rail the other side — so there is one
+          spread to pay instead of one per bank.
+        </p>
+        <Contrast />
+        <p style={{ margin: "22px 0 0", fontSize: 14.5, lineHeight: 1.6, maxWidth: "62ch", color: "#5B6376" }}>
+          Everything below is the working thing, not a description of it — the price, the route and
+          the payouts all come from the running API. Drag them and check the arithmetic.
         </p>
       </div>
 
