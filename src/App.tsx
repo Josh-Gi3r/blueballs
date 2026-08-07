@@ -321,10 +321,11 @@ export default function App() {
                   <span style={{ width: 6, height: 6, borderRadius: 999, background: "#5A6DB8" }} />MIT LICENCED · FREE FOREVER
                 </div>
                 <h1 style={{ margin: 0, fontSize: "clamp(30px, 3.6vw, 50px)", lineHeight: 1.1, fontWeight: 600, letterSpacing: "-0.035em", textWrap: "balance" as CSSProperties["textWrap"] }}>
-                  Launching a bank<br />used to take capital.<br /><span style={{ color: "#5A6DB8" }}>Now it takes a community.</span>
+                  The banking stack,<br />open sourced.<br /><span style={{ color: "#5A6DB8" }}>Accounts, cards, exchange.</span>
                 </h1>
                 <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "50ch", color: "#454B5C" }}>
-                  The tech is the part you shouldn't have to build again. Blueballs is every primitive a bank runs on — multi-currency accounts, issued cards, transfers, savings, exchange and on-chain FX — tried in the open, MIT licenced, yours to run. Bring the community; start from a working bank instead of an empty repo.</p>
+                  Blueballs gives any product the primitives a modern bank runs on — multi-currency accounts, issued cards, transfers, savings and exchange — behind one API. Hosted or self-hosted, with no licence to negotiate.
+                </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <H as="button" onClick={() => setPage("contact")} style={ink} hover={{ background: "#5A6DB8", borderColor: "#5A6DB8" }}>Request a key</H>
                   <H as="button" onClick={() => setPage("dev")} style={{ ...ink, border: "1px solid #D7DBE4", background: "#FFFFFF", color: "#14161C" }} hover={{ borderColor: "#14161C" }}>Read the docs</H>
