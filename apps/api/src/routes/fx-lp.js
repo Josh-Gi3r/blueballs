@@ -24,15 +24,47 @@ import { isStable } from "../assets.js";
 const positions = collection("fxLpPositions");
 const earnings = collection("fxLpEarnings");
 
-/** How a spread is split. The provider takes the majority — they carry the risk. */
-export const SPREAD_SPLIT = { provider: 0.70, operator: 0.30 };
+/** How a spread is split. The provider takes the majority — they carry the risk.
+ *  Everything here is integer basis points: these numbers multiply real money, and
+ *  0.70 + 0.10 is not 0.80 in binary floating point. */
+export const SPREAD_SPLIT_BPS = { provider: 7000, operator: 3000 };
+const MAX_SHARE_BPS = 9500;
 
 /** Class only affects the share, never access. Anyone verified can provide. */
-const CLASS_BONUS = {
-  issuer: 0.00,   // near-zero risk, so no premium
-  bank: 0.05,     // long its deposits already
-  member: 0.10,   // no native position — paid most for round-trip risk
+const CLASS_BONUS_BPS = {
+  issuer: 0,      // near-zero risk, so no premium
+  bank: 500,      // long its deposits already
+  member: 1000,   // no native position — paid most for round-trip risk
 };
+
+/** The class is DERIVED from the verified customer, never taken on trust from the
+ *  request. Self-declaration would be free money: `member` pays the most, so every
+ *  bank would simply call itself one. Since the premium exists to compensate real
+ *  round-trip risk, it has to follow who the customer actually is.
+ *
+ *  A provider may still declare a class *below* the one they qualify for — an issuer
+ *  being honest about holding native reserves — but never above it. */
+const CLASS_RANK = { issuer: 0, bank: 1, member: 2 };
+
+function classFor(customer, declared) {
+  const derived = customer.type === "business" ? "bank" : "member";
+  if (declared && CLASS_RANK[declared] !== undefined
+      && CLASS_RANK[declared] < CLASS_RANK[derived]) {
+    return declared; // claiming down is allowed
+  }
+  return derived;
+}
+
+const shareBpsFor = (klass) =>
+  Math.min(MAX_SHARE_BPS, SPREAD_SPLIT_BPS.provider + CLASS_BONUS_BPS[klass]);
+
+/** Positions committed before shares moved to integer basis points are still live in
+ *  the store. Read their share through here so an old row can never become NaN
+ *  halfway through a payout. */
+const shareBpsOf = (p) =>
+  Number.isInteger(p.share_bps) ? p.share_bps
+    : typeof p.share === "number" ? Math.round(p.share * 10000)
+      : shareBpsFor(p.class ?? "member");
 
 const pairKey = (a, b) => `${a}/${b}`;
 /** A corridor is bidirectional — the same pool serves USDX/EURX and EURX/USDX.
@@ -63,7 +95,7 @@ route("POST", "/v2/fx/lp", ({ body, key }) => {
     throw new ApiError("insufficient-balance", 400, `Account holds ${fromMinor(balanceOf(acc.id, cur))} ${cur}`);
   }
 
-  const klass = ["issuer", "bank", "member"].includes(body.class) ? body.class : "member";
+  const klass = classFor(cus, body.class);
 
   // liquidity moves into the corridor's pool account — still the LP's, but committed
   const pool = `lp:${a}/${b}:${cur}`;
@@ -77,7 +109,7 @@ route("POST", "/v2/fx/lp", ({ body, key }) => {
     account: acc.id, customer: acc.customer, class: klass,
     pair: `${a}/${b}`, currency: cur,
     committed: body.amount,
-    share: Math.min(0.95, SPREAD_SPLIT.provider + CLASS_BONUS[klass]),
+    share_bps: shareBpsFor(klass),
     status: "active", created_at: now(), owner: key.id,
   };
   positions.set(p.id, p);
@@ -85,8 +117,12 @@ route("POST", "/v2/fx/lp", ({ body, key }) => {
 
   return {
     ...p,
+    share: (p.share_bps / 100).toFixed(0) + "%",
     earned: { amount: "0.00", currency: cur },
-    note: `Earning ${Math.round(p.share * 100)}% of the spread on fills your liquidity provides. Yield comes from real flow — no trades, no earnings.`,
+    class_note: body.class && body.class !== klass
+      ? `Class is derived from your verified customer record, not the request — you were recorded as ${klass}.`
+      : undefined,
+    note: `Earning ${p.share_bps / 100}% of the spread on fills your liquidity provides. Yield comes from real flow — no trades, no earnings.`,
   };
 });
 
@@ -102,9 +138,10 @@ export function creditProviders(pair, currency, spreadMinor, fillId) {
 
   const credited = [];
   for (const p of active) {
-    const weight = Number(toMinor(p.committed)) / Number(total);
-    const gross = BigInt(Math.floor(Number(spreadMinor) * weight));
-    const providerCut = BigInt(Math.floor(Number(gross) * p.share));
+    // All integer: spread x stake-weight x share, in minor units and basis points.
+    // Any float here would round real money in a way that never reconciles.
+    const gross = (spreadMinor * toMinor(p.committed)) / total;
+    const providerCut = (gross * BigInt(shareBpsOf(p))) / 10000n;
     if (providerCut <= 0n) continue;
 
     post([
@@ -114,7 +151,7 @@ export function creditProviders(pair, currency, spreadMinor, fillId) {
 
     const e = {
       id: ksuid("lpe"), position: p.id, fill: fillId, pair, currency,
-      amount: fromMinor(providerCut), share: p.share, at: now(), owner: p.owner,
+      amount: fromMinor(providerCut), share_bps: shareBpsOf(p), at: now(), owner: p.owner,
     };
     earnings.set(e.id, e);
     credited.push(e);
@@ -134,6 +171,7 @@ route("GET", "/v2/fx/lp", ({ key }) => {
         .reduce((n, e) => n + toMinor(e.amount), 0n);
       return {
         ...p,
+        share: `${shareBpsOf(p) / 100}%`,
         earned: { amount: fromMinor(earned), currency: p.currency },
         fills: [...earnings.values()].filter((e) => e.position === p.id).length,
       };
