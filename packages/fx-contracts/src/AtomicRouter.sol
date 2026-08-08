@@ -7,14 +7,16 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 
 import { FxTypes } from "./FxTypes.sol";
 import { FxSettlement } from "./FxSettlement.sol";
+import { PolicyAuthorizationRegistry } from "./PolicyAuthorizationRegistry.sol";
 
 /// @title Blueballs FX Atomic Router
-/// @notice Executes one signed taker intent across one or more signed maker orders atomically.
+/// @notice Executes one institution-authorized signed taker intent across signed maker orders atomically.
 contract AtomicRouter is EIP712, ReentrancyGuard {
     error ZeroAddress();
     error InvalidIntent();
     error IntentExpired();
     error InvalidTakerSignature();
+    error PolicyAuthorizationInvalid();
     error NonceAlreadyUsed();
     error EmptyRoute();
     error WrongAssetPair();
@@ -38,18 +40,24 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
     );
 
     FxSettlement public immutable settlement;
+    PolicyAuthorizationRegistry public immutable policyRegistry;
     mapping(address taker => mapping(uint256 nonce => bool used)) public usedNonce;
 
-    constructor(FxSettlement settlement_) EIP712("Blueballs FX Router", "1") {
-        if (address(settlement_) == address(0)) revert ZeroAddress();
+    constructor(FxSettlement settlement_, PolicyAuthorizationRegistry policyRegistry_)
+        EIP712("Blueballs FX Router", "1")
+    {
+        if (address(settlement_) == address(0) || address(policyRegistry_) == address(0)) {
+            revert ZeroAddress();
+        }
         settlement = settlement_;
+        policyRegistry = policyRegistry_;
     }
 
     function hashTakerIntent(FxTypes.TakerIntent calldata intent) public view returns (bytes32) {
         return _hashTypedDataV4(_hashTakerIntentStruct(intent));
     }
 
-    /// @notice Execute a route. Anyone may submit it; only the taker's valid signature grants authority.
+    /// @notice Execute a route. Anyone may submit it, but customer and institution authority are both required.
     /// @dev Every external state change rolls back if final max-input/min-output checks fail.
     function execute(
         FxTypes.TakerIntent calldata intent,
@@ -60,6 +68,9 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
         if (block.timestamp > intent.deadline) revert IntentExpired();
         if (fills.length == 0) revert EmptyRoute();
         if (usedNonce[intent.taker][intent.nonce]) revert NonceAlreadyUsed();
+        if (!policyRegistry.isValid(intent.policyAuthorizationHash)) {
+            revert PolicyAuthorizationInvalid();
+        }
 
         bytes32 intentHash = hashTakerIntent(intent);
         if (!SignatureChecker.isValidSignatureNowCalldata(intent.taker, intentHash, takerSignature))
@@ -130,7 +141,7 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
         ) revert ZeroAddress();
         if (
             intent.inputToken == intent.outputToken || intent.maxInput == 0 || intent.minOutput == 0
-                || intent.deadline == 0
+                || intent.deadline == 0 || intent.policyAuthorizationHash == bytes32(0)
         ) revert InvalidIntent();
     }
 
