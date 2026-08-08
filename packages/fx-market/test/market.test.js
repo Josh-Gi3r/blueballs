@@ -77,7 +77,9 @@ test('admission is compliance and signature gated', async () => {
   await assert.rejects(() => rejectedSignature.admitOrder(makeAdmission({ id: 1 })), /signature rejected/);
   rejectedSignature.close();
 
-  const rejectedPolicy = market({ policyAuthorizer: async () => ({ eligible: false, reason: 'KYB expired' }) });
+  const rejectedPolicy = market({
+    policyAuthorizer: async () => ({ eligible: false, reason: 'KYB expired' }),
+  });
   await assert.rejects(() => rejectedPolicy.admitOrder(makeAdmission({ id: 2 })), /KYB expired/);
   rejectedPolicy.close();
 });
@@ -146,9 +148,10 @@ test('route can span multiple makers and reproduces exact signed payloads', asyn
 
   assert.equal(route.fills.length, 2);
   assert.equal(route.totalInput, '194');
-  assert.deepEqual(route.fills[0].order, a.order);
-  assert.equal(route.fills[0].signature, a.signature);
-  assert.deepEqual(route.fills[1].order, b.order);
+  assert.deepEqual(route.fills[0].order, b.order);
+  assert.equal(route.fills[0].signature, b.signature);
+  assert.deepEqual(route.fills[1].order, a.order);
+  assert.equal(route.fills[1].signature, a.signature);
   book.close();
 });
 
@@ -365,6 +368,8 @@ test('aggregate depth combines equivalent prices and leaks no maker identity or 
 
   const depth = book.aggregateDepth({ inputToken: INPUT, outputToken: OUTPUT });
   assert.equal(depth.length, 1);
+  assert.equal(depth[0].buyAmount, '2');
+  assert.equal(depth[0].sellAmount, '1');
   assert.equal(depth[0].availableSell, '150');
   assert.equal('maker' in depth[0], false);
   assert.equal('orderHash' in depth[0], false);
