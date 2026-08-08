@@ -1,0 +1,44 @@
+name: FX node
+
+on:
+  push:
+    branches: [fx-policy]
+    paths:
+      - 'apps/fx-node/**'
+      - 'packages/fx-market/**'
+      - 'packages/fx-fiat/**'
+      - 'spec/fx/API-RUNTIME.md'
+      - '.github/workflows/fx-node.yml'
+  pull_request:
+    paths:
+      - 'apps/fx-node/**'
+      - 'packages/fx-market/**'
+      - 'packages/fx-fiat/**'
+      - 'spec/fx/API-RUNTIME.md'
+      - '.github/workflows/fx-node.yml'
+
+concurrency:
+  group: fx-node-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/fx-node
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+
+      - name: Tests
+        run: node --test --test-reporter=spec test/*.test.js
