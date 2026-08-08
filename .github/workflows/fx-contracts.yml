@@ -1,0 +1,48 @@
+name: FX contracts
+
+on:
+  push:
+    branches: [fx-foundation]
+    paths:
+      - 'packages/fx-contracts/**'
+      - 'spec/fx/**'
+      - '.github/workflows/fx-contracts.yml'
+  pull_request:
+    paths:
+      - 'packages/fx-contracts/**'
+      - 'spec/fx/**'
+      - '.github/workflows/fx-contracts.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  forge:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/fx-contracts
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+
+      - name: Forge version
+        run: forge --version
+
+      - name: Format check
+        run: forge fmt --check
+
+      - name: Build
+        run: forge build --sizes
+
+      - name: Tests
+        run: forge test -vvv
+
+      - name: CI fuzz and invariants
+        run: FOUNDRY_PROFILE=ci forge test -vv
