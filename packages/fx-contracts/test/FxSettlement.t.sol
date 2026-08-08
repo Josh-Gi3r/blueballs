@@ -114,7 +114,9 @@ contract FxSettlementTest {
         router.fillTo(order, signature, 25 ether, taker, recipient, keccak256("fill-recipient"));
 
         require(vault.balanceOf(address(sellToken), taker) == 0, "payer received output");
-        require(vault.balanceOf(address(sellToken), recipient) == 25 ether, "recipient missing output");
+        require(
+            vault.balanceOf(address(sellToken), recipient) == 25 ether, "recipient missing output"
+        );
         require(vault.balanceOf(address(buyToken), taker) == 1_950 ether, "payer not debited");
         require(vault.balanceOf(address(buyToken), maker) == 50 ether, "maker not paid");
     }
