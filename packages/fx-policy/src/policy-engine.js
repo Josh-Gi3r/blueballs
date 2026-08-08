@@ -15,7 +15,7 @@ function canonical(value) {
 }
 
 function hashSnapshot(value) {
-  return `sha256:${createHash('sha256').update(canonical(value)).digest('hex')}`;
+  return `0x${createHash('sha256').update(canonical(value)).digest('hex')}`;
 }
 
 function parseJson(value) {
