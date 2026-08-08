@@ -36,15 +36,15 @@ contract PolicyAuthorizationRegistry {
         _;
     }
 
-    function authorize(bytes32 authorizationHash, uint64 validUntil, uint64 epoch) external onlyOwner {
+    function authorize(bytes32 authorizationHash, uint64 validUntil, uint64 epoch)
+        external
+        onlyOwner
+    {
         if (authorizationHash == bytes32(0)) revert ZeroAuthorizationHash();
         if (validUntil <= block.timestamp) revert AuthorizationExpired();
         if (epoch < minimumEpoch) revert EpochBelowMinimum();
-        authorizations[authorizationHash] = Authorization({
-            validUntil: validUntil,
-            epoch: epoch,
-            revoked: false
-        });
+        authorizations[authorizationHash] =
+            Authorization({ validUntil: validUntil, epoch: epoch, revoked: false });
         emit AuthorizationGranted(authorizationHash, validUntil, epoch);
     }
 
