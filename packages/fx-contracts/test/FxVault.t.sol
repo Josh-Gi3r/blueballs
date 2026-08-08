@@ -46,11 +46,23 @@ contract FxVaultTest {
 
         address[] memory tokens = new address[](1);
         tokens[0] = address(token);
-        vault = new FxVault(address(this), address(settlement), tokens);
+        vault = new FxVault(address(this), tokens);
+        vault.bindSettlement(address(settlement));
         settlement.setVault(vault);
 
         alice = new VaultActor();
         bob = new VaultActor();
+    }
+
+    function testSettlementBindingCannotChange() public {
+        bool reverted;
+        try vault.bindSettlement(address(0xBEEF)) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "settlement rebound");
+        require(vault.settlement() == address(settlement), "settlement changed");
     }
 
     function testDepositCreatesExactlyBackedLiability() public {
