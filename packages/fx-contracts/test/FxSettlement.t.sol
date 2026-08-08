@@ -22,7 +22,22 @@ contract RouterHarness {
         address taker,
         bytes32 settlementRef
     ) external returns (uint256) {
-        return settlement.fillMakerOrder(order, signature, makerSellAmount, taker, settlementRef);
+        return settlement.fillMakerOrder(
+            order, signature, makerSellAmount, taker, taker, settlementRef
+        );
+    }
+
+    function fillTo(
+        FxTypes.MakerOrder calldata order,
+        bytes calldata signature,
+        uint256 makerSellAmount,
+        address takerPayer,
+        address outputRecipient,
+        bytes32 settlementRef
+    ) external returns (uint256) {
+        return settlement.fillMakerOrder(
+            order, signature, makerSellAmount, takerPayer, outputRecipient, settlementRef
+        );
     }
 }
 
@@ -89,6 +104,19 @@ contract FxSettlementTest {
         require(vault.balanceOf(address(buyToken), maker) == 50 ether, "maker buy");
         require(vault.totalLiabilities(address(sellToken)) == 1_000 ether, "sell liabilities");
         require(vault.totalLiabilities(address(buyToken)) == 2_000 ether, "buy liabilities");
+    }
+
+    function testOutputCanBeCreditedToDifferentAuthorizedRecipient() public {
+        FxTypes.MakerOrder memory order = _order(100 ether, 200 ether, 0, type(uint64).max, 1);
+        bytes memory signature = _sign(order, MAKER_PK);
+        address recipient = address(0xCA11);
+
+        router.fillTo(order, signature, 25 ether, taker, recipient, keccak256("fill-recipient"));
+
+        require(vault.balanceOf(address(sellToken), taker) == 0, "payer received output");
+        require(vault.balanceOf(address(sellToken), recipient) == 25 ether, "recipient missing output");
+        require(vault.balanceOf(address(buyToken), taker) == 1_950 ether, "payer not debited");
+        require(vault.balanceOf(address(buyToken), maker) == 50 ether, "maker not paid");
     }
 
     function testCancelledOrderCannotSettle() public {
@@ -217,7 +245,9 @@ contract FxSettlementTest {
         bytes memory signature = _sign(order, MAKER_PK);
 
         bool reverted;
-        try settlement.fillMakerOrder(order, signature, 10 ether, taker, keccak256("direct")) {
+        try settlement.fillMakerOrder(
+            order, signature, 10 ether, taker, taker, keccak256("direct")
+        ) {
             reverted = false;
         } catch {
             reverted = true;
