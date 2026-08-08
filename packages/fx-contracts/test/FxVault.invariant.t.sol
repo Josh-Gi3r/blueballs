@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.36;
 
+import { StdInvariant } from "forge-std/StdInvariant.sol";
+
 import { FxVault } from "../src/FxVault.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
-import { Vm } from "./utils/Vm.sol";
 
 contract InvariantActor {
     function approve(MockERC20 token, address spender, uint256 amount) external {
@@ -37,19 +38,19 @@ contract VaultInvariantHandler {
         uint256 amount = uint256(rawAmount);
         if (amount == 0) return;
 
-        InvariantActor actor = actors[actorSeed % 3];
-        token.mint(address(actor), amount);
-        actor.approve(token, address(vault), amount);
-        actor.deposit(vault, address(token), amount);
+        InvariantActor selectedActor = actors[actorSeed % 3];
+        token.mint(address(selectedActor), amount);
+        selectedActor.approve(token, address(vault), amount);
+        selectedActor.deposit(vault, address(token), amount);
     }
 
     function withdraw(uint8 actorSeed, uint96 rawAmount) external {
-        InvariantActor actor = actors[actorSeed % 3];
-        uint256 balance = vault.balanceOf(address(token), address(actor));
+        InvariantActor selectedActor = actors[actorSeed % 3];
+        uint256 balance = vault.balanceOf(address(token), address(selectedActor));
         if (balance == 0) return;
 
         uint256 amount = (uint256(rawAmount) % balance) + 1;
-        actor.withdraw(vault, address(token), amount);
+        selectedActor.withdraw(vault, address(token), amount);
     }
 
     function move(uint8 fromSeed, uint8 toSeed, uint96 rawAmount) external {
@@ -66,14 +67,12 @@ contract VaultInvariantHandler {
         vault.move(address(token), address(from), address(to), amount, keccak256("invariant-move"));
     }
 
-    function actor(uint256 index) external view returns (address) {
+    function actorAt(uint256 index) external view returns (address) {
         return address(actors[index]);
     }
 }
 
-contract FxVaultInvariantTest {
-    Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
-
+contract FxVaultInvariantTest is StdInvariant {
     MockERC20 internal token;
     FxVault internal vault;
     VaultInvariantHandler internal handler;
@@ -87,7 +86,7 @@ contract FxVaultInvariantTest {
         handler = new VaultInvariantHandler(vault, token);
         vault.bindSettlement(address(handler));
 
-        vm.targetContract(address(handler));
+        targetContract(address(handler));
     }
 
     function invariant_PhysicalBalanceAlwaysBacksLiabilities() public view {
@@ -107,7 +106,7 @@ contract FxVaultInvariantTest {
     function invariant_ActorLedgerSumEqualsTotalLiabilities() public view {
         uint256 ledgerSum;
         for (uint256 i; i < 3; ++i) {
-            ledgerSum += vault.balanceOf(address(token), handler.actor(i));
+            ledgerSum += vault.balanceOf(address(token), handler.actorAt(i));
         }
         require(ledgerSum == vault.totalLiabilities(address(token)), "ledger sum mismatch");
     }
