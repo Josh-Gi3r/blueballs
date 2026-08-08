@@ -78,23 +78,27 @@ export class SettlementGraph {
     this.edges = new Map();
   }
 
+  #verifyEdgeAuthorization(edge) {
+    if (!this.authorizationVerifier) return;
+    const result = this.authorizationVerifier(edge.policyAuthorizationId, {
+      action: 'SETTLE_FIAT_EDGE',
+      inputAsset: edge.fromAsset,
+      outputAsset: edge.toAsset,
+      amount: edge.capacity,
+      providerId: edge.providerId,
+      edgeType: edge.edgeType,
+    });
+    if (!result || result.valid !== true) {
+      const error = new Error(`settlement edge authorization invalid: ${result?.reason ?? 'INVALID'}`);
+      error.code = 'POLICY_AUTHORIZATION_INVALID';
+      error.edgeId = edge.edgeId;
+      throw error;
+    }
+  }
+
   upsertEdge(edge) {
     const normalized = normalizeSettlementEdge(edge);
-    if (this.authorizationVerifier) {
-      const result = this.authorizationVerifier(normalized.policyAuthorizationId, {
-        action: 'SETTLE_FIAT_EDGE',
-        inputAsset: normalized.fromAsset,
-        outputAsset: normalized.toAsset,
-        amount: normalized.capacity,
-        providerId: normalized.providerId,
-        edgeType: normalized.edgeType,
-      });
-      if (!result || result.valid !== true) {
-        const error = new Error(`settlement edge authorization invalid: ${result?.reason ?? 'INVALID'}`);
-        error.code = 'POLICY_AUTHORIZATION_INVALID';
-        throw error;
-      }
-    }
+    this.#verifyEdgeAuthorization(normalized);
     this.edges.set(normalized.edgeId, normalized);
     return normalized;
   }
@@ -110,7 +114,15 @@ export class SettlementGraph {
   }
 
   activeEdges() {
-    return [...this.edges.values()].filter((edge) => edge.available && BigInt(edge.capacity) > 0n);
+    return [...this.edges.values()].filter((edge) => {
+      if (!edge.available || BigInt(edge.capacity) <= 0n) return false;
+      try {
+        this.#verifyEdgeAuthorization(edge);
+        return true;
+      } catch {
+        return false;
+      }
+    });
   }
 
   analyzeRoute(edgeIds) {
@@ -120,6 +132,7 @@ export class SettlementGraph {
       if (!edge) throw new Error(`edge not found: ${edgeId}`);
       if (!edge.available) throw new Error(`edge unavailable: ${edgeId}`);
       if (BigInt(edge.capacity) <= 0n) throw new Error(`edge has no capacity: ${edgeId}`);
+      this.#verifyEdgeAuthorization(edge);
       return edge;
     });
 
