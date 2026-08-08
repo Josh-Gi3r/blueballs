@@ -145,7 +145,7 @@ contract ControlledProof is Script {
         require(router.usedNonce(taker, 1), "taker nonce not consumed");
     }
 
-    function _sign(uint256 privateKey, bytes32 digest) internal pure returns (bytes memory) {
+    function _sign(uint256 privateKey, bytes32 digest) internal returns (bytes memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         return abi.encodePacked(r, s, v);
     }
