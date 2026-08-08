@@ -4,6 +4,14 @@
 export const API_BASE =
   (import.meta as any).env?.VITE_API_BASE || "http://localhost:5290";
 
+/**
+ * The proven FX runtime is intentionally separate from the legacy monolithic API.
+ * These values must point only at a sandbox/demo FX node when used in a browser build.
+ */
+export const FX_NODE_BASE = (import.meta as any).env?.VITE_FX_NODE_BASE || "";
+export const FX_NODE_KEY = (import.meta as any).env?.VITE_FX_NODE_KEY || "";
+export const fxNodeConfigured = () => Boolean(FX_NODE_BASE && FX_NODE_KEY);
+
 const KEY_STORAGE = "bb_sandbox_key";
 
 export const getKey = () => localStorage.getItem(KEY_STORAGE);
@@ -18,7 +26,7 @@ export type ApiResult = {
   error?: string;
 };
 
-/** Fire a real request at the running API and report exactly what came back. */
+/** Fire a real request at the running legacy/general Blueballs API. */
 export async function call(
   method: string,
   path: string,
@@ -48,6 +56,60 @@ export async function call(
       ms: Math.round(performance.now() - started),
       body: null,
       error: `Could not reach ${API_BASE}. Is the API running?`,
+    };
+  }
+}
+
+/**
+ * Fire a request at the standalone, release-gated Blueballs FX node.
+ * There is deliberately no fallback to the older /v2/fx routes in apps/api.
+ */
+export async function fxCall(
+  method: string,
+  path: string,
+  body?: unknown,
+  authenticated = true,
+): Promise<ApiResult> {
+  const started = performance.now();
+  if (!FX_NODE_BASE) {
+    return {
+      ok: false,
+      status: 0,
+      ms: 0,
+      body: null,
+      error: "Live FX node is not configured. Set VITE_FX_NODE_BASE for sandbox mode.",
+    };
+  }
+  if (authenticated && !FX_NODE_KEY) {
+    return {
+      ok: false,
+      status: 0,
+      ms: 0,
+      body: null,
+      error: "Live FX node key is not configured. Use a sandbox/demo key only in browser builds.",
+    };
+  }
+
+  try {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (authenticated) headers.authorization = `Bearer ${FX_NODE_KEY}`;
+    const res = await fetch(FX_NODE_BASE.replace(/\/$/, "") + path, {
+      method,
+      headers,
+      body: method === "GET" || method === "DELETE" ? undefined : JSON.stringify(body ?? {}),
+    });
+    const ms = Math.round(performance.now() - started);
+    const text = await res.text();
+    let parsed: unknown = text;
+    try { parsed = JSON.parse(text); } catch { /* keep raw */ }
+    return { ok: res.ok, status: res.status, ms, body: parsed };
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      ms: Math.round(performance.now() - started),
+      body: null,
+      error: `Could not reach ${FX_NODE_BASE}. Is the sandbox FX node running?`,
     };
   }
 }

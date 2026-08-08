@@ -1,0 +1,50 @@
+name: FX visual
+
+on:
+  push:
+    branches: [fx-visual]
+    paths:
+      - 'src/**'
+      - 'packages/fx-simulator/**'
+      - 'packages/fx-liquidity/**'
+      - 'spec/fx/VISUAL-LAB.md'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
+      - '.github/workflows/fx-visual.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'packages/fx-simulator/**'
+      - 'packages/fx-liquidity/**'
+      - 'spec/fx/VISUAL-LAB.md'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
+      - '.github/workflows/fx-visual.yml'
+
+concurrency:
+  group: fx-visual-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build

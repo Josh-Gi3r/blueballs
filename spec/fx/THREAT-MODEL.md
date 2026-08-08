@@ -1,6 +1,6 @@
 # Blueballs FX — Threat Model
 
-Status: **FX-0 foundation draft**
+Status: **FX-10 release-hardening baseline**
 
 The threat model assumes off-chain services can fail, become stale, be compromised or behave maliciously. The on-chain financial kernel must constrain the damage they can cause.
 
@@ -10,6 +10,7 @@ The threat model assumes off-chain services can fail, become stale, be compromis
 - institution treasury/principal balances
 - maker signed authority
 - taker signed authority
+- institution policy authority
 - fiat settlement claims
 - participant identity/privacy
 - order confidentiality
@@ -36,16 +37,22 @@ Must not be able to:
 - violate taker min output
 - steal output by changing recipient
 - spend collateral that does not exist
+- settle a route whose institution policy authorization is expired/revoked/invalidated
 
 ### Malicious / compromised execution coordinator
-May submit arbitrary payloads.
+May:
+- submit arbitrary payloads
+- retain a previously valid signed route and attempt to broadcast it after compliance status changes
+- bypass the canonical off-chain revalidation path
 
-Contracts must reject anything outside cryptographic authority and settlement invariants.
+Contracts must reject anything outside maker authority, taker authority, institution policy authority and settlement invariants.
 
-### Malicious administrator
-May control deployment administration, supported-token lists or service configuration.
+**Red-team finding FX-10:** customer/maker signatures alone were insufficient because any submitter could previously replay a still-valid signed route after the off-chain institution revoked eligibility. The kernel now requires the taker intent's `policyAuthorizationHash` to be live in `PolicyAuthorizationRegistry` at execution time. The institution can revoke an individual authorization or advance a minimum epoch to invalidate a class of older authorizations. A compromised executor therefore cannot settle a route merely because its maker/taker signatures remain cryptographically valid.
 
-The financial kernel must minimize unilateral asset-moving authority. Administrative recovery cannot consume accounted participant funds.
+### Malicious administrator / policy authority
+The institution policy authority can grant/revoke execution authorization. This is intentionally a powerful compliance control and must be operated through production-grade institutional key custody, access control, audit and change management.
+
+The financial kernel still minimizes unilateral asset-moving authority. Policy authorization cannot itself move collateral; it only permits an otherwise valid signed route to execute. Administrative recovery cannot consume accounted participant funds.
 
 ### Compromised pricing source
 May publish erroneous or malicious reference data.
@@ -76,7 +83,7 @@ May:
 - exploit token behaviour
 - attempt to receive output without valid input
 
-Nonce/replay controls and atomic settlement must prevent double execution.
+Nonce/replay controls, institution policy authorization and atomic settlement must prevent unauthorized/double execution.
 
 ### Compromised fiat attestor
 May attest to payments that did not happen or alter payment data.
@@ -116,7 +123,7 @@ Default: private L3 order data. Any public/participant-visible depth is aggregat
 ### On-chain identity linkage
 Customer PII must never be written to public chain state.
 
-Institutions may map addresses/keys to identity off-chain. Address rotation or account abstraction may be used, but privacy claims must not imply anonymity from the institution/regulator.
+Institutions map addresses/keys to identity off-chain. The policy registry stores only opaque authorization hashes, expiry/epoch and revocation state, not KYC documents or PII.
 
 ### Cross-provider data leakage
 Partner adapters receive only the data necessary for their function. Blueballs canonical IDs should avoid leaking unrelated internal identity data.
@@ -124,14 +131,20 @@ Partner adapters receive only the data necessary for their function. Blueballs c
 ## Compliance threats
 
 ### Policy bypass
-A route may be economically executable but institutionally prohibited.
+A route may be economically executable and cryptographically signed but institutionally prohibited.
 
-Canonical quote/execution flows must evaluate policy before matching/settlement. Direct low-level contract interaction cannot be marketed as institution-compliant merely because contracts permit it.
+Canonical quote/execution flows evaluate policy before matching/reservation and immediately before submission. The on-chain Router independently requires a live institution policy authorization before settlement. Therefore direct low-level submission cannot bypass a policy revocation merely by presenting old valid maker/taker signatures.
 
 ### Stale compliance decision
-Participant status may change after an order is signed.
+Participant status may change after an order or taker intent is signed.
 
-Design must define whether policy authorisation is checked at quote, reservation and/or settlement time, with explicit expiries.
+Mitigations operate at multiple layers:
+- participant/credential changes invalidate off-chain authorization epochs;
+- maker liquidity is revalidated before reservation;
+- reserved routes are revalidated before submission;
+- `PolicyAuthorizationRegistry` enforces on-chain expiry/revocation/minimum epoch at execution.
+
+Once an external transaction has actually been submitted, off-chain history is not rewritten; the route stays in reconciliation while future liquidity/authorizations are blocked.
 
 ### Counterparty substitution
 A route must not replace an approved liquidity source with an ineligible one without re-running policy and quote evaluation.
@@ -147,8 +160,9 @@ A route must not replace an approved liquidity source with an ineligible one wit
 - inconsistent cache between nodes
 - failed fiat provider callback
 - blockchain RPC outage
+- ambiguous outbound submission
 
-The system must be restart-safe and idempotent. Authoritative settlement/reconciliation state must be reconstructable from durable records plus chain/attestation evidence.
+The system must be restart-safe and idempotent. Authoritative settlement/reconciliation state must be reconstructable from durable records plus chain/attestation evidence. Once the runtime commits a route to `SUBMITTED`, ambiguous adapter outcomes do not automatically release its liquidity; they require reconciliation.
 
 ## Economic threats
 
@@ -161,7 +175,7 @@ The system must be restart-safe and idempotent. Authoritative settlement/reconci
 - manipulation through tiny orders
 - fake depth / non-executable liquidity
 
-Quotes must be based on executable/reservable liquidity, not advertised capacity alone.
+Quotes must be based on executable/reservable liquidity, not advertised capacity alone. Bank-principal exposure is hard-limited independently from spread.
 
 ## Security posture for MVP
 
@@ -174,3 +188,7 @@ The MVP intentionally avoids:
 - unsecured credit inside settlement
 
 Reducing feature surface is a security control.
+
+## Remaining external assurance boundary
+
+The internal red-team and CI gates are not an independent security audit. Before anyone represents the stack as production-audited financial infrastructure, the contracts and the cross-layer operational design require independent external review. Blueballs must distinguish "reference implementation with passing internal gates" from "externally audited production deployment."

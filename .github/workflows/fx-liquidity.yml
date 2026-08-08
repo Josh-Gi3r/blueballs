@@ -1,0 +1,37 @@
+name: FX liquidity
+
+on:
+  push:
+    branches: [fx-pricing-risk]
+    paths:
+      - 'packages/fx-liquidity/**'
+      - 'spec/fx/LIQUIDITY-ROUTING.md'
+      - '.github/workflows/fx-liquidity.yml'
+  pull_request:
+    paths:
+      - 'packages/fx-liquidity/**'
+      - 'spec/fx/LIQUIDITY-ROUTING.md'
+      - '.github/workflows/fx-liquidity.yml'
+
+concurrency:
+  group: fx-liquidity-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  liquidity:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/fx-liquidity
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - name: Tests
+        run: node --test --test-reporter=spec test/*.test.js

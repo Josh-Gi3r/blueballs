@@ -6,6 +6,7 @@ import { FxSettlement } from "../src/FxSettlement.sol";
 import { FxTypes } from "../src/FxTypes.sol";
 import { FxVault } from "../src/FxVault.sol";
 import { OrderCancellation } from "../src/OrderCancellation.sol";
+import { PolicyAuthorizationRegistry } from "../src/PolicyAuthorizationRegistry.sol";
 import { Mock1271Wallet } from "./mocks/Mock1271Wallet.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 import { Vm } from "./utils/Vm.sol";
@@ -23,6 +24,7 @@ contract SmartWalletSignaturesTest {
     FxVault internal vault;
     OrderCancellation internal cancellation;
     FxSettlement internal settlement;
+    PolicyAuthorizationRegistry internal policyRegistry;
     AtomicRouter internal router;
 
     function setUp() public {
@@ -38,7 +40,8 @@ contract SmartWalletSignaturesTest {
         vault = new FxVault(address(this), tokens);
         cancellation = new OrderCancellation();
         settlement = new FxSettlement(address(this), vault, cancellation);
-        router = new AtomicRouter(settlement);
+        policyRegistry = new PolicyAuthorizationRegistry(address(this));
+        router = new AtomicRouter(settlement, policyRegistry);
         vault.bindSettlement(address(settlement));
         settlement.bindRouter(address(router));
 
@@ -74,6 +77,8 @@ contract SmartWalletSignaturesTest {
         fills[0] =
             FxTypes.MakerFill({ order: order, signature: hex"01", makerSellAmount: 50 ether });
 
+        bytes32 policyHash = keccak256("policy-erc1271-valid");
+        policyRegistry.authorize(policyHash, type(uint64).max, 1);
         FxTypes.TakerIntent memory intent = FxTypes.TakerIntent({
             taker: taker,
             inputToken: address(inputToken),
@@ -83,7 +88,7 @@ contract SmartWalletSignaturesTest {
             recipient: recipient,
             deadline: type(uint64).max,
             nonce: 1,
-            policyAuthorizationHash: keccak256("policy")
+            policyAuthorizationHash: policyHash
         });
 
         bytes32 takerDigest = router.hashTakerIntent(intent);
@@ -117,6 +122,8 @@ contract SmartWalletSignaturesTest {
         fills[0] =
             FxTypes.MakerFill({ order: order, signature: hex"01", makerSellAmount: 50 ether });
 
+        bytes32 policyHash = keccak256("policy-erc1271-rejected");
+        policyRegistry.authorize(policyHash, type(uint64).max, 1);
         FxTypes.TakerIntent memory intent = FxTypes.TakerIntent({
             taker: taker,
             inputToken: address(inputToken),
@@ -126,7 +133,7 @@ contract SmartWalletSignaturesTest {
             recipient: recipient,
             deadline: type(uint64).max,
             nonce: 2,
-            policyAuthorizationHash: keccak256("policy")
+            policyAuthorizationHash: policyHash
         });
 
         bytes32 takerDigest = router.hashTakerIntent(intent);

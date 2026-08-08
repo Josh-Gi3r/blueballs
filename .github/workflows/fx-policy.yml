@@ -1,0 +1,37 @@
+name: FX policy
+
+on:
+  push:
+    branches: [fx-policy]
+    paths:
+      - 'packages/fx-policy/**'
+      - 'spec/fx/POLICY-AUTHORIZATION.md'
+      - '.github/workflows/fx-policy.yml'
+  pull_request:
+    paths:
+      - 'packages/fx-policy/**'
+      - 'spec/fx/POLICY-AUTHORIZATION.md'
+      - '.github/workflows/fx-policy.yml'
+
+concurrency:
+  group: fx-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/fx-policy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - name: Tests
+        run: node --test --test-reporter=spec test/*.test.js

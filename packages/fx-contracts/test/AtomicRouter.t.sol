@@ -6,6 +6,7 @@ import { FxSettlement } from "../src/FxSettlement.sol";
 import { FxTypes } from "../src/FxTypes.sol";
 import { FxVault } from "../src/FxVault.sol";
 import { OrderCancellation } from "../src/OrderCancellation.sol";
+import { PolicyAuthorizationRegistry } from "../src/PolicyAuthorizationRegistry.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 import { Vm } from "./utils/Vm.sol";
 
@@ -27,6 +28,7 @@ contract AtomicRouterTest {
     FxVault internal vault;
     OrderCancellation internal cancellation;
     FxSettlement internal settlement;
+    PolicyAuthorizationRegistry internal policyRegistry;
     AtomicRouter internal router;
 
     function setUp() public {
@@ -44,7 +46,8 @@ contract AtomicRouterTest {
         vault = new FxVault(address(this), tokens);
         cancellation = new OrderCancellation();
         settlement = new FxSettlement(address(this), vault, cancellation);
-        router = new AtomicRouter(settlement);
+        policyRegistry = new PolicyAuthorizationRegistry(address(this));
+        router = new AtomicRouter(settlement, policyRegistry);
 
         vault.bindSettlement(address(settlement));
         settlement.bindRouter(address(router));
@@ -190,6 +193,40 @@ contract AtomicRouterTest {
         require(reverted, "policy hash was not signature-bound");
     }
 
+    function testRevokedPolicyAuthorizationBlocksStillValidSignatures() public {
+        FxTypes.MakerFill[] memory fills = _twoFills();
+        bytes32 policyHash = keccak256("revocable-policy");
+        FxTypes.TakerIntent memory intent = _intent(200 ether, 100 ether, 70, policyHash);
+        bytes memory signature = _signTaker(intent, TAKER_PK);
+        policyRegistry.revoke(policyHash);
+
+        bool reverted;
+        try router.execute(intent, signature, fills) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "revoked policy authorization settled");
+        require(!router.usedNonce(taker, 70), "nonce consumed for revoked policy");
+    }
+
+    function testPolicyEpochInvalidationBlocksOldAuthorizedIntent() public {
+        FxTypes.MakerFill[] memory fills = _twoFills();
+        bytes32 policyHash = keccak256("old-policy-epoch");
+        FxTypes.TakerIntent memory intent = _intent(200 ether, 100 ether, 71, policyHash);
+        bytes memory signature = _signTaker(intent, TAKER_PK);
+        policyRegistry.invalidateBefore(2);
+
+        bool reverted;
+        try router.execute(intent, signature, fills) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "invalidated policy epoch settled");
+        require(!router.usedNonce(taker, 71), "nonce consumed for invalidated epoch");
+    }
+
     function testWrongMakerAssetPairIsRejectedBeforeSettlement() public {
         FxTypes.MakerFill[] memory fills = new FxTypes.MakerFill[](1);
         FxTypes.MakerOrder memory wrongOrder = FxTypes.MakerOrder({
@@ -284,9 +321,9 @@ contract AtomicRouterTest {
 
     function _intent(uint256 maxInput, uint256 minOutput, uint256 nonce, bytes32 policyHash)
         internal
-        view
         returns (FxTypes.TakerIntent memory)
     {
+        policyRegistry.authorize(policyHash, type(uint64).max, 1);
         return FxTypes.TakerIntent({
             taker: taker,
             inputToken: address(inputToken),
