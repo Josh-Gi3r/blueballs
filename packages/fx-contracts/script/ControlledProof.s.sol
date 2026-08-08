@@ -123,9 +123,7 @@ contract ControlledProof is Script {
 
         FxTypes.MakerFill[] memory fills = new FxTypes.MakerFill[](1);
         fills[0] = FxTypes.MakerFill({
-            order: order,
-            signature: makerSignature,
-            makerSellAmount: MAKER_SELL
+            order: order, signature: makerSignature, makerSellAmount: MAKER_SELL
         });
 
         vm.startBroadcast(ownerKey);
@@ -138,8 +136,13 @@ contract ControlledProof is Script {
         require(vault.balanceOf(address(outputToken), taker) == MAKER_SELL, "taker output missing");
         require(vault.balanceOf(address(inputToken), taker) == 800 ether, "taker input wrong");
         require(vault.balanceOf(address(outputToken), maker) == 900 ether, "maker output wrong");
-        require(vault.totalLiabilities(address(inputToken)) == 1_000 ether, "input liabilities changed");
-        require(vault.totalLiabilities(address(outputToken)) == 1_000 ether, "output liabilities changed");
+        require(
+            vault.totalLiabilities(address(inputToken)) == 1_000 ether, "input liabilities changed"
+        );
+        require(
+            vault.totalLiabilities(address(outputToken)) == 1_000 ether,
+            "output liabilities changed"
+        );
         require(vault.physicalBalance(address(inputToken)) == 1_000 ether, "input backing wrong");
         require(vault.physicalBalance(address(outputToken)) == 1_000 ether, "output backing wrong");
         require(router.usedNonce(taker, 1), "taker nonce not consumed");
