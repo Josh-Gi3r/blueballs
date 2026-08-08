@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import http from 'node:http';
 
 function apiError(code, status, message, details = undefined) {
@@ -14,6 +15,7 @@ function errorResponse(error) {
     RISK_LIMIT: 409,
     POLICY_AUTHORIZATION_INVALID: 403,
     EXECUTION_UNAVAILABLE: 503,
+    EXECUTION_REJECTED: 409,
     QUOTE_EXPIRED: 409,
     NOT_FOUND: 404,
     AUTH_REQUIRED: 401,
@@ -162,11 +164,49 @@ export function createFxNodeServer({
         if (!executionAdapter || typeof executionAdapter.submit !== 'function') {
           throw apiError('EXECUTION_UNAVAILABLE', 503, 'execution adapter is not configured');
         }
-        const submitted = await executionAdapter.submit(privateQuote);
-        if (!submitted || typeof submitted.submissionRef !== 'string' || submitted.submissionRef.length === 0) {
-          throw apiError('EXECUTION_UNAVAILABLE', 503, 'execution adapter did not return a submission reference');
+
+        // Revalidation occurs inside markSubmitted before any external call. From this
+        // point the route is intentionally non-releasable and must be reconciled.
+        const submissionRef = `submit_${randomUUID()}`;
+        const committed = quotes.markSubmitted(params.quoteId, submissionRef);
+        let outcome;
+        try {
+          outcome = await executionAdapter.submit(privateQuote, { submissionRef });
+        } catch (error) {
+          return send(res, 202, {
+            ...committed,
+            execution: { status: 'UNKNOWN', submissionRef, reason: error.message },
+          });
         }
-        return send(res, 202, quotes.markSubmitted(params.quoteId, submitted.submissionRef));
+
+        const status = outcome?.status ?? 'ACCEPTED';
+        if (status === 'REJECTED') {
+          quotes.fail(params.quoteId, {
+            eventId: outcome.eventId ?? `reject_${submissionRef}`,
+            reason: outcome.reason ?? 'EXECUTION_ADAPTER_REJECTED',
+          });
+          throw apiError('EXECUTION_REJECTED', 409, outcome.reason ?? 'execution adapter rejected submission');
+        }
+        if (status === 'UNKNOWN') {
+          return send(res, 202, {
+            ...committed,
+            execution: { status: 'UNKNOWN', submissionRef, reason: outcome.reason ?? null },
+          });
+        }
+        if (status !== 'ACCEPTED') {
+          return send(res, 202, {
+            ...committed,
+            execution: { status: 'UNKNOWN', submissionRef, reason: `unexpected adapter status: ${status}` },
+          });
+        }
+        return send(res, 202, {
+          ...committed,
+          execution: {
+            status: 'ACCEPTED',
+            submissionRef,
+            externalRef: outcome.externalRef ?? null,
+          },
+        });
       }
 
       params = match(path, '/v2/fx/routes/:routeId');
