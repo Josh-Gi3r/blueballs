@@ -1,0 +1,39 @@
+name: FX market
+
+on:
+  push:
+    branches: [fx-foundation]
+    paths:
+      - 'packages/fx-market/**'
+      - 'spec/fx/MARKET-SERVICE.md'
+      - '.github/workflows/fx-market.yml'
+  pull_request:
+    paths:
+      - 'packages/fx-market/**'
+      - 'spec/fx/MARKET-SERVICE.md'
+      - '.github/workflows/fx-market.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  market:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/fx-market
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+
+      - name: Node version
+        run: node --version
+
+      - name: Tests
+        run: node --test --test-reporter=spec
