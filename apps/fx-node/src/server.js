@@ -53,7 +53,7 @@ async function readJson(req, maxBytes = 1_000_000) {
 }
 
 function send(res, status, body) {
-  const payload = JSON.stringify(body);
+  const payload = JSON.stringify(body, (_key, value) => typeof value === 'bigint' ? value.toString() : value);
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'content-length': Buffer.byteLength(payload),
