@@ -1,0 +1,15 @@
+{
+  "name": "@blueballs/fx-market",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Private, durable, compliance-gated FX order market for Blueballs",
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "exports": "./src/index.js",
+  "scripts": {
+    "test": "node --test",
+    "test:ci": "node --test --test-reporter=spec"
+  }
+}
