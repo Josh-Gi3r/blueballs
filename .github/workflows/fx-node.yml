@@ -48,3 +48,7 @@ jobs:
 
       - name: Tests
         run: node --test --test-reporter=spec test/*.test.js
+
+      - name: Docker build
+        working-directory: ../..
+        run: docker build -f apps/fx-node/Dockerfile -t blueballs-fx:test .
