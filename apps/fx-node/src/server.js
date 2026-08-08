@@ -85,6 +85,7 @@ export function createFxNodeServer({
   executionAdapter = null,
   apiKey,
   publicDepth = false,
+  now = () => Date.now(),
 } = {}) {
   if (!market) throw new TypeError('market service required');
   if (!quotes) throw new TypeError('quote coordinator required');
@@ -157,7 +158,7 @@ export function createFxNodeServer({
       if (method === 'POST' && params) {
         const privateQuote = quotes.getPrivateQuote(params.quoteId);
         if (!privateQuote) throw apiError('NOT_FOUND', 404, 'quote not found');
-        if (privateQuote.row.expires_at <= Date.now()) throw apiError('QUOTE_EXPIRED', 409, 'quote expired');
+        if (privateQuote.row.expires_at <= now()) throw apiError('QUOTE_EXPIRED', 409, 'quote expired');
         if (!executionAdapter || typeof executionAdapter.submit !== 'function') {
           throw apiError('EXECUTION_UNAVAILABLE', 503, 'execution adapter is not configured');
         }
