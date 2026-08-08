@@ -13,6 +13,10 @@ on:
       - 'spec/fx/MARKET-SERVICE.md'
       - '.github/workflows/fx-market.yml'
 
+concurrency:
+  group: fx-market-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
