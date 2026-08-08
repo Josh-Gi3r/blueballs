@@ -1,0 +1,39 @@
+name: FX pricing
+
+on:
+  push:
+    branches: [fx-pricing-risk]
+    paths:
+      - 'packages/fx-pricing/**'
+      - 'spec/fx/PRICING-RISK.md'
+      - '.github/workflows/fx-pricing.yml'
+  pull_request:
+    paths:
+      - 'packages/fx-pricing/**'
+      - 'spec/fx/PRICING-RISK.md'
+      - '.github/workflows/fx-pricing.yml'
+
+concurrency:
+  group: fx-pricing-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pricing:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/fx-pricing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - name: Node version
+        run: node --version
+      - name: Tests
+        run: node --test --test-reporter=spec test/*.test.js
