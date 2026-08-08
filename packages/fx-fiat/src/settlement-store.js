@@ -50,7 +50,6 @@ export class FiatSettlementStore {
         enabled INTEGER NOT NULL,
         metadata_json TEXT NOT NULL
       );
-
       CREATE TABLE IF NOT EXISTS fiat_intents (
         intent_id TEXT PRIMARY KEY,
         intent_hash TEXT NOT NULL UNIQUE,
@@ -71,7 +70,6 @@ export class FiatSettlementStore {
         failure_reason TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_fiat_intents_route ON fiat_intents(route_id, state);
-
       CREATE TABLE IF NOT EXISTS fiat_attestations (
         attestation_id TEXT PRIMARY KEY,
         verifier_id TEXT NOT NULL REFERENCES fiat_verifiers(verifier_id),
@@ -90,7 +88,6 @@ export class FiatSettlementStore {
         payload_json TEXT NOT NULL,
         UNIQUE(verifier_id, payment_id)
       );
-
       CREATE TABLE IF NOT EXISTS fiat_events (
         event_id TEXT PRIMARY KEY,
         intent_id TEXT NOT NULL,
@@ -127,8 +124,7 @@ export class FiatSettlementStore {
   }
 
   setVerifierEnabled(verifierId, enabled) {
-    const result = this.db
-      .prepare('UPDATE fiat_verifiers SET enabled = ? WHERE verifier_id = ?')
+    const result = this.db.prepare('UPDATE fiat_verifiers SET enabled = ? WHERE verifier_id = ?')
       .run(enabled ? 1 : 0, verifierId);
     if (Number(result.changes) !== 1) throw new Error('verifier not found');
   }
@@ -144,24 +140,16 @@ export class FiatSettlementStore {
         if (existing.intent_hash !== intentHash) throw new Error('intentId already exists with different payload');
         return rowToIntent(existing);
       }
-
       this.db.prepare(`
         INSERT INTO fiat_intents(
           intent_id, intent_hash, route_id, edge_id, provider_id, currency, amount,
           payer_ref_hash, payee_ref_hash, expires_at, state, intent_json
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CREATED', ?)
       `).run(
-        normalized.intentId,
-        intentHash,
-        normalized.routeId,
-        normalized.edgeId,
-        normalized.providerId,
-        normalized.currency,
-        normalized.amount,
-        hashRef(normalized.payerAccountRef),
-        hashRef(normalized.payeeAccountRef),
-        normalized.expiresAt,
-        JSON.stringify(normalized),
+        normalized.intentId, intentHash, normalized.routeId, normalized.edgeId,
+        normalized.providerId, normalized.currency, normalized.amount,
+        hashRef(normalized.payerAccountRef), hashRef(normalized.payeeAccountRef),
+        normalized.expiresAt, JSON.stringify(normalized),
       );
       return this.getIntent(normalized.intentId);
     });
@@ -177,20 +165,16 @@ export class FiatSettlementStore {
       const row = this.db.prepare('SELECT * FROM fiat_intents WHERE intent_id = ?').get(intentId);
       if (!row) throw new Error('intent not found');
       if (!fromStates.includes(row.state)) throw new Error(`cannot transition ${row.state} to ${toState}`);
-      if (row.expires_at <= this.now() && !['EXPIRED', 'FAILED'].includes(toState)) {
-        throw new Error('intent expired');
-      }
+      if (row.expires_at <= this.now() && !['EXPIRED', 'FAILED'].includes(toState)) throw new Error('intent expired');
 
       const fields = ['state = ?'];
       const values = [toState];
+      const mapping = {
+        submissionRef: 'submission_ref', paymentObservedAt: 'payment_observed_at',
+        attestationId: 'attestation_id', settledAt: 'settled_at', failureReason: 'failure_reason',
+      };
       for (const [key, value] of Object.entries(updates)) {
-        const column = {
-          submissionRef: 'submission_ref',
-          paymentObservedAt: 'payment_observed_at',
-          attestationId: 'attestation_id',
-          settledAt: 'settled_at',
-          failureReason: 'failure_reason',
-        }[key];
+        const column = mapping[key];
         if (!column) throw new Error(`unsupported transition field: ${key}`);
         fields.push(`${column} = ?`);
         values.push(value);
@@ -201,9 +185,7 @@ export class FiatSettlementStore {
     });
   }
 
-  reserveIntent(intentId) {
-    return this.#transition(intentId, ['CREATED'], 'RESERVED');
-  }
+  reserveIntent(intentId) { return this.#transition(intentId, ['CREATED'], 'RESERVED'); }
 
   submitIntent(intentId, submissionRef) {
     if (typeof submissionRef !== 'string' || submissionRef.length === 0) throw new TypeError('submissionRef required');
@@ -215,14 +197,11 @@ export class FiatSettlementStore {
     return this.#transition(intentId, ['SUBMITTED'], 'PAYMENT_OBSERVED', { paymentObservedAt: observedAt });
   }
 
-  cancelIntent(intentId) {
-    return this.#transition(intentId, ['CREATED', 'RESERVED'], 'CANCELLED');
-  }
+  cancelIntent(intentId) { return this.#transition(intentId, ['CREATED', 'RESERVED'], 'CANCELLED'); }
 
   expireIntents(now = this.now()) {
     const result = this.db.prepare(`
-      UPDATE fiat_intents
-      SET state = 'EXPIRED'
+      UPDATE fiat_intents SET state = 'EXPIRED'
       WHERE state IN ('CREATED', 'RESERVED') AND expires_at <= ?
     `).run(now);
     return Number(result.changes);
@@ -230,31 +209,30 @@ export class FiatSettlementStore {
 
   failIntent(intentId, reason) {
     if (typeof reason !== 'string' || reason.length === 0) throw new TypeError('reason required');
-    return this.#transition(
-      intentId,
-      ['SUBMITTED', 'PAYMENT_OBSERVED', 'VERIFIED'],
-      'FAILED',
-      { failureReason: reason },
-    );
+    return this.#transition(intentId, ['SUBMITTED', 'PAYMENT_OBSERVED', 'VERIFIED'], 'FAILED', { failureReason: reason });
   }
 
   manualReview(intentId, reason) {
     if (typeof reason !== 'string' || reason.length === 0) throw new TypeError('reason required');
-    return this.#transition(
-      intentId,
-      ['SUBMITTED', 'PAYMENT_OBSERVED', 'VERIFIED'],
-      'MANUAL_REVIEW',
-      { failureReason: reason },
-    );
+    return this.#transition(intentId, ['SUBMITTED', 'PAYMENT_OBSERVED', 'VERIFIED'], 'MANUAL_REVIEW', { failureReason: reason });
   }
 
   acceptAttestation(attestation) {
     if (!attestation || typeof attestation !== 'object') throw new TypeError('attestation required');
     const now = this.now();
-    const verifier = this.db
-      .prepare('SELECT * FROM fiat_verifiers WHERE verifier_id = ?')
-      .get(attestation.verifierId);
+    const verifier = this.db.prepare('SELECT * FROM fiat_verifiers WHERE verifier_id = ?').get(attestation.verifierId);
     if (!verifier || !verifier.enabled) throw new Error('verifier not enabled');
+
+    const suppliedId = attestation.attestationId ?? null;
+    if (suppliedId) {
+      const prior = this.db.prepare('SELECT * FROM fiat_attestations WHERE attestation_id = ?').get(suppliedId);
+      if (prior) {
+        if (prior.intent_id === attestation.intentId && prior.payment_id === attestation.paymentId) {
+          return { duplicate: true, attestationId: suppliedId };
+        }
+        throw new Error('attestationId collision');
+      }
+    }
 
     return this.#transaction(() => {
       const intent = this.db.prepare('SELECT * FROM fiat_intents WHERE intent_id = ?').get(attestation.intentId);
@@ -268,28 +246,11 @@ export class FiatSettlementStore {
       if (BigInt(String(attestation.amount)) !== BigInt(intent.amount)) throw new Error('amount mismatch');
       if (attestation.payerRefHash !== intent.payer_ref_hash) throw new Error('payer mismatch');
       if (attestation.payeeRefHash !== intent.payee_ref_hash) throw new Error('payee mismatch');
-      if (typeof attestation.paymentId !== 'string' || attestation.paymentId.length === 0) {
-        throw new TypeError('paymentId required');
-      }
-      if (!Number.isSafeInteger(attestation.settledAt) || attestation.settledAt < 0) {
-        throw new RangeError('settledAt invalid');
-      }
-      if (!Number.isSafeInteger(attestation.issuedAt) || attestation.issuedAt < attestation.settledAt) {
-        throw new RangeError('issuedAt invalid');
-      }
-      if (!Number.isSafeInteger(attestation.expiresAt) || attestation.expiresAt <= now) {
-        throw new Error('attestation expired');
-      }
+      if (typeof attestation.paymentId !== 'string' || attestation.paymentId.length === 0) throw new TypeError('paymentId required');
+      if (!Number.isSafeInteger(attestation.settledAt) || attestation.settledAt < 0) throw new RangeError('settledAt invalid');
+      if (!Number.isSafeInteger(attestation.issuedAt) || attestation.issuedAt < attestation.settledAt) throw new RangeError('issuedAt invalid');
+      if (!Number.isSafeInteger(attestation.expiresAt) || attestation.expiresAt <= now) throw new Error('attestation expired');
       if (attestation.status !== 'VERIFIED') throw new Error('attestation is not verified');
-
-      const attestationId = attestation.attestationId ?? randomUUID();
-      const existing = this.db.prepare('SELECT * FROM fiat_attestations WHERE attestation_id = ?').get(attestationId);
-      if (existing) {
-        if (existing.intent_id === intent.intent_id && existing.payment_id === attestation.paymentId) {
-          return { duplicate: true, attestationId };
-        }
-        throw new Error('attestationId collision');
-      }
 
       const paymentReplay = this.db
         .prepare('SELECT intent_id FROM fiat_attestations WHERE verifier_id = ? AND payment_id = ?')
@@ -300,30 +261,20 @@ export class FiatSettlementStore {
         throw error;
       }
 
+      const attestationId = suppliedId ?? randomUUID();
       this.db.prepare(`
         INSERT INTO fiat_attestations(
           attestation_id, verifier_id, intent_id, intent_hash, payment_id, currency, amount,
           payer_ref_hash, payee_ref_hash, settled_at, issued_at, expires_at, status, proof_ref, payload_json
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        attestationId,
-        attestation.verifierId,
-        intent.intent_id,
-        intent.intent_hash,
-        attestation.paymentId,
-        intent.currency,
-        intent.amount,
-        intent.payer_ref_hash,
-        intent.payee_ref_hash,
-        attestation.settledAt,
-        attestation.issuedAt,
-        attestation.expiresAt,
-        attestation.status,
-        attestation.proofRef ?? null,
+        attestationId, attestation.verifierId, intent.intent_id, intent.intent_hash,
+        attestation.paymentId, intent.currency, intent.amount, intent.payer_ref_hash,
+        intent.payee_ref_hash, attestation.settledAt, attestation.issuedAt,
+        attestation.expiresAt, attestation.status, attestation.proofRef ?? null,
         JSON.stringify(attestation),
       );
-      this.db
-        .prepare("UPDATE fiat_intents SET state = 'VERIFIED', attestation_id = ? WHERE intent_id = ?")
+      this.db.prepare("UPDATE fiat_intents SET state = 'VERIFIED', attestation_id = ? WHERE intent_id = ?")
         .run(attestationId, intent.intent_id);
       return { duplicate: false, attestationId };
     });
@@ -336,12 +287,9 @@ export class FiatSettlementStore {
       const intent = this.db.prepare('SELECT * FROM fiat_intents WHERE intent_id = ?').get(intentId);
       if (!intent) throw new Error('intent not found');
       if (intent.state !== 'VERIFIED') throw new Error('intent must be VERIFIED before settlement');
-
-      this.db
-        .prepare("UPDATE fiat_intents SET state = 'SETTLED', settled_at = ? WHERE intent_id = ?")
+      this.db.prepare("UPDATE fiat_intents SET state = 'SETTLED', settled_at = ? WHERE intent_id = ?")
         .run(this.now(), intentId);
-      this.db
-        .prepare('INSERT INTO fiat_events(event_id, intent_id, kind, created_at, payload_json) VALUES (?, ?, ?, ?, ?)')
+      this.db.prepare('INSERT INTO fiat_events(event_id, intent_id, kind, created_at, payload_json) VALUES (?, ?, ?, ?, ?)')
         .run(eventId, intentId, 'SETTLED', this.now(), '{}');
       return { duplicate: false };
     });
