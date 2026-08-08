@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
-import { availableSell, compareMakerPrice, minBigInt } from './math.js';
+import { availableSell, compareMakerPrice, minBigInt, normalizedPriceKey } from './math.js';
 import { normalizeAddress, validateAdmission } from './validation.js';
 
 const ACTIVE_STATES = new Set(['OPEN', 'PARTIALLY_FILLED']);
@@ -294,7 +294,10 @@ export class SqliteFxMarket {
         const makerSell = minBigInt(available, remaining);
         const oldSell = BigInt(row.confirmed_filled_sell);
         const oldBuy = BigInt(row.confirmed_filled_buy);
-        const targetBuy = ceilDiv((oldSell + makerSell) * BigInt(row.buy_amount), BigInt(row.sell_amount));
+        const targetBuy = ceilDiv(
+          (oldSell + makerSell) * BigInt(row.buy_amount),
+          BigInt(row.sell_amount),
+        );
         const takerPay = targetBuy - oldBuy;
 
         const reservationId = randomUUID();
@@ -385,7 +388,10 @@ export class SqliteFxMarket {
       }
 
       if (reservations.length > 0) {
-        this.#audit('ROUTE_RELEASED', { routeId, details: { reason, count: reservations.length } });
+        this.#audit('ROUTE_RELEASED', {
+          routeId,
+          details: { reason, count: reservations.length },
+        });
       }
       return reservations.length;
     });
@@ -394,7 +400,9 @@ export class SqliteFxMarket {
   expireReservations(now = this.now()) {
     return this.#transaction(() => {
       const expired = this.db
-        .prepare("SELECT DISTINCT route_id FROM reservations WHERE state = 'ACTIVE' AND expires_at <= ?")
+        .prepare(
+          "SELECT DISTINCT route_id FROM reservations WHERE state = 'ACTIVE' AND expires_at <= ?",
+        )
         .all(now)
         .map((row) => row.route_id);
 
@@ -417,18 +425,26 @@ export class SqliteFxMarket {
   }
 
   confirmRoute({ routeId, eventId, fills }) {
-    if (typeof eventId !== 'string' || eventId.length === 0) throw new TypeError('eventId is required');
+    if (typeof eventId !== 'string' || eventId.length === 0) {
+      throw new TypeError('eventId is required');
+    }
     if (!Array.isArray(fills)) throw new TypeError('fills must be an array');
 
     return this.#transaction(() => {
-      const existingEvent = this.db.prepare('SELECT event_id FROM chain_events WHERE event_id = ?').get(eventId);
+      const existingEvent = this.db
+        .prepare('SELECT event_id FROM chain_events WHERE event_id = ?')
+        .get(eventId);
       if (existingEvent) return { duplicate: true };
 
       const reservations = this.db
-        .prepare("SELECT * FROM reservations WHERE route_id = ? AND state = 'ACTIVE' ORDER BY rowid")
+        .prepare(
+          "SELECT * FROM reservations WHERE route_id = ? AND state = 'ACTIVE' ORDER BY rowid",
+        )
         .all(routeId);
       if (reservations.length === 0) throw new Error('no active reservations for route');
-      if (reservations.length !== fills.length) throw new Error('confirmed fill count does not match reservations');
+      if (reservations.length !== fills.length) {
+        throw new Error('confirmed fill count does not match reservations');
+      }
 
       for (let i = 0; i < reservations.length; i += 1) {
         const reservation = reservations[i];
@@ -441,7 +457,9 @@ export class SqliteFxMarket {
           throw new Error('confirmed fill does not match reservation');
         }
 
-        const order = this.db.prepare('SELECT * FROM orders WHERE order_hash = ?').get(reservation.order_hash);
+        const order = this.db
+          .prepare('SELECT * FROM orders WHERE order_hash = ?')
+          .get(reservation.order_hash);
         const newSell = BigInt(order.confirmed_filled_sell) + BigInt(reservation.maker_sell_amount);
         const newBuy = BigInt(order.confirmed_filled_buy) + BigInt(reservation.taker_pay_amount);
         if (newSell > BigInt(order.sell_amount) || newBuy > BigInt(order.buy_amount)) {
@@ -462,9 +480,14 @@ export class SqliteFxMarket {
       }
 
       this.db
-        .prepare('INSERT INTO chain_events(event_id, route_id, kind, created_at, payload_json) VALUES (?, ?, ?, ?, ?)')
+        .prepare(
+          'INSERT INTO chain_events(event_id, route_id, kind, created_at, payload_json) VALUES (?, ?, ?, ?, ?)',
+        )
         .run(eventId, routeId, 'SETTLEMENT_CONFIRMED', this.now(), json(fills));
-      this.#audit('SETTLEMENT_CONFIRMED', { routeId, details: { eventId, fillCount: fills.length } });
+      this.#audit('SETTLEMENT_CONFIRMED', {
+        routeId,
+        details: { eventId, fillCount: fills.length },
+      });
       return { duplicate: false };
     });
   }
@@ -472,10 +495,14 @@ export class SqliteFxMarket {
   failRoute({ routeId, eventId = null, reason = 'SETTLEMENT_FAILED' }) {
     return this.#transaction(() => {
       if (eventId) {
-        const existing = this.db.prepare('SELECT event_id FROM chain_events WHERE event_id = ?').get(eventId);
+        const existing = this.db
+          .prepare('SELECT event_id FROM chain_events WHERE event_id = ?')
+          .get(eventId);
         if (existing) return { duplicate: true, released: 0 };
         this.db
-          .prepare('INSERT INTO chain_events(event_id, route_id, kind, created_at, payload_json) VALUES (?, ?, ?, ?, ?)')
+          .prepare(
+            'INSERT INTO chain_events(event_id, route_id, kind, created_at, payload_json) VALUES (?, ?, ?, ?, ?)',
+          )
           .run(eventId, routeId, 'SETTLEMENT_FAILED', this.now(), json({ reason }));
       }
 
@@ -488,7 +515,10 @@ export class SqliteFxMarket {
           .run(reservation.reservation_id);
         this.#restoreOrderAfterReservation(reservation.order_hash);
       }
-      this.#audit('SETTLEMENT_FAILED', { routeId, details: { reason, count: reservations.length } });
+      this.#audit('SETTLEMENT_FAILED', {
+        routeId,
+        details: { reason, count: reservations.length },
+      });
       return { duplicate: false, released: reservations.length };
     });
   }
@@ -523,13 +553,17 @@ export class SqliteFxMarket {
     return this.#transaction(() => {
       const row = this.db.prepare('SELECT * FROM orders WHERE order_hash = ?').get(orderHash);
       if (!row) throw new Error('order not found');
-      if (row.offchain_hidden || row.onchain_invalidated) throw new Error('cancelled order cannot be policy-unblocked');
+      if (row.offchain_hidden || row.onchain_invalidated) {
+        throw new Error('cancelled order cannot be policy-unblocked');
+      }
 
       const filled = BigInt(row.confirmed_filled_sell);
       const signed = BigInt(row.sell_amount);
       const state = filled === 0n ? 'OPEN' : filled < signed ? 'PARTIALLY_FILLED' : 'FILLED';
       this.db
-        .prepare('UPDATE orders SET policy_blocked = 0, policy_reason = NULL, state = ? WHERE order_hash = ?')
+        .prepare(
+          'UPDATE orders SET policy_blocked = 0, policy_reason = NULL, state = ? WHERE order_hash = ?',
+        )
         .run(state, orderHash);
       this.#audit('POLICY_UNBLOCKED', { orderHash });
     });
@@ -563,10 +597,14 @@ export class SqliteFxMarket {
 
   markOnChainInvalidated(orderHash) {
     return this.#transaction(() => {
-      const row = this.db.prepare('SELECT order_hash FROM orders WHERE order_hash = ?').get(orderHash);
+      const row = this.db
+        .prepare('SELECT order_hash FROM orders WHERE order_hash = ?')
+        .get(orderHash);
       if (!row) throw new Error('order not found');
       this.db
-        .prepare("UPDATE orders SET onchain_invalidated = 1, offchain_hidden = 1, reserved_sell = '0', state = 'CANCELLED' WHERE order_hash = ?")
+        .prepare(
+          "UPDATE orders SET onchain_invalidated = 1, offchain_hidden = 1, reserved_sell = '0', state = 'CANCELLED' WHERE order_hash = ?",
+        )
         .run(orderHash);
       this.#audit('ONCHAIN_INVALIDATION_OBSERVED', { orderHash });
     });
@@ -580,10 +618,11 @@ export class SqliteFxMarket {
     const levels = new Map();
 
     for (const row of rows) {
-      const key = `${row.buy_amount}/${row.sell_amount}`;
+      const key = normalizedPriceKey(row.buy_amount, row.sell_amount);
+      const [buyAmount, sellAmount] = key.split(':');
       const current = levels.get(key) ?? {
-        buyAmount: row.buy_amount,
-        sellAmount: row.sell_amount,
+        buyAmount,
+        sellAmount,
         availableSell: 0n,
       };
       current.availableSell += availableSell(row);
