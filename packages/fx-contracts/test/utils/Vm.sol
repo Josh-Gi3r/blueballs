@@ -10,4 +10,5 @@ interface Vm {
     function startPrank(address msgSender) external;
     function stopPrank() external;
     function warp(uint256 newTimestamp) external;
+    function targetContract(address target) external;
 }
