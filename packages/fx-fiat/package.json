@@ -1,0 +1,13 @@
+{
+  "name": "@blueballs/fx-fiat",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Provider-neutral fiat settlement intents, attestations and graph primitives for Blueballs FX",
+  "engines": { "node": ">=24.15.0" },
+  "exports": "./src/index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:ci": "node --test --test-reporter=spec test/*.test.js"
+  }
+}
