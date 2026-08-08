@@ -40,5 +40,11 @@ jobs:
         with:
           node-version: '24.15.0'
 
+      - name: Syntax
+        run: |
+          node --check src/server.js
+          node --check src/quote-coordinator.js
+          node --check src/cli.js
+
       - name: Tests
         run: node --test --test-reporter=spec test/*.test.js
