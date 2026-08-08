@@ -21,7 +21,9 @@ contract MockERC20 {
     function transfer(address to, uint256 amount) external returns (bool) {
         uint256 balance = balanceOf[msg.sender];
         require(balance >= amount, "BALANCE");
-        unchecked { balanceOf[msg.sender] = balance - amount; }
+        unchecked {
+            balanceOf[msg.sender] = balance - amount;
+        }
         balanceOf[to] += amount;
         return true;
     }
