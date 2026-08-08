@@ -35,6 +35,9 @@ jobs:
       - name: Forge version
         run: forge --version
 
+      - name: Install pinned dependencies
+        run: make deps
+
       - name: Format check
         run: forge fmt --check
 
