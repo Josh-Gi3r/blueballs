@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.36;
 
-import {FxVault} from "../src/FxVault.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
+import { FxVault } from "../src/FxVault.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
 
 contract SettlementHarness {
     FxVault public vault;
@@ -12,13 +12,9 @@ contract SettlementHarness {
         vault = vault_;
     }
 
-    function move(
-        address token,
-        address from,
-        address to,
-        uint256 amount,
-        bytes32 settlementRef
-    ) external {
+    function move(address token, address from, address to, uint256 amount, bytes32 settlementRef)
+        external
+    {
         vault.move(token, from, to, amount, settlementRef);
     }
 }
