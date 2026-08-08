@@ -72,29 +72,44 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
 
         uint256 length = fills.length;
         for (uint256 i; i < length; ++i) {
-            FxTypes.MakerFill calldata fill = fills[i];
-            if (
-                fill.order.sellToken != intent.outputToken
-                    || fill.order.buyToken != intent.inputToken
-            ) revert WrongAssetPair();
-
-            uint256 takerPay = settlement.fillMakerOrder(
-                fill.order,
-                fill.signature,
-                fill.makerSellAmount,
-                intent.taker,
-                intent.recipient,
-                intentHash
-            );
-
+            (uint256 takerPay, uint256 makerOutput) = _settleFill(intent, fills[i], intentHash);
             totalInput += takerPay;
-            totalOutput += fill.makerSellAmount;
-
+            totalOutput += makerOutput;
             if (totalInput > intent.maxInput) revert MaxInputExceeded();
         }
 
         if (totalOutput < intent.minOutput) revert MinOutputNotMet();
+        _emitRouteExecuted(intent, intentHash, totalInput, totalOutput, length);
+    }
 
+    function _settleFill(
+        FxTypes.TakerIntent calldata intent,
+        FxTypes.MakerFill calldata fill,
+        bytes32 intentHash
+    ) internal returns (uint256 takerPay, uint256 makerOutput) {
+        if (
+            fill.order.sellToken != intent.outputToken
+                || fill.order.buyToken != intent.inputToken
+        ) revert WrongAssetPair();
+
+        takerPay = settlement.fillMakerOrder(
+            fill.order,
+            fill.signature,
+            fill.makerSellAmount,
+            intent.taker,
+            intent.recipient,
+            intentHash
+        );
+        makerOutput = fill.makerSellAmount;
+    }
+
+    function _emitRouteExecuted(
+        FxTypes.TakerIntent calldata intent,
+        bytes32 intentHash,
+        uint256 totalInput,
+        uint256 totalOutput,
+        uint256 fillCount
+    ) internal {
         emit RouteExecuted(
             intentHash,
             intent.taker,
@@ -103,7 +118,7 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
             intent.outputToken,
             totalInput,
             totalOutput,
-            length,
+            fillCount,
             intent.policyAuthorizationHash
         );
     }
