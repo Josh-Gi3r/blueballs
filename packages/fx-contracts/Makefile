@@ -4,7 +4,10 @@ OZ_VERSION := v5.6.1
 
 deps:
 	@if [ ! -d lib/openzeppelin-contracts ]; then \
-		forge install OpenZeppelin/openzeppelin-contracts@$(OZ_VERSION) --no-commit; \
+		mkdir -p lib && \
+		git clone --quiet --depth 1 --branch $(OZ_VERSION) \
+			https://github.com/OpenZeppelin/openzeppelin-contracts.git \
+			lib/openzeppelin-contracts; \
 	fi
 
 fmt:
