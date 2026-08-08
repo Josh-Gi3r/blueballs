@@ -1,0 +1,13 @@
+{
+  "name": "@blueballs/fx-sdk",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Dependency-free JavaScript client for the Blueballs FX node",
+  "engines": { "node": ">=18" },
+  "exports": "./src/index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:ci": "node --test --test-reporter=spec test/*.test.js"
+  }
+}
