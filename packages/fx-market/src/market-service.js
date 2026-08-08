@@ -18,6 +18,10 @@ export class FxMarketService {
     this.market = options.market ?? new SqliteFxMarket(options);
     this.db = this.market.db;
     this.now = options.now ?? this.market.now;
+    this.authorizationVerifier = options.authorizationVerifier ?? null;
+    if (this.authorizationVerifier !== null && typeof this.authorizationVerifier !== 'function') {
+      throw new TypeError('authorizationVerifier must be a function');
+    }
     this.#migrate();
   }
 
@@ -48,6 +52,73 @@ export class FxMarketService {
     }
   }
 
+  #verifyAuthorization(order) {
+    if (!this.authorizationVerifier) return { valid: true };
+    const result = this.authorizationVerifier(order.policy_authorization_id, {
+      orderHash: order.order_hash,
+      maker: order.maker,
+      inputAsset: order.buy_token,
+      outputAsset: order.sell_token,
+      policySnapshotHash: order.policy_snapshot_hash,
+    });
+    if (!result || result.valid !== true) {
+      return { valid: false, reason: result?.reason ?? 'AUTHORIZATION_INVALID' };
+    }
+    return result;
+  }
+
+  #revalidatePair(inputToken, outputToken) {
+    if (!this.authorizationVerifier) return 0;
+    const rows = this.db
+      .prepare(`
+        SELECT * FROM orders
+        WHERE buy_token = ?
+          AND sell_token = ?
+          AND state IN ('OPEN', 'PARTIALLY_FILLED')
+          AND offchain_hidden = 0
+          AND onchain_invalidated = 0
+          AND policy_blocked = 0
+      `)
+      .all(inputToken.toLowerCase(), outputToken.toLowerCase());
+
+    let blocked = 0;
+    for (const order of rows) {
+      const verification = this.#verifyAuthorization(order);
+      if (!verification.valid) {
+        const result = this.blockOrderPolicy(
+          order.order_hash,
+          `authorization invalid: ${verification.reason}`,
+        );
+        if (!result.submitted) blocked += 1;
+      }
+    }
+    return blocked;
+  }
+
+  #revalidateReservedRoute(routeId) {
+    if (!this.authorizationVerifier) return;
+    const rows = this.db
+      .prepare(`
+        SELECT o.*
+        FROM reservations r
+        JOIN orders o ON o.order_hash = r.order_hash
+        WHERE r.route_id = ? AND r.state = 'ACTIVE'
+        ORDER BY r.rowid
+      `)
+      .all(routeId);
+
+    for (const order of rows) {
+      const verification = this.#verifyAuthorization(order);
+      if (!verification.valid) {
+        this.blockOrderPolicy(order.order_hash, `authorization invalid: ${verification.reason}`);
+        const error = new Error(`route authorization invalid: ${verification.reason}`);
+        error.code = 'POLICY_AUTHORIZATION_INVALID';
+        error.orderHash = order.order_hash;
+        throw error;
+      }
+    }
+  }
+
   close() {
     this.market.close();
   }
@@ -65,6 +136,7 @@ export class FxMarketService {
   }
 
   aggregateDepth(pair) {
+    this.#revalidatePair(pair.inputToken, pair.outputToken);
     return this.market.aggregateDepth(pair);
   }
 
@@ -74,6 +146,7 @@ export class FxMarketService {
 
   reserveExactOutput(args) {
     if (this.getRoute(args.routeId)) throw new Error('route already exists');
+    this.#revalidatePair(args.inputToken, args.outputToken);
 
     const route = this.market.reserveExactOutput(args);
     try {
@@ -95,12 +168,19 @@ export class FxMarketService {
       throw new TypeError('submissionRef is required');
     }
 
+    const current = this.getRoute(routeId);
+    if (!current) throw new Error('route not found');
+    if (current.state === 'SUBMITTED' && current.submissionRef === submissionRef) {
+      return current;
+    }
+    if (current.state !== 'RESERVED') throw new Error(`route cannot be submitted from ${current.state}`);
+    if (current.expiresAt <= this.now()) throw new Error('route reservation expired');
+
+    this.#revalidateReservedRoute(routeId);
+
     return this.#transaction(() => {
       const route = this.db.prepare('SELECT * FROM routes WHERE route_id = ?').get(routeId);
       if (!route) throw new Error('route not found');
-      if (route.state === 'SUBMITTED' && route.submission_ref === submissionRef) {
-        return rowToRoute(route);
-      }
       if (route.state !== 'RESERVED') throw new Error(`route cannot be submitted from ${route.state}`);
       if (route.expires_at <= this.now()) throw new Error('route reservation expired');
 
