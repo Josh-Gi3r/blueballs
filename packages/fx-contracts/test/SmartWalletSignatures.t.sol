@@ -71,11 +71,8 @@ contract SmartWalletSignaturesTest {
         makerWallet.approveDigest(makerDigest);
 
         FxTypes.MakerFill[] memory fills = new FxTypes.MakerFill[](1);
-        fills[0] = FxTypes.MakerFill({
-            order: order,
-            signature: hex"01",
-            makerSellAmount: 50 ether
-        });
+        fills[0] =
+            FxTypes.MakerFill({ order: order, signature: hex"01", makerSellAmount: 50 ether });
 
         FxTypes.TakerIntent memory intent = FxTypes.TakerIntent({
             taker: taker,
@@ -117,11 +114,8 @@ contract SmartWalletSignaturesTest {
         });
 
         FxTypes.MakerFill[] memory fills = new FxTypes.MakerFill[](1);
-        fills[0] = FxTypes.MakerFill({
-            order: order,
-            signature: hex"01",
-            makerSellAmount: 50 ether
-        });
+        fills[0] =
+            FxTypes.MakerFill({ order: order, signature: hex"01", makerSellAmount: 50 ether });
 
         FxTypes.TakerIntent memory intent = FxTypes.TakerIntent({
             taker: taker,
