@@ -40,4 +40,4 @@ jobs:
         run: node --version
 
       - name: Tests
-        run: node --test --test-reporter=spec
+        run: node --test --test-reporter=spec test/*.test.js
