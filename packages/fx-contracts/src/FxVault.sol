@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.36;
 
-import {IERC20Minimal} from "./interfaces/IERC20Minimal.sol";
+import { IERC20Minimal } from "./interfaces/IERC20Minimal.sol";
 
 /// @title Blueballs FX Vault
 /// @notice Segregated token accounting for the FX settlement kernel.
@@ -18,7 +18,9 @@ contract FxVault {
     error RescueExceedsSurplus();
 
     event Deposited(address indexed token, address indexed account, uint256 amount);
-    event Withdrawn(address indexed token, address indexed account, address indexed recipient, uint256 amount);
+    event Withdrawn(
+        address indexed token, address indexed account, address indexed recipient, uint256 amount
+    );
     event BalanceMoved(
         address indexed token,
         address indexed from,
@@ -79,7 +81,9 @@ contract FxVault {
         if (amount == 0) revert ZeroAmount();
 
         uint256 beforeBalance = physicalBalance(token);
-        if (!IERC20Minimal(token).transferFrom(msg.sender, address(this), amount)) revert TransferFailed();
+        if (!IERC20Minimal(token).transferFrom(msg.sender, address(this), amount)) {
+            revert TransferFailed();
+        }
         uint256 afterBalance = physicalBalance(token);
 
         if (afterBalance <= beforeBalance) revert TransferFailed();
@@ -114,13 +118,10 @@ contract FxVault {
 
     /// @notice Reassign already-accounted collateral during settlement.
     /// @dev This function never changes total token liabilities and never transfers physical tokens.
-    function move(
-        address token,
-        address from,
-        address to,
-        uint256 amount,
-        bytes32 settlementRef
-    ) external onlySettlement {
+    function move(address token, address from, address to, uint256 amount, bytes32 settlementRef)
+        external
+        onlySettlement
+    {
         if (!isSupportedToken[token]) revert UnsupportedToken();
         if (from == address(0) || to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
