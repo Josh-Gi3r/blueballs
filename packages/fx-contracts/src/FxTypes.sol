@@ -14,4 +14,22 @@ library FxTypes {
         uint64 epoch;
         bytes32 salt;
     }
+
+    struct MakerFill {
+        MakerOrder order;
+        bytes signature;
+        uint256 makerSellAmount;
+    }
+
+    struct TakerIntent {
+        address taker;
+        address inputToken;
+        address outputToken;
+        uint256 maxInput;
+        uint256 minOutput;
+        address recipient;
+        uint64 deadline;
+        uint256 nonce;
+        bytes32 policyAuthorizationHash;
+    }
 }
