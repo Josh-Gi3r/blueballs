@@ -5,3 +5,9 @@ dist/
 *.sqlite-shm
 .DS_Store
 *.log
+
+# Foundry / FX contracts
+packages/fx-contracts/lib/
+packages/fx-contracts/out/
+packages/fx-contracts/cache/
+packages/fx-contracts/broadcast/
