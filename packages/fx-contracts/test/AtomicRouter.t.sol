@@ -113,12 +113,7 @@ contract AtomicRouterTest {
     function testMinOutputFailureRollsBackMakerFillAndNonce() public {
         FxTypes.MakerFill[] memory fills = new FxTypes.MakerFill[](1);
         fills[0] = _makerFill(
-            makerOne,
-            MAKER_ONE_PK,
-            40 ether,
-            80 ether,
-            40 ether,
-            bytes32("maker-one-min")
+            makerOne, MAKER_ONE_PK, 40 ether, 80 ether, 40 ether, bytes32("maker-one-min")
         );
         FxTypes.TakerIntent memory intent = _intent(100 ether, 50 ether, 4, bytes32("policy"));
         bytes memory takerSignature = _signTaker(intent, TAKER_PK);
@@ -283,9 +278,7 @@ contract AtomicRouterTest {
             salt: salt
         });
         return FxTypes.MakerFill({
-            order: order,
-            signature: _signMaker(order, privateKey),
-            makerSellAmount: fillAmount
+            order: order, signature: _signMaker(order, privateKey), makerSellAmount: fillAmount
         });
     }
 
