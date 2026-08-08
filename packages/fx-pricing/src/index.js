@@ -18,3 +18,4 @@ export {
 } from './rational.js';
 export { ReferencePriceEngine } from './reference.js';
 export { PrincipalRiskBook } from './risk-book.js';
+export { PrincipalQuoteEngine } from './principal-pricing.js';
