@@ -2,13 +2,10 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { baselineScenarios, runSimulation } from "../packages/fx-simulator/src/index.js";
 import { fxCall, fxNodeConfigured, FX_NODE_BASE } from "./api";
 
-const MONO = "'IBM Plex Mono', monospace";
 const RC = "02ebbf70ed6cef054549010222719d1a0357cf27";
 const REPO = "https://github.com/Josh-Gi3r/blueballs";
 const rcSource = (path: string) => `${REPO}/blob/${RC}/${path}`;
 
-const ink = "#111318";
-const muted = "#697184";
 const line = "#DDE2EA";
 const panel: CSSProperties = {
   background: "rgba(255,255,255,.94)",
