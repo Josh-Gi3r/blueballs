@@ -17,6 +17,12 @@ line_length = 100
 tab_width = 4
 bracket_spacing = true
 
+# Per-commit gate: deliberately strong but bounded so every branch change receives timely evidence.
 [profile.ci]
-fuzz = { runs = 50000 }
+fuzz = { runs = 20000 }
+invariant = { runs = 1000, depth = 100, fail_on_revert = false }
+
+# Milestone/release stress campaign. This is intentionally expensive and is not the normal branch gate.
+[profile.stress]
+fuzz = { runs = 100000 }
 invariant = { runs = 5000, depth = 250, fail_on_revert = false }
