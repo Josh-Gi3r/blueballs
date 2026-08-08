@@ -1,10 +1,20 @@
 export {
-  Rational,
-  ceilDiv,
-  floorDiv,
-  decimalToRational,
+  gcd,
+  rational,
+  parseDecimal,
+  add,
+  sub,
+  mul,
+  div,
+  compare,
+  abs,
+  midpoint,
+  median,
   applyBps,
-  convertAtomic,
+  deviationWithinBps,
+  ceilDiv,
+  quoteInputAtomicExactOutput,
+  toDecimalString,
 } from './rational.js';
 export { ReferencePriceBook } from './reference.js';
 export { PrincipalRiskBook } from './risk-book.js';
