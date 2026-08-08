@@ -29,7 +29,7 @@ function intent(id = 'fiat-1') {
 
 function attestation(i, overrides = {}) {
   return {
-    attestationId: `att-${i}`,
+    attestationId: `att-${i.intentId}`,
     intentId: i.intentId,
     intentHash: hashFiatIntent(i),
     verifierId: 'verifier-1',
