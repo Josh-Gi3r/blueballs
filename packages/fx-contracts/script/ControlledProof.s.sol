@@ -58,32 +58,57 @@ contract ControlledProof is Script {
     uint256 internal constant MAKER_SELL = 100 ether;
     uint256 internal constant MAKER_BUY = 200 ether;
 
+    uint256 internal ownerKey;
+    uint256 internal makerKey;
+    uint256 internal takerKey;
+    address internal owner;
+    address internal maker;
+    address internal taker;
+
+    ProofToken internal inputToken;
+    ProofToken internal outputToken;
+    FxVault internal vault;
+    OrderCancellation internal cancellation;
+    FxSettlement internal settlement;
+    AtomicRouter internal router;
+
     function run() external {
-        uint256 ownerKey = vm.envUint("OWNER_KEY");
-        uint256 makerKey = vm.envUint("MAKER_KEY");
-        uint256 takerKey = vm.envUint("TAKER_KEY");
+        _loadActors();
+        _deployKernel();
+        _depositLiquidity();
+        _executeSignedRoute();
+        _assertPostState();
+    }
 
-        address owner = vm.addr(ownerKey);
-        address maker = vm.addr(makerKey);
-        address taker = vm.addr(takerKey);
+    function _loadActors() internal {
+        ownerKey = vm.envUint("OWNER_KEY");
+        makerKey = vm.envUint("MAKER_KEY");
+        takerKey = vm.envUint("TAKER_KEY");
+        owner = vm.addr(ownerKey);
+        maker = vm.addr(makerKey);
+        taker = vm.addr(takerKey);
+    }
 
+    function _deployKernel() internal {
         vm.startBroadcast(ownerKey);
-        ProofToken inputToken = new ProofToken("Proof USD", "pUSD");
-        ProofToken outputToken = new ProofToken("Proof EUR", "pEUR");
+        inputToken = new ProofToken("Proof USD", "pUSD");
+        outputToken = new ProofToken("Proof EUR", "pEUR");
         inputToken.mint(taker, 1_000 ether);
         outputToken.mint(maker, 1_000 ether);
 
         address[] memory supported = new address[](2);
         supported[0] = address(inputToken);
         supported[1] = address(outputToken);
-        FxVault vault = new FxVault(owner, supported);
-        OrderCancellation cancellation = new OrderCancellation();
-        FxSettlement settlement = new FxSettlement(owner, vault, cancellation);
-        AtomicRouter router = new AtomicRouter(settlement);
+        vault = new FxVault(owner, supported);
+        cancellation = new OrderCancellation();
+        settlement = new FxSettlement(owner, vault, cancellation);
+        router = new AtomicRouter(settlement);
         vault.bindSettlement(address(settlement));
         settlement.bindRouter(address(router));
         vm.stopBroadcast();
+    }
 
+    function _depositLiquidity() internal {
         vm.startBroadcast(makerKey);
         outputToken.approve(address(vault), 1_000 ether);
         vault.deposit(address(outputToken), 1_000 ether);
@@ -93,8 +118,28 @@ contract ControlledProof is Script {
         inputToken.approve(address(vault), 1_000 ether);
         vault.deposit(address(inputToken), 1_000 ether);
         vm.stopBroadcast();
+    }
 
-        FxTypes.MakerOrder memory order = FxTypes.MakerOrder({
+    function _executeSignedRoute() internal {
+        FxTypes.MakerOrder memory order = _makerOrder();
+        bytes memory makerSignature = _sign(makerKey, settlement.hashMakerOrder(order));
+        FxTypes.TakerIntent memory intent = _takerIntent();
+        bytes memory takerSignature = _sign(takerKey, router.hashTakerIntent(intent));
+
+        FxTypes.MakerFill[] memory fills = new FxTypes.MakerFill[](1);
+        fills[0] = FxTypes.MakerFill({
+            order: order, signature: makerSignature, makerSellAmount: MAKER_SELL
+        });
+
+        vm.startBroadcast(ownerKey);
+        (uint256 totalInput, uint256 totalOutput) = router.execute(intent, takerSignature, fills);
+        vm.stopBroadcast();
+        require(totalInput == MAKER_BUY, "wrong total input");
+        require(totalOutput == MAKER_SELL, "wrong total output");
+    }
+
+    function _makerOrder() internal view returns (FxTypes.MakerOrder memory) {
+        return FxTypes.MakerOrder({
             maker: maker,
             sellToken: address(outputToken),
             buyToken: address(inputToken),
@@ -106,9 +151,10 @@ contract ControlledProof is Script {
             epoch: 1,
             salt: keccak256("controlled-proof-maker")
         });
-        bytes memory makerSignature = _sign(makerKey, settlement.hashMakerOrder(order));
+    }
 
-        FxTypes.TakerIntent memory intent = FxTypes.TakerIntent({
+    function _takerIntent() internal view returns (FxTypes.TakerIntent memory) {
+        return FxTypes.TakerIntent({
             taker: taker,
             inputToken: address(inputToken),
             outputToken: address(outputToken),
@@ -119,19 +165,9 @@ contract ControlledProof is Script {
             nonce: 1,
             policyAuthorizationHash: keccak256("controlled-proof-policy")
         });
-        bytes memory takerSignature = _sign(takerKey, router.hashTakerIntent(intent));
+    }
 
-        FxTypes.MakerFill[] memory fills = new FxTypes.MakerFill[](1);
-        fills[0] = FxTypes.MakerFill({
-            order: order, signature: makerSignature, makerSellAmount: MAKER_SELL
-        });
-
-        vm.startBroadcast(ownerKey);
-        (uint256 totalInput, uint256 totalOutput) = router.execute(intent, takerSignature, fills);
-        vm.stopBroadcast();
-
-        require(totalInput == MAKER_BUY, "wrong total input");
-        require(totalOutput == MAKER_SELL, "wrong total output");
+    function _assertPostState() internal view {
         require(vault.balanceOf(address(inputToken), maker) == MAKER_BUY, "maker input missing");
         require(vault.balanceOf(address(outputToken), taker) == MAKER_SELL, "taker output missing");
         require(vault.balanceOf(address(inputToken), taker) == 800 ether, "taker input wrong");
