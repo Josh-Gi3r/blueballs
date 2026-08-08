@@ -7,6 +7,7 @@ import { FxPolicyEngine, createMarketAuthorizationVerifier } from '../src/index.
 const NOW = 1_000_000;
 const INPUT = '0x0000000000000000000000000000000000000011';
 const OUTPUT = '0x0000000000000000000000000000000000000022';
+const OTHER = '0x0000000000000000000000000000000000000033';
 const MAKER = '0x00000000000000000000000000000000000000a1';
 
 function hash(n) {
@@ -118,7 +119,7 @@ test('authorization context is bound to action corridor amount and maker account
   );
 
   const wrongPair = admission(decision, 2, '100');
-  wrongPair.order.sellToken = INPUT;
+  wrongPair.order.sellToken = OTHER;
   await assert.rejects(() => market.admitOrder(wrongPair), /OUTPUT_ASSET_MISMATCH/);
 
   const wrongMaker = admission(decision, 3, '100');
