@@ -9,6 +9,7 @@ import { IERC20Minimal } from "./interfaces/IERC20Minimal.sol";
 contract FxVault {
     error NotOwner();
     error NotSettlement();
+    error SettlementAlreadySet();
     error UnsupportedToken();
     error ZeroAddress();
     error ZeroAmount();
@@ -17,6 +18,7 @@ contract FxVault {
     error Insolvent();
     error RescueExceedsSurplus();
 
+    event SettlementBound(address indexed settlement);
     event Deposited(address indexed token, address indexed account, uint256 amount);
     event Withdrawn(
         address indexed token, address indexed account, address indexed recipient, uint256 amount
@@ -31,16 +33,15 @@ contract FxVault {
     event SurplusRescued(address indexed token, address indexed recipient, uint256 amount);
 
     address public immutable owner;
-    address public immutable settlement;
+    address public settlement;
 
     mapping(address token => bool supported) public isSupportedToken;
     mapping(address token => mapping(address account => uint256 amount)) private _balances;
     mapping(address token => uint256 amount) public totalLiabilities;
 
-    constructor(address owner_, address settlement_, address[] memory supportedTokens_) {
-        if (owner_ == address(0) || settlement_ == address(0)) revert ZeroAddress();
+    constructor(address owner_, address[] memory supportedTokens_) {
+        if (owner_ == address(0)) revert ZeroAddress();
         owner = owner_;
-        settlement = settlement_;
 
         uint256 length = supportedTokens_.length;
         for (uint256 i; i < length; ++i) {
@@ -58,6 +59,15 @@ contract FxVault {
     modifier onlySettlement() {
         if (msg.sender != settlement) revert NotSettlement();
         _;
+    }
+
+    /// @notice Bind the only contract allowed to reassign ledger balances.
+    /// @dev One-time operation. There is deliberately no settlement upgrade path in FX-1.
+    function bindSettlement(address settlement_) external onlyOwner {
+        if (settlement_ == address(0)) revert ZeroAddress();
+        if (settlement != address(0)) revert SettlementAlreadySet();
+        settlement = settlement_;
+        emit SettlementBound(settlement_);
     }
 
     function balanceOf(address token, address account) external view returns (uint256) {
