@@ -28,7 +28,8 @@ contract FxSettlement is EIP712, ReentrancyGuard {
     event MakerOrderFilled(
         bytes32 indexed orderHash,
         address indexed maker,
-        address indexed taker,
+        address indexed takerPayer,
+        address outputRecipient,
         uint256 makerSellAmount,
         uint256 takerPayAmount,
         uint256 cumulativeMakerSell,
@@ -115,14 +116,17 @@ contract FxSettlement is EIP712, ReentrancyGuard {
     }
 
     /// @notice Settle one maker leg for a route already authorised by the atomic router.
+    /// @param takerPayer Vault account debited for the maker's requested buy asset.
+    /// @param outputRecipient Vault account credited with the maker's sold asset.
     function fillMakerOrder(
         FxTypes.MakerOrder calldata order,
         bytes calldata makerSignature,
         uint256 makerSellAmount,
-        address taker,
+        address takerPayer,
+        address outputRecipient,
         bytes32 settlementRef
     ) external onlyRouter nonReentrant returns (uint256 takerPayAmount) {
-        _validateOrderShape(order, taker);
+        _validateOrderShape(order, takerPayer, outputRecipient);
         if (block.timestamp < order.validAfter || block.timestamp > order.validUntil) {
             revert OrderNotActive();
         }
@@ -140,15 +144,16 @@ contract FxSettlement is EIP712, ReentrancyGuard {
         filledSellAmount[orderHash] = newSell;
         filledBuyAmount[orderHash] = newBuy;
 
-        vault.move(order.sellToken, order.maker, taker, makerSellAmount, settlementRef);
+        vault.move(order.sellToken, order.maker, outputRecipient, makerSellAmount, settlementRef);
         if (takerPayAmount != 0) {
-            vault.move(order.buyToken, taker, order.recipient, takerPayAmount, settlementRef);
+            vault.move(order.buyToken, takerPayer, order.recipient, takerPayAmount, settlementRef);
         }
 
         emit MakerOrderFilled(
             orderHash,
             order.maker,
-            taker,
+            takerPayer,
+            outputRecipient,
             makerSellAmount,
             takerPayAmount,
             newSell,
@@ -157,11 +162,15 @@ contract FxSettlement is EIP712, ReentrancyGuard {
         );
     }
 
-    function _validateOrderShape(FxTypes.MakerOrder calldata order, address taker) internal pure {
+    function _validateOrderShape(
+        FxTypes.MakerOrder calldata order,
+        address takerPayer,
+        address outputRecipient
+    ) internal pure {
         if (
             order.maker == address(0) || order.sellToken == address(0)
                 || order.buyToken == address(0) || order.recipient == address(0)
-                || taker == address(0)
+                || takerPayer == address(0) || outputRecipient == address(0)
         ) revert ZeroAddress();
         if (
             order.sellToken == order.buyToken || order.sellAmount == 0 || order.buyAmount == 0
