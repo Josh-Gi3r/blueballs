@@ -87,7 +87,8 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
         FxTypes.MakerFill calldata fill,
         bytes32 intentHash
     ) internal returns (uint256 takerPay, uint256 makerOutput) {
-        if (fill.order.sellToken != intent.outputToken || fill.order.buyToken != intent.inputToken) {
+        if (fill.order.sellToken != intent.outputToken || fill.order.buyToken != intent.inputToken)
+        {
             revert WrongAssetPair();
         }
 
