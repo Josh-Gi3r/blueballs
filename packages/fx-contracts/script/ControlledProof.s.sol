@@ -135,7 +135,9 @@ contract ControlledProof is Script {
         });
 
         vm.startBroadcast(ownerKey);
-        policyRegistry.authorize(intent.policyAuthorizationHash, uint64(block.timestamp + 1 days), 1);
+        policyRegistry.authorize(
+            intent.policyAuthorizationHash, uint64(block.timestamp + 1 days), 1
+        );
         (uint256 totalInput, uint256 totalOutput) = router.execute(intent, takerSignature, fills);
         vm.stopBroadcast();
         require(totalInput == MAKER_BUY, "wrong total input");
