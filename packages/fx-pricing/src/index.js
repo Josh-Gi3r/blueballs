@@ -16,5 +16,5 @@ export {
   quoteInputAtomicExactOutput,
   toDecimalString,
 } from './rational.js';
-export { ReferencePriceBook } from './reference.js';
+export { ReferencePriceEngine } from './reference.js';
 export { PrincipalRiskBook } from './risk-book.js';
