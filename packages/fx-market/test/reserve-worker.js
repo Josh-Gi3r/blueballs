@@ -24,6 +24,7 @@ parentPort.on('message', (message) => {
     parentPort.postMessage({ ok: false, error: error.message });
   } finally {
     book.close();
+    parentPort.close();
   }
 });
 
