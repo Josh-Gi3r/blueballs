@@ -21,11 +21,11 @@ function requests(count, oneWayPct = 50, amount = '1000') {
 }
 
 const baseSources = () => [
-  source('PRIVATE_MARKET', 'market', 5, '25000'),
-  source('ISSUER', 'issuer', 8, '30000'),
-  source('INSTITUTIONAL_LP', 'lp', 10, '40000'),
-  source('NEOBANK', 'neobank', 12, '25000'),
-  source('BANK_TREASURY', 'treasury', 15, '20000'),
+  source('PRIVATE_MARKET', 'market', 5, '250'),
+  source('ISSUER', 'issuer', 8, '200'),
+  source('INSTITUTIONAL_LP', 'lp', 10, '200'),
+  source('NEOBANK', 'neobank', 12, '100'),
+  source('BANK_TREASURY', 'treasury', 15, '100'),
   source('BANK_PRINCIPAL', 'principal', 20, '1000000'),
 ];
 
@@ -69,7 +69,7 @@ export function baselineScenarios() {
     referenceOutage: {
       seed: 16,
       principalHardLimit: '50000',
-      sources: [source('INSTITUTIONAL_LP', 'lp', 10, '5000'), source('BANK_PRINCIPAL', 'principal', 20, '1000000')],
+      sources: [source('INSTITUTIONAL_LP', 'lp', 10, '400'), source('BANK_PRINCIPAL', 'principal', 20, '1000000')],
       requests: requests(100, 100, '1000'),
       events: [
         { at: 20, type: 'REFERENCE_UNAVAILABLE' },
