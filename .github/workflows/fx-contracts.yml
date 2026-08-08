@@ -2,7 +2,7 @@ name: FX contracts
 
 on:
   push:
-    branches: [fx-foundation]
+    branches: [main, fx-policy]
     paths:
       - 'packages/fx-contracts/**'
       - 'spec/fx/**'
