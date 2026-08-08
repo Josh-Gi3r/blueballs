@@ -8,6 +8,7 @@ import { FxSettlement } from "../src/FxSettlement.sol";
 import { FxTypes } from "../src/FxTypes.sol";
 import { FxVault } from "../src/FxVault.sol";
 import { OrderCancellation } from "../src/OrderCancellation.sol";
+import { PolicyAuthorizationRegistry } from "../src/PolicyAuthorizationRegistry.sol";
 
 contract ProofToken {
     string public name;
@@ -70,6 +71,7 @@ contract ControlledProof is Script {
     FxVault internal vault;
     OrderCancellation internal cancellation;
     FxSettlement internal settlement;
+    PolicyAuthorizationRegistry internal policyRegistry;
     AtomicRouter internal router;
 
     function run() external {
@@ -102,7 +104,8 @@ contract ControlledProof is Script {
         vault = new FxVault(owner, supported);
         cancellation = new OrderCancellation();
         settlement = new FxSettlement(owner, vault, cancellation);
-        router = new AtomicRouter(settlement);
+        policyRegistry = new PolicyAuthorizationRegistry(owner);
+        router = new AtomicRouter(settlement, policyRegistry);
         vault.bindSettlement(address(settlement));
         settlement.bindRouter(address(router));
         vm.stopBroadcast();
@@ -132,6 +135,7 @@ contract ControlledProof is Script {
         });
 
         vm.startBroadcast(ownerKey);
+        policyRegistry.authorize(intent.policyAuthorizationHash, uint64(block.timestamp + 1 days), 1);
         (uint256 totalInput, uint256 totalOutput) = router.execute(intent, takerSignature, fills);
         vm.stopBroadcast();
         require(totalInput == MAKER_BUY, "wrong total input");
