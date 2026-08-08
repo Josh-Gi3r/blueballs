@@ -57,8 +57,10 @@ export class FxMarketService {
     const result = this.authorizationVerifier(order.policy_authorization_id, {
       orderHash: order.order_hash,
       maker: order.maker,
+      accountRef: order.maker,
       inputAsset: order.buy_token,
       outputAsset: order.sell_token,
+      amount: order.sell_amount,
       policySnapshotHash: order.policy_snapshot_hash,
     });
     if (!result || result.valid !== true) {
