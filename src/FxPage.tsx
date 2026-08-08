@@ -1,377 +1,132 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { planExactOutput } from "../packages/fx-liquidity/src/index.js";
 import { baselineScenarios, runSimulation } from "../packages/fx-simulator/src/index.js";
-import { fxCall, fxNodeConfigured, FX_NODE_BASE } from "./api";
+import liquidityB64 from "./assets/fx-liquidity.b64?raw";
+import complianceB64 from "./assets/fx-compliance.b64?raw";
+import routeB64 from "./assets/fx-route.b64?raw";
+import treasuryB64 from "./assets/fx-treasury.b64?raw";
+import "./FxPage.css";
 
+const IMG = (raw: string) => `data:image/webp;base64,${raw.trim()}`;
+const FX_LIQUIDITY = IMG(liquidityB64);
+const FX_COMPLIANCE = IMG(complianceB64);
+const FX_ROUTE = IMG(routeB64);
+const FX_TREASURY = IMG(treasuryB64);
 const RC = "02ebbf70ed6cef054549010222719d1a0357cf27";
 const REPO = "https://github.com/Josh-Gi3r/blueballs";
-const rcSource = (path: string) => `${REPO}/blob/${RC}/${path}`;
+const source = (path: string) => `${REPO}/blob/${RC}/${path}`;
 
-const line = "#DDE2EA";
-const panel: CSSProperties = {
-  background: "rgba(255,255,255,.94)",
-  border: `1px solid ${line}`,
-  borderRadius: 20,
-  boxShadow: "0 14px 45px rgba(21,30,52,.05)",
-};
+type SourceType = "PRIVATE_MARKET" | "ISSUER" | "INSTITUTIONAL_LP" | "NEOBANK" | "BANK_TREASURY" | "BANK_PRINCIPAL";
+type DemoSource = { sourceType: SourceType; sourceId: string; label: string; rate: number; capacityEur: number; enabled?: boolean; status?: string };
+type DemoQuote = { payBrl: number; receiveEur: number; rate: number; route: Array<DemoSource & { inputBrl: number; outputEur: number }> };
 
-const SOURCE_LABELS: Record<string, string> = {
-  PRIVATE_MARKET: "Approved member flow",
-  ISSUER: "Stablecoin issuer",
-  INSTITUTIONAL_LP: "Institutional LP",
-  NEOBANK: "Other neobank",
-  BANK_TREASURY: "Bank treasury",
-  BANK_PRINCIPAL: "Bank principal",
-};
+const SOURCES: DemoSource[] = [
+  { sourceType: "PRIVATE_MARKET", sourceId: "customer", label: "Customer flow", rate: 6.045, capacityEur: 3200 },
+  { sourceType: "ISSUER", sourceId: "issuer", label: "Issuer", rate: 6.072, capacityEur: 2600 },
+  { sourceType: "INSTITUTIONAL_LP", sourceId: "lp", label: "Institutional LP", rate: 6.088, capacityEur: 4800 },
+  { sourceType: "NEOBANK", sourceId: "neobank", label: "Other institution", rate: 6.102, capacityEur: 2200 },
+  { sourceType: "BANK_TREASURY", sourceId: "treasury", label: "Treasury", rate: 6.128, capacityEur: 3600 },
+  { sourceType: "BANK_PRINCIPAL", sourceId: "principal", label: "Bank principal", rate: 6.155, capacityEur: 6500 },
+];
+const SCENARIOS = [
+  ["balanced", "Balanced"], ["oneWay90", "90% buying EUR"], ["lpOff", "Remove LP"],
+  ["issuerOff", "Remove issuer"], ["riskLimit", "Bank risk limit"], ["referenceOutage", "Reference unavailable"],
+] as const;
+type Scenario = typeof SCENARIOS[number][0];
 
-const SCENARIO_LABELS: Record<string, string> = {
-  balanced: "Balanced flow",
-  oneWay90: "90% one-way flow",
-  lpDisappears: "Institutional LP disappears",
-  issuerDisappears: "Issuer disappears",
-  principalLimit: "Principal hard limit",
-  referenceOutage: "Reference price outage",
-  priceShock: "5% price shock",
-  cancellationStorm: "Cancellation storm",
-  chainCongestion: "Chain congestion",
-  recovery: "Outage + recovery",
-};
+function Eye({ children }: { children: ReactNode }) { return <div className="fxr-eye">{children}</div>; }
+function Tag({ children }: { children: ReactNode }) { return <span className="fxr-tag">{children}</span>; }
+function money(n: number, c: "BRL" | "EUR") { return `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${c}`; }
 
-type SimulationResult = {
-  requestedOrders: number;
-  filledOrders: number;
-  fillRatePct: number;
-  requestedVolume: string;
-  filledVolume: string;
-  volumeFillPct: number;
-  routeComposition: Record<string, string>;
-  principalExposureB: string;
-  peakPrincipalExposureAbs: string;
-  principalHardLimit: string;
-  rejections: { RISK_LIMIT: number; NO_LIQUIDITY: number };
-  settlementFailures: number;
-  referenceOutageRequests: number;
-  referenceIndex: number;
-};
-
-type LiveQuote = {
-  id?: string;
-  quoteId?: string;
-  routeId?: string;
-  inputAsset?: string;
-  outputAsset?: string;
-  totalInput?: string;
-  totalOutput?: string;
-  state?: string;
-  [key: string]: unknown;
-};
-
-function Eyebrow({ children }: { children: ReactNode }) {
-  return <div className="fx-eyebrow">{children}</div>;
+function marketFor(id: Scenario): DemoSource[] {
+  return SOURCES.map((s) => {
+    if (id === "lpOff" && s.sourceId === "lp") return { ...s, enabled: false, status: "OFFLINE" };
+    if (id === "issuerOff" && s.sourceId === "issuer") return { ...s, enabled: false, status: "OFFLINE" };
+    if (id === "riskLimit" && s.sourceId === "treasury") return { ...s, capacityEur: 450, status: "NEAR LIMIT" };
+    if (id === "riskLimit" && s.sourceId === "principal") return { ...s, enabled: false, status: "RISK LIMIT" };
+    if (id === "referenceOutage" && s.sourceId === "principal") return { ...s, enabled: false, status: "NO REFERENCE" };
+    if (id === "oneWay90" && s.sourceId === "customer") return { ...s, capacityEur: 850, rate: 6.082, status: "THIN" };
+    if (id === "oneWay90" && s.sourceId === "lp") return { ...s, rate: 6.108 };
+    if (id === "oneWay90" && s.sourceId === "treasury") return { ...s, rate: 6.145 };
+    if (id === "oneWay90" && s.sourceId === "principal") return { ...s, rate: 6.19 };
+    return { ...s, enabled: true };
+  });
 }
 
-function Pill({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
-  return <span className={dark ? "fx-pill fx-pill-dark" : "fx-pill"}>{children}</span>;
-}
-
-function Metric({ label, value, note }: { label: string; value: string; note?: string }) {
-  return (
-    <div className="fx-metric">
-      <div className="fx-metric-label">{label}</div>
-      <div className="fx-metric-value">{value}</div>
-      {note && <div className="fx-metric-note">{note}</div>}
-    </div>
-  );
-}
-
-function SourceLink({ path, label = "Inspect source" }: { path: string; label?: string }) {
-  return (
-    <a className="fx-source-link" href={rcSource(path)} target="_blank" rel="noreferrer">
-      {label} ↗
-    </a>
-  );
-}
-
-function SystemFlow() {
-  const steps = [
-    ["01", "IDENTITY", "KYC / KYB, sanctions, AML and account attribution"],
-    ["02", "POLICY", "Corridor, jurisdiction, participant class and ticket rules"],
-    ["03", "AUTHORIZED LIQUIDITY", "Only eligible makers, issuers, LPs and treasury capacity enter"],
-    ["04", "PRICE + ROUTE", "Executable capacity competes on exact economics; risk stays a hard gate"],
-    ["05", "POLICY AUTH", "Institution grants a short-lived authorization bound into execution"],
-    ["06", "SETTLEMENT", "Atomic token execution or explicitly asynchronous fiat finality"],
-    ["07", "RECONCILIATION", "Submitted, confirmed, failed and ambiguous states remain reconstructable"],
-  ];
-
-  return (
-    <section style={{ ...panel, padding: "24px" }}>
-      <div className="fx-section-head">
-        <div>
-          <Eyebrow>SEE IT · THE EXECUTION PERIMETER</Eyebrow>
-          <h2 className="fx-h2">Compliance is upstream of price.</h2>
-        </div>
-        <SourceLink path="spec/fx/ARCHITECTURE.md" label="Architecture" />
-      </div>
-      <div className="fx-flow" data-scroll>
-        {steps.map(([n, title, text], i) => (
-          <div key={title} className={i === 4 ? "fx-flow-step fx-flow-step-dark" : "fx-flow-step"}>
-            <div className="fx-step-number">{n}</div>
-            <div className="fx-step-title">{title}</div>
-            <div className="fx-step-copy">{text}</div>
-          </div>
-        ))}
-      </div>
-      <div className="fx-callout">
-        <strong>Cryptographically valid is not enough.</strong> The Router independently requires a live institution policy authorization. Expiry, individual revocation or policy-epoch invalidation blocks settlement even when maker and taker signatures remain valid.
-      </div>
-    </section>
-  );
-}
-
-function ScenarioLab() {
-  const scenarios = useMemo(() => baselineScenarios(), []);
-  const [scenario, setScenario] = useState("balanced");
-  const result = useMemo(
-    () => runSimulation((scenarios as Record<string, unknown>)[scenario]) as SimulationResult,
-    [scenario, scenarios],
-  );
-  const totalRouted = Object.values(result.routeComposition).reduce((sum, value) => sum + BigInt(value), 0n);
-  const principal = BigInt(result.peakPrincipalExposureAbs);
-  const limit = BigInt(result.principalHardLimit);
-  const utilization = limit === 0n ? 0 : Math.min(100, Number((principal * 10_000n) / limit) / 100);
-
-  return (
-    <section style={{ ...panel, overflow: "hidden" }}>
-      <div className="fx-panel-head">
-        <div>
-          <Eyebrow>BREAK IT · REAL SIMULATOR</Eyebrow>
-          <h2 className="fx-h2">Change the market. Watch routing survive or refuse.</h2>
-          <p className="fx-copy">This imports the same deterministic simulator used by the FX-8 CI gate and calls the real exact-output liquidity planner. It is not a frontend recreation.</p>
-        </div>
-        <div className="fx-head-actions">
-          <SourceLink path="packages/fx-simulator/src/simulator.js" label="Simulator" />
-          <select className="fx-select" value={scenario} onChange={(e) => setScenario(e.target.value)}>
-            {Object.keys(SCENARIO_LABELS).map((key) => <option key={key} value={key}>{SCENARIO_LABELS[key]}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="fx-panel-body">
-        <div className="fx-metric-grid">
-          <Metric label="ORDER FILL RATE" value={`${result.fillRatePct.toFixed(1)}%`} note={`${result.filledOrders}/${result.requestedOrders} orders`} />
-          <Metric label="VOLUME FILLED" value={`${result.volumeFillPct.toFixed(1)}%`} note={`${result.filledVolume} / ${result.requestedVolume}`} />
-          <Metric label="PRINCIPAL PEAK" value={`${utilization.toFixed(1)}%`} note={`${result.peakPrincipalExposureAbs} / ${result.principalHardLimit}`} />
-          <Metric label="NO LIQUIDITY" value={String(result.rejections.NO_LIQUIDITY)} note="fail closed" />
-          <Metric label="SETTLEMENT FAILURES" value={String(result.settlementFailures)} note="not counted as fills" />
-        </div>
-
-        <div className="fx-sim-grid">
-          <div className="fx-inset">
-            <div className="fx-mini-title">WHO ACTUALLY FILLED THE FLOW</div>
-            <div className="fx-bars">
-              {Object.entries(result.routeComposition).map(([type, value]) => {
-                const amount = BigInt(value);
-                const width = totalRouted === 0n ? 0 : Math.max(0.5, Number((amount * 10_000n) / totalRouted) / 100);
-                return (
-                  <div key={type}>
-                    <div className="fx-bar-label"><span>{SOURCE_LABELS[type] ?? type}</span><span>{value}</span></div>
-                    <div className="fx-bar-track"><div className="fx-bar-fill" style={{ width: `${width}%`, opacity: amount === 0n ? 0 : 1 }} /></div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="fx-risk-card">
-            <div className="fx-mini-title fx-mini-title-dark">HARD TREASURY LIMIT</div>
-            <div className="fx-ring" style={{ background: `conic-gradient(#8799F0 ${utilization * 3.6}deg,#292E39 0deg)` }}>
-              <div className="fx-ring-inner"><strong>{utilization.toFixed(0)}%</strong><span>PEAK</span></div>
-            </div>
-            <p>Hard risk is not a price. When capacity is gone, the engine rejects flow instead of widening spread until someone accepts it.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function CompliancePanel() {
-  const checks = [
-    ["Identity credentials", "KYC / KYB / sanctions / AML", "OFF-CHAIN"],
-    ["Institution rules", "corridor · jurisdiction · ticket · participant class", "OFF-CHAIN"],
-    ["Account attribution", "settlement account belongs to the approved participant", "OFF-CHAIN"],
-    ["Authorization freshness", "participant epoch + policy version + expiry", "OFF-CHAIN"],
-    ["Execution authority", "policyAuthorizationHash must still be live", "ON-CHAIN"],
-  ];
-  return (
-    <section style={{ ...panel, padding: "27px 28px" }}>
-      <div className="fx-section-head">
-        <div>
-          <Eyebrow>UNDERSTAND IT · COMPLIANCE</Eyebrow>
-          <h2 className="fx-h2">The market never sees ineligible liquidity.</h2>
-        </div>
-        <div className="fx-head-actions">
-          <SourceLink path="packages/fx-policy/src/policy-engine.js" label="Policy engine" />
-          <SourceLink path="packages/fx-contracts/src/PolicyAuthorizationRegistry.sol" label="On-chain guard" />
-        </div>
-      </div>
-      <p className="fx-copy">KYC providers supply identity facts. Blueballs owns the authorization framework that decides whether those facts permit this participant, corridor and amount to become executable.</p>
-      <div className="fx-checks">
-        {checks.map(([title, text, where]) => (
-          <div className="fx-check-row" key={title}>
-            <strong>{title}</strong><span>{text}</span><code>{where}</code>
-          </div>
-        ))}
-      </div>
-      <div className="fx-two-col">
-        <div className="fx-approved"><strong>APPROVED</strong><span>Eligible liquidity can now compete on price.</span></div>
-        <div className="fx-rejected"><strong>REJECTED</strong><span>It never becomes a candidate route, regardless of price.</span></div>
-      </div>
-    </section>
-  );
-}
-
-function SettlementGraph() {
-  const legs = [
-    ["MYR", "VERIFIED FIAT PAYMENT", "USDC", "ASYNC / ATTESTED"],
-    ["USDC", "TOKEN SWAP", "EURC", "ATOMIC"],
-    ["EURC", "ISSUER REDEMPTION", "EUR", "ASYNC / EXTERNAL"],
-  ];
-  return (
-    <section style={{ ...panel, padding: "27px 28px" }}>
-      <div className="fx-section-head">
-        <div>
-          <Eyebrow>INSPECT IT · SETTLEMENT GRAPH</Eyebrow>
-          <h2 className="fx-h2">Atomic where it is true. Explicit where it is not.</h2>
-        </div>
-        <SourceLink path="packages/fx-fiat/src/settlement-graph.js" label="Settlement graph" />
-      </div>
-      <p className="fx-copy">Blueballs can route across token swaps, issuer mint/redeem, internal ledgers, bank rails and verified fiat. It never upgrades asynchronous fiat finality into an “atomic” marketing claim.</p>
-      <div className="fx-route" data-scroll>
-        {legs.map(([from, kind, to, finality], i) => (
-          <div className="fx-route-leg" key={kind}>
-            <div className="fx-route-assets"><strong>{from}</strong><span>→</span><strong>{to}</strong></div>
-            <div className="fx-route-kind">{kind}</div>
-            <Pill dark={finality === "ATOMIC"}>{finality}</Pill>
-            {i < legs.length - 1 && <div className="fx-route-join">+</div>}
-          </div>
-        ))}
-      </div>
-      <div className="fx-finality"><strong>MIXED FINALITY</strong><span>Route is not end-to-end atomic.</span></div>
-    </section>
-  );
-}
-
-function LiveNodePanel() {
-  const [inputAsset, setInputAsset] = useState("USDC");
-  const [outputAsset, setOutputAsset] = useState("EURC");
-  const [exactOutput, setExactOutput] = useState("100000000");
-  const [quote, setQuote] = useState<LiveQuote | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function getQuote() {
-    setBusy(true); setMessage(null); setQuote(null);
-    const result = await fxCall("POST", "/v2/fx/quotes", { inputAsset, outputAsset, exactOutput });
-    setBusy(false);
-    if (!result.ok) {
-      const detail = (result.body as { error?: { message?: string; code?: string } } | null)?.error;
-      setMessage(detail?.message ?? detail?.code ?? result.error ?? `FX node returned ${result.status}`);
-      return;
-    }
-    setQuote(result.body as LiveQuote);
+function quoteForInput(payBrl: number, scenario: Scenario): DemoQuote | null {
+  if (!Number.isFinite(payBrl) || payBrl <= 0) return null;
+  const market = marketFor(scenario);
+  const slices = market.filter((s) => s.enabled !== false && s.capacityEur > 0).map((s) => ({
+    sourceType: s.sourceType, sourceId: s.sourceId, sliceId: `${s.sourceId}:brl-eur`, inputAsset: "BRL", outputAsset: "EUR",
+    maxOutput: String(Math.round(s.capacityEur * 100)), inputNumerator: String(Math.round(s.rate * 1000)), inputDenominator: "1000",
+    policyAuthorizationId: `sandbox:${s.sourceId}`, expiresAt: 9_999_999_999_999,
+  }));
+  const budget = BigInt(Math.round(payBrl * 100));
+  let lo = 1n, hi = slices.reduce((n, s) => n + BigInt(s.maxOutput), 0n), best: ReturnType<typeof planExactOutput> | null = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) / 2n;
+    try {
+      const p = planExactOutput({ inputAsset: "BRL", outputAsset: "EUR", desiredOutput: mid.toString(), slices, now: 1 });
+      if (BigInt(p.totalInput) <= budget) { best = p; lo = mid + 1n; } else hi = mid - 1n;
+    } catch { hi = mid - 1n; }
   }
-
-  return (
-    <section style={{ ...panel, padding: "27px 28px" }}>
-      <div className="fx-section-head">
-        <div>
-          <Eyebrow>TRY IT · FIRM SANDBOX QUOTE</Eyebrow>
-          <h2 className="fx-h2">A quote means liquidity was actually reserved.</h2>
-        </div>
-        <SourceLink path="apps/fx-node/src/quote-coordinator.js" label="Quote coordinator" />
-      </div>
-      <p className="fx-copy">This panel only talks to the standalone release-gated FX node. There is no fallback to the legacy hardcoded FX API.</p>
-
-      <div className="fx-live-status">
-        <Pill dark={fxNodeConfigured()}>{fxNodeConfigured() ? "LIVE SANDBOX CONFIGURED" : "LIVE NODE NOT CONFIGURED"}</Pill>
-        <code>{fxNodeConfigured() ? FX_NODE_BASE : "set VITE_FX_NODE_BASE + VITE_FX_NODE_KEY"}</code>
-      </div>
-
-      <div className="fx-quote-form">
-        <label><span>INPUT ASSET</span><input value={inputAsset} onChange={(e) => setInputAsset(e.target.value.toUpperCase())} /></label>
-        <label><span>OUTPUT ASSET</span><input value={outputAsset} onChange={(e) => setOutputAsset(e.target.value.toUpperCase())} /></label>
-        <label><span>EXACT OUTPUT · ATOMIC UNITS</span><input value={exactOutput} onChange={(e) => setExactOutput(e.target.value)} /></label>
-        <button onClick={getQuote} disabled={busy || !fxNodeConfigured()}>{busy ? "RESERVING…" : "RESERVE FIRM QUOTE"}</button>
-      </div>
-
-      {message && <div className="fx-error">{message}</div>}
-      {quote && (
-        <div className="fx-quote-result">
-          <div><span>QUOTE</span><strong>{quote.id ?? quote.quoteId ?? "reserved"}</strong></div>
-          <div><span>INPUT</span><strong>{quote.totalInput ?? "see response"} {quote.inputAsset ?? inputAsset}</strong></div>
-          <div><span>OUTPUT</span><strong>{quote.totalOutput ?? exactOutput} {quote.outputAsset ?? outputAsset}</strong></div>
-          <div><span>STATE</span><strong>{quote.state ?? "RESERVED"}</strong></div>
-          <details><summary>Raw node response</summary><pre>{JSON.stringify(quote, null, 2)}</pre></details>
-        </div>
-      )}
-    </section>
-  );
+  if (!best) return null;
+  const byId = new Map(market.map((s) => [s.sourceId, s]));
+  const route = best.legs.map((leg) => ({ ...byId.get(leg.sourceId)!, inputBrl: Number(leg.inputAmount) / 100, outputEur: Number(leg.outputAmount) / 100 }));
+  const input = Number(best.totalInput) / 100, output = Number(best.totalOutput) / 100;
+  return { payBrl: input, receiveEur: output, rate: input / output, route };
 }
 
-function SourceMap() {
-  const items = [
-    ["Financial kernel", "Vault · cancellation · maker settlement · atomic Router", "packages/fx-contracts/src/AtomicRouter.sol"],
-    ["Compliance", "Policy engine + on-chain policy authorization guard", "packages/fx-contracts/src/PolicyAuthorizationRegistry.sol"],
-    ["Private market", "Durable orders · deterministic matching · reservations", "packages/fx-market/src/sqlite-market.js"],
-    ["Pricing + risk", "Reference consensus · bank-principal risk", "packages/fx-pricing/src/principal-quote-engine.js"],
-    ["Liquidity routing", "Exact-output multi-source executable planner", "packages/fx-liquidity/src/optimizer.js"],
-    ["Fiat", "Replay-safe intents · attestations · mixed-finality graph", "packages/fx-fiat/src/settlement-graph.js"],
-    ["Runtime", "Self-hostable node · honest submission/reconciliation lifecycle", "apps/fx-node/src/server.js"],
-    ["Simulation", "Seeded hostile economic scenarios using the real planner", "packages/fx-simulator/src/simulator.js"],
-  ];
-  return (
-    <section style={{ ...panel, padding: "27px 28px" }}>
-      <Eyebrow>TAKE IT · THE IMPLEMENTATION IS THE PRODUCT</Eyebrow>
-      <h2 className="fx-h2">Every major claim has code behind it.</h2>
-      <div className="fx-source-map">
-        {items.map(([name, description, path]) => (
-          <a href={rcSource(path)} target="_blank" rel="noreferrer" key={name}>
-            <div><strong>{name}</strong><span>{description}</span></div><code>VIEW SOURCE ↗</code>
-          </a>
-        ))}
-      </div>
-      <div className="fx-rc-note">
-        <div><span>BACKEND RC</span><code>{RC}</code></div>
-        <div><span>RELEASE GATE</span><strong>11 / 11 GREEN</strong></div>
-        <a href={rcSource(".github/workflows/fx-release-gate.yml")} target="_blank" rel="noreferrer">Inspect release gate ↗</a>
-      </div>
-    </section>
-  );
+function Phone({ amount, quote, setAmount }: { amount: number; quote: DemoQuote | null; setAmount: (n: number) => void }) {
+  return <div className="fxr-phone"><div className="fxr-phone-in">
+    <div className="fxr-status"><span>9:41</span><span>▮▮▮ ᯤ ▰</span></div><div className="fxr-phone-title">Exchange</div>
+    <div className="fxr-phone-box"><div className="fxr-phone-label"><span>YOU PAY</span><span>BAL 82,400 BRL</span></div><div className="fxr-phone-amt"><input value={amount} onChange={(e) => setAmount(Number(e.target.value.replace(/[^0-9.]/g, "")) || 0)} /><b>BRL ▾</b></div></div>
+    <div className="fxr-swap-dot">⇅</div>
+    <div className="fxr-phone-box"><div className="fxr-phone-label"><span>YOU RECEIVE</span><span>SANDBOX QUOTE</span></div><div className="fxr-phone-amt"><strong>{quote ? quote.receiveEur.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><b>EUR ▾</b></div></div>
+    <div className="fxr-phone-meta"><div><span>Effective rate</span><b>{quote ? `1 EUR = ${quote.rate.toFixed(4)} BRL` : "No route"}</b></div><div><span>Sources used</span><b>{quote?.route.length ?? 0}</b></div><div><span>Quote holds</span><b>{quote ? "30 seconds" : "—"}</b></div><div><span>Settlement</span><b>{quote ? "Route dependent" : "—"}</b></div></div>
+    <div className={quote ? "fxr-convert" : "fxr-convert off"}>{quote ? "Review exchange" : "No quote available"}</div>
+  </div></div>;
 }
+
+function Breakdown({ quote, scenario }: { quote: DemoQuote | null; scenario: Scenario }) {
+  return <div className="fxr-route-card"><div className="fxr-route-title"><div><Eye>HOW BLUEBALLS FILLED IT</Eye><h3>{quote ? `${money(quote.payBrl, "BRL")} → ${money(quote.receiveEur, "EUR")}` : "No executable route"}</h3></div><Tag>real fx-liquidity planner</Tag></div>
+    {quote ? <div className="fxr-route-list">{quote.route.map((l) => <div className="fxr-route-row" key={l.sourceId}><div><strong>{l.label}</strong><span>{l.sourceType.replaceAll("_", " ")}</span></div><div><b>{money(l.outputEur, "EUR")}</b><span>{l.rate.toFixed(3)} BRL/EUR</span></div></div>)}</div> : <div className="fxr-empty">Approved executable capacity cannot fill this request under the current scenario.</div>}
+    <div className="fxr-candidates">{marketFor(scenario).map((s) => <span className={s.enabled === false ? "off" : ""} key={s.sourceId}>{s.label}{s.status ? ` · ${s.status}` : ""}</span>)}</div>
+  </div>;
+}
+
+function Editorial({ image, eyebrow, title, body, reverse = false }: { image: string; eyebrow: string; title: string; body: string; reverse?: boolean }) {
+  return <section className={reverse ? "fxr-editorial reverse" : "fxr-editorial"}><div className="fxr-editorial-copy"><Eye>{eyebrow}</Eye><h2>{title}</h2><p>{body}</p></div><div className="fxr-editorial-img"><img src={image} alt={title} /></div></section>;
+}
+function CodePanel({ title, tag, children }: { title: string; tag: string; children: ReactNode }) { return <div className="fxr-code-panel"><div className="fxr-code-head"><span>{title}</span><b>{tag}</b></div><pre>{children}</pre></div>; }
 
 export default function FxPage() {
-  return (
-    <div className="fx-page">
-      <section className="fx-hero">
-        <div className="fx-hero-copy">
-          <Eyebrow>BLUEBALLS FX · OPEN-SOURCE NEOBANK INFRASTRUCTURE</Eyebrow>
-          <h1>Your institution's FX market.<br />Your compliance perimeter.</h1>
-          <p>Source liquidity from approved customers, issuers, institutional LPs, other financial institutions or your own treasury. Blueballs decides who is legally and operationally eligible first. Then eligible liquidity competes on executable economics.</p>
-          <div className="fx-pills"><Pill>PRIVATE MARKET</Pill><Pill>POLICY-GATED</Pill><Pill>ATOMIC TOKEN SETTLEMENT</Pill><Pill>MIXED FIAT ROUTING</Pill><Pill>MIT</Pill></div>
-        </div>
-        <div className="fx-hero-proof">
-          <div className="fx-proof-top"><span>EXECUTION RULE</span><strong>POLICY → PRICE → SETTLE</strong></div>
-          <div className="fx-proof-center"><div>VALID SIGNATURES</div><span>+</span><div>LIVE POLICY AUTH</div><span>=</span><strong>EXECUTABLE</strong></div>
-          <p>A leaked or stale signed route cannot bypass a later institution compliance stop. The on-chain Router checks policy authorization again at execution.</p>
-          <SourceLink path="packages/fx-contracts/src/AtomicRouter.sol" label="Inspect Router" />
-        </div>
-      </section>
+  const [amount, setAmount] = useState(50_000);
+  const [scenario, setScenario] = useState<Scenario>("balanced");
+  const quote = useMemo(() => quoteForInput(amount, scenario), [amount, scenario]);
+  const simulatorKey = scenario === "oneWay90" ? "oneWay90" : scenario === "lpOff" ? "lpDisappears" : scenario === "issuerOff" ? "issuerDisappears" : scenario === "riskLimit" ? "principalLimit" : scenario === "referenceOutage" ? "referenceOutage" : "balanced";
+  const stress = useMemo(() => runSimulation((baselineScenarios() as Record<string, unknown>)[simulatorKey]) as { requestedOrders: number; fillRatePct: number; rejections: { NO_LIQUIDITY: number; RISK_LIMIT: number }; settlementFailures: number }, [simulatorKey]);
 
-      <SystemFlow />
-      <ScenarioLab />
-      <CompliancePanel />
-      <SettlementGraph />
-      <LiveNodePanel />
-      <SourceMap />
-    </div>
-  );
+  return <div className="fxr">
+    <section className="fxr-hero"><div className="fxr-hero-copy"><Eye>FX · PART OF THE BLUEBALLS BANKING STACK</Eye><h1>Put exchange inside your bank.</h1><p>Your customer sees a simple exchange. Blueballs can source the trade from approved customer flow, issuers, institutional LPs, other institutions and your own balance sheet, then carry the approved route into settlement.</p><div className="fxr-actions"><button className="fxr-btn" onClick={() => document.getElementById("fx-test")?.scrollIntoView()}>Try an FX swap</button><a className="fxr-btn alt" href="#fx-dev">See the calls behind it</a></div><div className="fxr-call"><div className="fxr-call-top"><Eye>THE CALL BEHIND THIS SCREEN</Eye><Tag>POST /v2/fx/quotes</Tag></div><div className="fxr-code">{`await bb.fx.quote({\n  from: "BRL", to: "EUR",\n  amount: "${amount.toFixed(2)}"\n});\n\n// → quote + reserved route`}</div></div></div><div className="fxr-hero-phone"><Phone amount={amount} quote={quote} setAmount={setAmount} /></div></section>
+
+    <section id="fx-test" className="fxr-demo"><div className="fxr-head"><div><Eye>TRY IT · SANDBOX MARKET</Eye><h2>Change the trade. Change the market.</h2><p>The route below is calculated by the same exact-output liquidity planner used by the FX packages. The source inventory is deterministic sandbox data so you can safely remove liquidity, create one-way pressure and hit a risk limit.</p></div><a href={source("packages/fx-liquidity/src/optimizer.js")} target="_blank" rel="noreferrer"><Tag>inspect optimizer ↗</Tag></a></div><div className="fxr-scenarios">{SCENARIOS.map(([id, label]) => <button className={scenario === id ? "on" : ""} key={id} onClick={() => setScenario(id)}>{label}</button>)}</div><div className="fxr-demo-grid"><div className="fxr-swap-form"><label>YOU PAY</label><input value={amount} onChange={(e) => setAmount(Number(e.target.value.replace(/[^0-9.]/g, "")) || 0)} /><div className="fxr-pair"><span>BRL</span><span>→</span><span>EUR</span></div><p>{quote ? `Firm sandbox result: ${money(quote.receiveEur, "EUR")}` : "No executable quote. Reduce the size or restore liquidity."}</p></div><Breakdown quote={quote} scenario={scenario} /></div><div className="fxr-stats"><div className="fxr-stat"><span>SIMULATED ORDERS</span><strong>{stress.requestedOrders}</strong></div><div className="fxr-stat"><span>FILL RATE</span><strong>{stress.fillRatePct.toFixed(0)}%</strong></div><div className="fxr-stat"><span>NO LIQUIDITY</span><strong>{stress.rejections.NO_LIQUIDITY}</strong></div><div className="fxr-stat"><span>RISK REJECTIONS</span><strong>{stress.rejections.RISK_LIMIT}</strong></div><div className="fxr-stat"><span>SETTLEMENT FAILURES</span><strong>{stress.settlementFailures}</strong></div></div></section>
+
+    <Editorial image={FX_LIQUIDITY} eyebrow="ONE REQUEST · MANY SOURCES" title="The price comes from executable liquidity, not a rate table." body="A customer trade can draw from natural customer flow, issuers, institutional LPs, other financial institutions, treasury or bank principal. One request can be split across sources instead of being forced through one provider." />
+
+    <section className="fxr-story"><Eye>STORY · TWO CUSTOMERS CAN BECOME EACH OTHER'S LIQUIDITY</Eye><h2>Internal flow first, external liquidity when you need it.</h2><div className="fxr-story-grid"><div className="fxr-story-card"><Eye>ALICE · SÃO PAULO</Eye><h3>50,000 BRL → EUR</h3><p>Alice wants euros. Her request enters the bank's approved FX market.</p></div><div className="fxr-story-card"><Eye>PIERRE · PARIS</Eye><h3>EUR → BRL</h3><p>Pierre wants reais. Compatible approved flow can offset part of Alice's request before external liquidity fills the residual.</p></div></div></section>
+
+    <Editorial image={FX_COMPLIANCE} eyebrow="BEST PRICE AMONG WHAT YOU MAY ACTUALLY TRADE" title="A cheaper quote can still be unusable." body="The institution decides which participants, corridors and ticket sizes are eligible. A source that fails those rules never enters the executable price competition, however attractive its displayed quote may be." reverse />
+
+    <section className="fxr-story"><Eye>SEE THE FILTER</Eye><h2>The rejected quote never wins the trade.</h2><div className="fxr-filter"><div className="fxr-quotes"><div className="fxr-q blocked"><span>Epsilon Liquidity · jurisdiction blocked</span><b>6.011</b></div><div className="fxr-q blocked"><span>Cobalt Markets · KYB expired</span><b>6.018</b></div><div className="fxr-q"><span>Beta Capital · approved</span><b>6.040</b></div><div className="fxr-q"><span>Delta FX · approved</span><b>6.070</b></div></div><div className="fxr-arrow">→</div><div className="fxr-quotes"><div className="fxr-q"><span>Beta Capital</span><b>6.040</b></div><div className="fxr-q"><span>Delta FX</span><b>6.070</b></div><p>The two cheaper quotes do not exist in the executable market.</p></div></div></section>
+
+    <Editorial image={FX_TREASURY} eyebrow="ONE-WAY MARKET PRESSURE" title="The bank can support the market without pretending its balance sheet is infinite." body="When customer flow becomes heavily one-sided, external liquidity and treasury can fill the gap. When hard balance-sheet risk capacity is gone, Blueballs can reject additional flow instead of manufacturing liquidity." />
+    <Editorial image={FX_ROUTE} eyebrow="FIAT + TOKEN ROUTING" title="BRL to EUR can cross more than one settlement domain." body="A route can begin with a verified PIX payment, move through an atomic USDC to EURC token exchange and finish through issuer redemption into EUR. Each leg keeps its real finality instead of turning the whole route into an atomic marketing claim." reverse />
+
+    <section className="fxr-journey"><Eye>WALK ONE EXCHANGE</Eye><h2>From the phone to final settlement.</h2><p>The rest of Blueballs pairs every user screen with the call behind it. FX does the same. One customer action becomes a quote, reservation, authorization, submission, settlement and reconciliation.</p><div className="fxr-steps"><span className="on">01 Quote</span><span>02 Reserve</span><span>03 Confirm</span><span>04 Submit</span><span>05 Settle</span><span>06 Reconcile</span></div><div className="fxr-journey-grid"><div className="fxr-event"><Eye>CUSTOMER SCREEN</Eye><h3>50,000 BRL → EUR</h3><p>The customer sees the amount, executable quote, expiry and expected settlement. The route remains infrastructure, not UI clutter.</p></div><CodePanel title="THE CALL BEHIND THIS STEP" tag="POST /v2/fx/quotes">{`{\n  "inputAsset": "BRL",\n  "outputAsset": "EUR",\n  "exactOutput": "${quote ? Math.round(quote.receiveEur * 100) : 0}"\n}\n\n→ state: RESERVED\n→ routeId: route_…\n→ sources: [ … ]`}</CodePanel></div></section>
+
+    <section id="fx-dev" className="fxr-dev"><Eye>FOR DEVELOPERS</Eye><h2>The UI is the surface. The engine is yours.</h2><p>Run the reference FX node yourself, call it through the SDK, inspect the reserved route or read the contracts that constrain token settlement.</p><div className="fxr-dev-grid"><CodePanel title="SDK" tag="quote + route">{`const fx = new BlueballsFxClient({\n  baseUrl: "http://localhost:8788",\n  apiKey: process.env.FX_KEY\n});\n\nconst quote = await fx.quote({\n  inputAsset: "USDC",\n  outputAsset: "EURC",\n  exactOutput: "100000000"\n});`}</CodePanel><CodePanel title="ROUTE RESPONSE" tag="reserved liquidity">{`{\n  "state": "RESERVED",\n  "maxInput": "…",\n  "output": "…",\n  "sources": [\n    { "type": "PRIVATE_MARKET", … }\n  ],\n  "finality": { "class": "ATOMIC" }\n}`}</CodePanel></div></section>
+
+    <section className="fxr-take"><Eye>TAKE IT</Eye><h2>The FX stack is open source and self-hostable.</h2><div className="fxr-packages">{[["FX node","apps/fx-node","apps/fx-node/src/server.js"],["SDK","packages/fx-sdk","packages/fx-sdk/src/index.js"],["Contracts","packages/fx-contracts","packages/fx-contracts/src/AtomicRouter.sol"],["Private market","packages/fx-market","packages/fx-market/src/market-service.js"],["Pricing + risk","packages/fx-pricing","packages/fx-pricing/src/principal-pricing.js"],["Liquidity","packages/fx-liquidity","packages/fx-liquidity/src/optimizer.js"],["Policy","packages/fx-policy","packages/fx-policy/src/policy-engine.js"],["Fiat","packages/fx-fiat","packages/fx-fiat/src/settlement-graph.js"]].map(([name, desc, path]) => <a key={name} href={source(path)} target="_blank" rel="noreferrer"><strong>{name}</strong><span>{desc}</span></a>)}</div><div className="fxr-note"><span>BACKEND REFERENCE COMMIT · {RC.slice(0, 12)}</span><span>INTERNAL ENGINEERING GATES PASSED · NOT AN INDEPENDENT SECURITY AUDIT</span></div></section>
+  </div>;
 }
