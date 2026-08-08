@@ -18,6 +18,35 @@ input, button, textarea, select { font: inherit; color: inherit; }
   [data-pad] { padding-left: 22px !important; padding-right: 22px !important; }
   [data-scroll] { overflow-x: auto; }
   [data-scroll] > div { min-width: 640px; }
+
+  /* FX visual laboratory. These selectors target the unique inline grid templates
+     used by FxPage without changing the rest of the site's card system. */
+  div[style*="repeat(5, minmax(0px, 1fr))"],
+  div[style*="repeat(5,minmax(0,1fr))"],
+  div[style*="minmax(0px, 1.6fr) minmax(240px, 0.7fr)"],
+  div[style*="minmax(0,1.6fr) minmax(240px,.7fr)"],
+  div[style*="190px 1fr 94px"],
+  div[style*="1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  div[style*="190px 1fr 94px"] span:last-child {
+    text-align: left !important;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Keep the seven-stage FX execution perimeter horizontally inspectable rather
+     than shrinking each stage into unreadable cards. */
+  div[style*="repeat(7, minmax(120px, 1fr))"],
+  div[style*="repeat(7, minmax(120px,1fr))"] {
+    grid-template-columns: repeat(7, minmax(150px, 1fr)) !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Long sandbox endpoints and quote IDs must wrap instead of widening cards. */
+  code, pre { overflow-wrap: anywhere; }
+  select, input, button { max-width: 100%; }
 }
 
 /* ---- docs sidebar: stays with you while the reference scrolls ---- */
