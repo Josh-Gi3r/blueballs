@@ -62,7 +62,8 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
         if (usedNonce[intent.taker][intent.nonce]) revert NonceAlreadyUsed();
 
         bytes32 intentHash = hashTakerIntent(intent);
-        if (!SignatureChecker.isValidSignatureNowCalldata(intent.taker, intentHash, takerSignature)) {
+        if (!SignatureChecker.isValidSignatureNowCalldata(intent.taker, intentHash, takerSignature))
+        {
             revert InvalidTakerSignature();
         }
 
@@ -73,7 +74,8 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
         for (uint256 i; i < length; ++i) {
             FxTypes.MakerFill calldata fill = fills[i];
             if (
-                fill.order.sellToken != intent.outputToken || fill.order.buyToken != intent.inputToken
+                fill.order.sellToken != intent.outputToken
+                    || fill.order.buyToken != intent.inputToken
             ) revert WrongAssetPair();
 
             uint256 takerPay = settlement.fillMakerOrder(
