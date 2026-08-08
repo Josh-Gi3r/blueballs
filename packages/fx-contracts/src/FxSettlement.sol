@@ -51,7 +51,10 @@ contract FxSettlement is EIP712, ReentrancyGuard {
     constructor(address owner_, FxVault vault_, OrderCancellation cancellation_)
         EIP712("Blueballs FX", "1")
     {
-        if (owner_ == address(0) || address(vault_) == address(0) || address(cancellation_) == address(0)) {
+        if (
+            owner_ == address(0) || address(vault_) == address(0)
+                || address(cancellation_) == address(0)
+        ) {
             revert ZeroAddress();
         }
         owner = owner_;
@@ -82,7 +85,11 @@ contract FxSettlement is EIP712, ReentrancyGuard {
         return _hashTypedDataV4(_hashMakerOrderStruct(order));
     }
 
-    function remainingSellAmount(FxTypes.MakerOrder calldata order) external view returns (uint256) {
+    function remainingSellAmount(FxTypes.MakerOrder calldata order)
+        external
+        view
+        returns (uint256)
+    {
         bytes32 orderHash = hashMakerOrder(order);
         uint256 filled = filledSellAmount[orderHash];
         return filled >= order.sellAmount ? 0 : order.sellAmount - filled;
@@ -152,8 +159,9 @@ contract FxSettlement is EIP712, ReentrancyGuard {
 
     function _validateOrderShape(FxTypes.MakerOrder calldata order, address taker) internal pure {
         if (
-            order.maker == address(0) || order.sellToken == address(0) || order.buyToken == address(0)
-                || order.recipient == address(0) || taker == address(0)
+            order.maker == address(0) || order.sellToken == address(0)
+                || order.buyToken == address(0) || order.recipient == address(0)
+                || taker == address(0)
         ) revert ZeroAddress();
         if (
             order.sellToken == order.buyToken || order.sellAmount == 0 || order.buyAmount == 0
@@ -161,7 +169,11 @@ contract FxSettlement is EIP712, ReentrancyGuard {
         ) revert InvalidOrder();
     }
 
-    function _hashMakerOrderStruct(FxTypes.MakerOrder calldata order) internal pure returns (bytes32) {
+    function _hashMakerOrderStruct(FxTypes.MakerOrder calldata order)
+        internal
+        pure
+        returns (bytes32)
+    {
         return keccak256(
             abi.encode(
                 MAKER_ORDER_TYPEHASH,
