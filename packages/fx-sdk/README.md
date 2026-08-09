@@ -106,7 +106,7 @@ Node errors become `BlueballsFxError` with:
 
 ```js
 error.code
-aerror.status
+error.status
 error.details
 ```
 
