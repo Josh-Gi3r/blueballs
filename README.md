@@ -55,6 +55,22 @@ pnpm dev:api
 pnpm dev:fx
 ```
 
+### Docker Compose
+
+Build and start the same three-service stack without installing Node or pnpm locally:
+
+```bash
+docker compose -f compose.reference.yml up --build
+```
+
+The FX databases persist in the `fx-data` volume. Stop the stack with:
+
+```bash
+docker compose -f compose.reference.yml down
+```
+
+Use `down -v` only when you deliberately want to delete the seeded FX state.
+
 ## General banking API key
 
 ```bash
@@ -107,6 +123,8 @@ curl \
   http://localhost:8788/v2/fx/reference/status
 ```
 
+The machine-readable REST contract is available in the repository at `apps/fx-node/openapi.yaml` and from the running node at `http://localhost:8788/openapi.yaml`.
+
 ## Architecture
 
 ```text
@@ -152,6 +170,8 @@ The aggregate FX release gate covers:
 - Solidity compile, tests, fuzzing and invariants;
 - controlled EVM execution through Anvil;
 - Docker image build.
+
+The FX node workflow additionally builds the complete reference image and validates the Docker Compose file.
 
 Internal green gates prove the tested reference behaviour. They do not replace an external audit or production operating controls.
 
