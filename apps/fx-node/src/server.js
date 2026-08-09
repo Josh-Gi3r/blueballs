@@ -41,7 +41,16 @@ function errorResponse(error) {
     }
   }
 
-  return { status, body: { error: { code, message, ...(error.details ? { details: error.details } : {}) } };
+  return {
+    status,
+    body: {
+      error: {
+        code,
+        message,
+        ...(error.details ? { details: error.details } : {}),
+      },
+    },
+  };
 }
 
 async function readJson(req, maxBytes = 1_000_000) {
