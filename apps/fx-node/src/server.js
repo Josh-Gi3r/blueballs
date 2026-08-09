@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
+
+const OPENAPI_YAML = readFileSync(new URL('../openapi.yaml', import.meta.url), 'utf8');
 
 function apiError(code, status, message, details = undefined) {
   const error = new Error(message);
@@ -38,7 +41,7 @@ function errorResponse(error) {
     }
   }
 
-  return { status, body: { error: { code, message, ...(error.details ? { details: error.details } : {}) } } };
+  return { status, body: { error: { code, message, ...(error.details ? { details: error.details } : {}) } };
 }
 
 async function readJson(req, maxBytes = 1_000_000) {
@@ -66,6 +69,14 @@ function send(res, status, body) {
   res.end(payload);
 }
 
+function sendText(res, status, body, contentType = 'text/plain; charset=utf-8') {
+  res.writeHead(status, {
+    'content-type': contentType,
+    'content-length': Buffer.byteLength(body),
+  });
+  res.end(body);
+}
+
 function match(pathname, pattern) {
   const names = [];
   const expression = pattern
@@ -91,6 +102,7 @@ export function createFxNodeServer({
   executionAdapter = null,
   apiKey,
   publicDepth = false,
+  corsOrigins = [],
   now = () => Date.now(),
 } = {}) {
   if (!market) throw new TypeError('market service required');
@@ -99,7 +111,23 @@ export function createFxNodeServer({
   if (inspector !== null && typeof inspector.status !== 'function') {
     throw new TypeError('inspector must expose status()');
   }
+  if (!Array.isArray(corsOrigins) || corsOrigins.some((origin) => typeof origin !== 'string')) {
+    throw new TypeError('corsOrigins must be an array of strings');
+  }
   if (typeof apiKey !== 'string' || apiKey.length < 8) throw new TypeError('apiKey of at least 8 characters required');
+
+  const allowedOrigins = new Set(corsOrigins);
+
+  function applyCors(req, res) {
+    const origin = req.headers.origin;
+    if (!origin || !allowedOrigins.has(origin)) return false;
+    res.setHeader('access-control-allow-origin', origin);
+    res.setHeader('vary', 'origin');
+    res.setHeader('access-control-allow-headers', 'authorization, content-type');
+    res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+    res.setHeader('access-control-max-age', '600');
+    return true;
+  }
 
   function authenticate(req) {
     const authorization = req.headers.authorization;
@@ -111,6 +139,15 @@ export function createFxNodeServer({
       const url = new URL(req.url, 'http://fx-node.local');
       const method = req.method ?? 'GET';
       const path = url.pathname;
+      const corsAllowed = applyCors(req, res);
+
+      if (method === 'OPTIONS') {
+        if (req.headers.origin && !corsAllowed) {
+          return send(res, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'browser origin is not allowed' } });
+        }
+        res.writeHead(204);
+        return res.end();
+      }
 
       if (method === 'GET' && path === '/health') {
         return send(res, 200, {
@@ -118,6 +155,10 @@ export function createFxNodeServer({
           service: 'blueballs-fx-node',
           ...(inspector ? { runtime: inspector.status().mode } : {}),
         });
+      }
+
+      if (method === 'GET' && path === '/openapi.yaml') {
+        return sendText(res, 200, OPENAPI_YAML, 'application/yaml; charset=utf-8');
       }
 
       if (method === 'GET' && path === '/v2/fx/depth') {
