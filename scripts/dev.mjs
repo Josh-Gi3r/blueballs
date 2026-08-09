@@ -1,11 +1,21 @@
 #!/usr/bin/env node
-/** One-command dev: starts the site (vite, :5280) and the API (:5290) together,
- *  zero new dependencies. `pnpm dev` from the repo root runs this. */
+/** One-command development stack.
+ *
+ * `pnpm dev` starts:
+ *   - the Blueballs site on :5280;
+ *   - the general banking API on :5290;
+ *   - the canonical FX reference node on :8788.
+ *
+ * The Vite process receives only the local sandbox FX credential. Production
+ * credentials must never be embedded into a browser build.
+ */
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const FX_KEY = process.env.FX_NODE_API_KEY ?? "bb_test_local_fx";
+const FX_BASE = process.env.VITE_FX_NODE_BASE ?? "http://127.0.0.1:8788";
 
 const procs = [
   {
@@ -14,6 +24,10 @@ const procs = [
     cmd: "pnpm",
     args: ["exec", "vite"],
     cwd: ROOT,
+    env: {
+      VITE_FX_NODE_BASE: FX_BASE,
+      VITE_FX_NODE_KEY: FX_KEY,
+    },
   },
   {
     name: "api",
@@ -22,6 +36,20 @@ const procs = [
     args: ["src/server.js"],
     cwd: join(ROOT, "apps", "api"),
     env: { PORT: "5290" },
+  },
+  {
+    name: "fx",
+    color: "\x1b[33m", // yellow
+    cmd: "node",
+    args: ["src/cli.js"],
+    cwd: join(ROOT, "apps", "fx-node"),
+    env: {
+      FX_NODE_MODE: "reference-sandbox",
+      FX_NODE_HOST: "127.0.0.1",
+      FX_NODE_PORT: "8788",
+      FX_NODE_API_KEY: FX_KEY,
+      FX_NODE_DATA_DIR: join(ROOT, ".data", "fx-reference"),
+    },
   },
 ];
 
@@ -33,21 +61,21 @@ function prefixLines(name, color, chunk) {
   const text = chunk.toString();
   const lines = text.split("\n");
   if (lines[lines.length - 1] === "") lines.pop();
-  return lines.map((l) => `${color}[${name}]${RESET} ${l}`).join("\n") + "\n";
+  return lines.map((line) => `${color}[${name}]${RESET} ${line}`).join("\n") + "\n";
 }
 
-for (const p of procs) {
-  const child = spawn(p.cmd, p.args, {
-    cwd: p.cwd,
-    env: { ...process.env, ...(p.env ?? {}) },
+for (const processConfig of procs) {
+  const child = spawn(processConfig.cmd, processConfig.args, {
+    cwd: processConfig.cwd,
+    env: { ...process.env, ...(processConfig.env ?? {}) },
     stdio: ["ignore", "pipe", "pipe"],
     shell: process.platform === "win32",
   });
-  child.stdout.on("data", (d) => process.stdout.write(prefixLines(p.name, p.color, d)));
-  child.stderr.on("data", (d) => process.stderr.write(prefixLines(p.name, p.color, d)));
+  child.stdout.on("data", (data) => process.stdout.write(prefixLines(processConfig.name, processConfig.color, data)));
+  child.stderr.on("data", (data) => process.stderr.write(prefixLines(processConfig.name, processConfig.color, data)));
   child.on("exit", (code) => {
     if (!shuttingDown) {
-      console.log(`${p.color}[${p.name}]${RESET} exited (${code}) — stopping the other process too`);
+      console.log(`${processConfig.color}[${processConfig.name}]${RESET} exited (${code}) — stopping the other processes too`);
       shutdown(code ?? 1);
     }
   });
@@ -57,11 +85,16 @@ for (const p of procs) {
 function shutdown(code) {
   if (shuttingDown) return;
   shuttingDown = true;
-  for (const c of children) if (!c.killed) c.kill("SIGTERM");
+  for (const child of children) if (!child.killed) child.kill("SIGTERM");
   setTimeout(() => process.exit(code ?? 0), 200);
 }
 
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
-console.log(`Site  → http://localhost:5280\nAPI   → http://localhost:5290/v2\n`);
+console.log(
+  `Site  → http://localhost:5280\n` +
+  `API   → http://localhost:5290/v2\n` +
+  `FX    → http://localhost:8788\n` +
+  `FX key→ ${FX_KEY}\n`,
+);
