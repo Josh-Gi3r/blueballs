@@ -17,6 +17,10 @@ const port = Number(process.env.FX_NODE_PORT ?? '8788');
 if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('FX_NODE_PORT invalid');
 
 const apiKey = process.env.FX_NODE_API_KEY ?? 'bb_test_local_fx';
+const corsOrigins = (process.env.FX_NODE_CORS_ORIGINS ?? 'http://localhost:5280,http://127.0.0.1:5280')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 let runtime;
 let node;
 
@@ -30,6 +34,7 @@ if (mode === 'reference-sandbox') {
     fiat: runtime.fiat,
     inspector: runtime.inspector,
     apiKey,
+    corsOrigins,
   });
 } else {
   const dbPath = process.env.FX_NODE_DB ?? './blueballs-fx.db';
@@ -51,12 +56,13 @@ if (mode === 'reference-sandbox') {
       market.close();
     },
   };
-  node = createFxNodeServer({ market, quotes, fiat, apiKey });
+  node = createFxNodeServer({ market, quotes, fiat, apiKey, corsOrigins });
 }
 
 const address = await node.listen({ host, port });
 console.log(`Blueballs FX node (${mode.toUpperCase()}) listening on http://${address.address}:${address.port}`);
 console.log(`API key: ${apiKey}`);
+console.log(`Browser origins: ${corsOrigins.join(', ') || 'none'}`);
 console.log('Execution adapter: NOT CONFIGURED (execute will fail closed)');
 if (mode === 'reference-sandbox') {
   console.log('Reference market: policy + private orders + issuer + LP + neobank + treasury + principal');
