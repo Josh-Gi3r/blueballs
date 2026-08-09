@@ -136,7 +136,7 @@ From repository root:
 docker build -f apps/fx-node/Dockerfile -t blueballs-fx .
 docker run --rm \
   -p 8788:8788 \
-  -v blueballs-fx-data:/app/apps/fx-node/blueballs-fx-data \
+  -v blueballs-fx-data:/data \
   -e FX_NODE_API_KEY=bb_test_change_me \
   blueballs-fx
 ```
