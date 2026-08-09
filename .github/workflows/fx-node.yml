@@ -79,8 +79,7 @@ jobs:
         run: docker build -f Dockerfile -t blueballs-fx:test ../..
 
       - name: Complete reference image and Compose config
-        working-directory: .
         run: |
-          cd ../..
+          cd "$GITHUB_WORKSPACE"
           docker compose -f compose.reference.yml config >/dev/null
           docker build -f Dockerfile.reference -t blueballs-reference:test .
