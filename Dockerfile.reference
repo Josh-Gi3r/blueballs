@@ -1,0 +1,19 @@
+FROM node:24.15.0-alpine
+
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps ./apps
+COPY packages ./packages
+COPY scripts ./scripts
+COPY spec ./spec
+COPY src ./src
+COPY index.html tsconfig.json vite.config.ts ./
+
+RUN pnpm install --frozen-lockfile
+
+EXPOSE 5280 5290 8788
+
+CMD ["pnpm", "dev"]

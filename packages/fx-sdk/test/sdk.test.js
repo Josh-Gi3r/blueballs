@@ -10,7 +10,7 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-test('SDK sends authenticated firm quote request with exact string amount', async () => {
+test('SDK sends authenticated firm quote request with exact string amount and participant context', async () => {
   let seen;
   const client = new BlueballsFxClient({
     baseUrl: 'http://localhost:8788/',
@@ -22,14 +22,52 @@ test('SDK sends authenticated firm quote request with exact string amount', asyn
   });
 
   const quote = await client.quote({
-    inputAsset: 'USDC', outputAsset: 'EURC', exactOutput: 100000000n, expiresInMs: 15_000,
+    inputAsset: 'USDC',
+    outputAsset: 'EURC',
+    exactOutput: 100000000n,
+    expiresInMs: 15_000,
+    participantId: 'customer-1',
+    accountRef: 'customer-1:wallet',
   });
   assert.equal(quote.id, 'quote-1');
   assert.equal(seen.url, 'http://localhost:8788/v2/fx/quotes');
   assert.equal(seen.options.headers.authorization, 'Bearer secret-key');
   assert.deepEqual(JSON.parse(seen.options.body), {
-    inputAsset: 'USDC', outputAsset: 'EURC', exactOutput: '100000000', expiresInMs: 15_000,
+    inputAsset: 'USDC',
+    outputAsset: 'EURC',
+    exactOutput: '100000000',
+    expiresInMs: 15_000,
+    participantId: 'customer-1',
+    accountRef: 'customer-1:wallet',
   });
+});
+
+test('SDK exposes the canonical reference runtime inspection surface', async () => {
+  const urls = [];
+  const client = new BlueballsFxClient({
+    baseUrl: 'http://localhost:8788',
+    apiKey: 'secret-key',
+    fetchImpl: async (url) => {
+      urls.push(url);
+      return jsonResponse({ ok: true });
+    },
+  });
+
+  await client.referenceStatus();
+  await client.referencePolicy();
+  await client.referenceLiquidity({
+    inputAsset: '0x input/value',
+    outputAsset: '0x output/value',
+    exactOutput: 100n,
+  });
+  await client.referenceSettlementRoute();
+
+  assert.deepEqual(urls, [
+    'http://localhost:8788/v2/fx/reference/status',
+    'http://localhost:8788/v2/fx/reference/policy',
+    'http://localhost:8788/v2/fx/reference/liquidity?inputAsset=0x+input%2Fvalue&outputAsset=0x+output%2Fvalue&exactOutput=100',
+    'http://localhost:8788/v2/fx/reference/settlement-route',
+  ]);
 });
 
 test('health request is intentionally unauthenticated', async () => {

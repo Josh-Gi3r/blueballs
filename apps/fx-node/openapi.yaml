@@ -1,0 +1,691 @@
+openapi: 3.1.0
+info:
+  title: Blueballs FX Node
+  version: 0.1.0-reference
+  description: |
+    Canonical REST contract for the self-hostable Blueballs FX reference runtime.
+
+    The default `reference-sandbox` composes policy, signed private liquidity,
+    reference pricing, principal risk, multi-source routing and fiat settlement
+    state. It does not configure an execution adapter and therefore fails closed
+    when execution is requested.
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8788
+    description: Local reference sandbox
+security:
+  - bearerAuth: []
+tags:
+  - name: Runtime
+  - name: Liquidity
+  - name: Quotes
+  - name: Orders
+  - name: Fiat
+  - name: Operations
+paths:
+  /health:
+    get:
+      tags: [Runtime]
+      security: []
+      summary: Health check
+      responses:
+        '200':
+          description: Node is available
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service]
+                properties:
+                  status: { type: string, const: ok }
+                  service: { type: string, const: blueballs-fx-node }
+                  runtime: { type: string }
+  /v2/fx/reference/status:
+    get:
+      tags: [Runtime]
+      summary: Inspect the canonical reference composition
+      responses:
+        '200':
+          description: Runtime capabilities and evidence boundary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReferenceStatus'
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/reference/policy:
+    get:
+      tags: [Runtime]
+      summary: Inspect the active reference policy
+      responses:
+        '200':
+          description: Policy summary
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/reference/liquidity:
+    get:
+      tags: [Liquidity]
+      summary: Inspect currently policy-eligible reference liquidity
+      parameters:
+        - $ref: '#/components/parameters/InputAsset'
+        - $ref: '#/components/parameters/OutputAsset'
+        - name: exactOutput
+          in: query
+          schema: { $ref: '#/components/schemas/AtomicAmount' }
+      responses:
+        '200':
+          description: Eligible source slices; this endpoint does not reserve them
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, data]
+                properties:
+                  object: { type: string, const: list }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/LiquiditySlice' }
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/reference/settlement-route:
+    get:
+      tags: [Runtime]
+      summary: Inspect the seeded BRL to EUR mixed-finality route
+      responses:
+        '200':
+          description: Settlement graph analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettlementRoute'
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/depth:
+    get:
+      tags: [Liquidity]
+      summary: Aggregate private-market depth
+      parameters:
+        - $ref: '#/components/parameters/InputAsset'
+        - $ref: '#/components/parameters/OutputAsset'
+      responses:
+        '200':
+          description: Aggregated levels without maker identity or signed payloads
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, inputAsset, outputAsset, levels]
+                properties:
+                  object: { type: string, const: depth }
+                  inputAsset: { type: string }
+                  outputAsset: { type: string }
+                  levels:
+                    type: array
+                    items:
+                      type: object
+                      required: [buyAmount, sellAmount, availableSell]
+                      properties:
+                        buyAmount: { $ref: '#/components/schemas/AtomicAmount' }
+                        sellAmount: { $ref: '#/components/schemas/AtomicAmount' }
+                        availableSell: { $ref: '#/components/schemas/AtomicAmount' }
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/orders:
+    post:
+      tags: [Orders]
+      summary: Submit a signed maker order for policy admission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderAdmission'
+      responses:
+        '201':
+          description: Admitted private order
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        default:
+          $ref: '#/components/responses/Error'
+    get:
+      tags: [Orders]
+      summary: List one maker's orders
+      parameters:
+        - name: maker
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Maker-owned orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, data]
+                properties:
+                  object: { type: string, const: list }
+                  data: { type: array, items: { type: object, additionalProperties: true } }
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/orders/{orderHash}/cancel:
+    post:
+      tags: [Orders]
+      summary: Hide an order off-chain and record optional on-chain invalidation
+      parameters:
+        - $ref: '#/components/parameters/OrderHash'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                onChainInvalidated: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Cancellation result
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/quotes:
+    post:
+      tags: [Quotes]
+      summary: Reserve a policy-approved exact-output route
+      description: |
+        Returns a firm sandbox quote only after every selected source reserves
+        capacity. The canonical reference runtime may combine private-market,
+        issuer, institutional LP, neobank, treasury and bank-principal sources.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuoteRequest'
+      responses:
+        '201':
+          description: Reserved firm sandbox quote
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/quotes/{quoteId}:
+    get:
+      tags: [Quotes]
+      summary: Retrieve a quote and current lifecycle state
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      responses:
+        '200':
+          description: Quote
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+        '404':
+          $ref: '#/components/responses/Error'
+  /v2/fx/quotes/{quoteId}/execute:
+    post:
+      tags: [Quotes]
+      summary: Submit a reserved quote through the configured execution adapter
+      description: |
+        The default reference runtime has no execution adapter and returns
+        `EXECUTION_UNAVAILABLE`. Before a configured adapter is called, the route
+        becomes non-releasable `SUBMITTED`. Ambiguous outcomes remain submitted
+        for reconciliation.
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      responses:
+        '202':
+          description: Submission accepted or outcome unknown
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Quote'
+                  - type: object
+                    properties:
+                      execution:
+                        type: object
+                        properties:
+                          status: { type: string, enum: [ACCEPTED, UNKNOWN] }
+                          submissionRef: { type: string }
+                          externalRef: { type: [string, 'null'] }
+                          reason: { type: [string, 'null'] }
+        '503':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/routes/{routeId}:
+    get:
+      tags: [Quotes]
+      summary: Inspect the public route and source allocation
+      parameters:
+        - $ref: '#/components/parameters/RouteId'
+      responses:
+        '200':
+          description: Route
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Route' }
+        '404':
+          $ref: '#/components/responses/Error'
+  /v2/fx/fiat/intents:
+    post:
+      tags: [Fiat]
+      summary: Create a typed fiat settlement intent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FiatIntentRequest' }
+      responses:
+        '201':
+          description: Created fiat intent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FiatIntent' }
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/fiat/intents/{intentId}:
+    get:
+      tags: [Fiat]
+      summary: Retrieve one fiat intent
+      parameters:
+        - $ref: '#/components/parameters/IntentId'
+      responses:
+        '200':
+          description: Fiat intent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FiatIntent' }
+        '404':
+          $ref: '#/components/responses/Error'
+  /v2/fx/fiat/intents/{intentId}/reserve:
+    post:
+      tags: [Fiat]
+      summary: Reserve a created fiat intent
+      parameters:
+        - $ref: '#/components/parameters/IntentId'
+      responses:
+        '200':
+          description: Reserved intent
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FiatIntent' }
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/fiat/intents/{intentId}/submit:
+    post:
+      tags: [Fiat]
+      summary: Record external fiat submission
+      parameters:
+        - $ref: '#/components/parameters/IntentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [submissionRef]
+              properties:
+                submissionRef: { type: string }
+      responses:
+        '202':
+          description: Submitted; not settled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FiatIntent' }
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/fiat/attestations:
+    post:
+      tags: [Fiat]
+      summary: Verify and bind fiat payment evidence to an intent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Attestation accepted or duplicate
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '409':
+          $ref: '#/components/responses/Error'
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/fiat/intents/{intentId}/settle:
+    post:
+      tags: [Fiat]
+      summary: Mark a verified fiat intent settled from a canonical event
+      parameters:
+        - $ref: '#/components/parameters/IntentId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                eventId: { type: string }
+      responses:
+        '200':
+          description: Settlement result
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/ops/quotes/{quoteId}/confirmed:
+    post:
+      tags: [Operations]
+      summary: Reconcile a submitted quote as confirmed
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventId]
+              properties:
+                eventId: { type: string }
+                fills: { type: array, items: { type: object, additionalProperties: true } }
+      responses:
+        '200':
+          description: Reconciled confirmation
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default:
+          $ref: '#/components/responses/Error'
+  /v2/fx/ops/quotes/{quoteId}/failed:
+    post:
+      tags: [Operations]
+      summary: Reconcile a submitted quote as failed
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                eventId: { type: [string, 'null'] }
+                reason: { type: string }
+      responses:
+        '200':
+          description: Reconciled failure
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default:
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    InputAsset:
+      name: inputAsset
+      in: query
+      required: true
+      schema: { type: string }
+    OutputAsset:
+      name: outputAsset
+      in: query
+      required: true
+      schema: { type: string }
+    QuoteId:
+      name: quoteId
+      in: path
+      required: true
+      schema: { type: string }
+    RouteId:
+      name: routeId
+      in: path
+      required: true
+      schema: { type: string }
+    IntentId:
+      name: intentId
+      in: path
+      required: true
+      schema: { type: string }
+    OrderHash:
+      name: orderHash
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^0x[0-9a-fA-F]{64}$'
+  responses:
+    Error:
+      description: Structured node error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    AtomicAmount:
+      type: string
+      pattern: '^[0-9]+$'
+      description: Non-negative integer amount in the asset's atomic units
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+    ReferenceStatus:
+      type: object
+      required: [mode, canonicalFxRuntime, assets, sourceTypes, policy, execution]
+      properties:
+        mode: { type: string, const: REFERENCE_SANDBOX }
+        canonicalFxRuntime: { type: boolean, const: true }
+        assets:
+          type: array
+          items:
+            type: object
+            required: [id, symbol, decimals, kind]
+            properties:
+              id: { type: string }
+              symbol: { type: string }
+              decimals: { type: integer }
+              kind: { type: string, enum: [token, fiat] }
+        sourceTypes:
+          type: array
+          items:
+            type: string
+            enum: [PRIVATE_MARKET, ISSUER, INSTITUTIONAL_LP, NEOBANK, BANK_TREASURY, BANK_PRINCIPAL]
+        policy:
+          type: object
+          required: [policyId, version, snapshotHash]
+          properties:
+            policyId: { type: string }
+            version: { type: integer }
+            snapshotHash: { type: string }
+        execution:
+          type: object
+          required: [configured, note]
+          properties:
+            configured: { type: boolean }
+            note: { type: string }
+    LiquiditySlice:
+      type: object
+      required: [sourceType, sourceId, inputAsset, outputAsset, maxOutput, inputNumerator, inputDenominator, expiresAt]
+      properties:
+        sourceType: { type: string }
+        sourceId: { type: string }
+        inputAsset: { type: string }
+        outputAsset: { type: string }
+        maxOutput: { $ref: '#/components/schemas/AtomicAmount' }
+        inputNumerator: { $ref: '#/components/schemas/AtomicAmount' }
+        inputDenominator: { $ref: '#/components/schemas/AtomicAmount' }
+        expiresAt: { type: integer, format: int64 }
+    SourceAllocation:
+      type: object
+      required: [type, sourceId, input, output]
+      properties:
+        type: { type: string }
+        sourceId: { type: string }
+        input: { $ref: '#/components/schemas/AtomicAmount' }
+        output: { $ref: '#/components/schemas/AtomicAmount' }
+    QuoteRequest:
+      type: object
+      required: [inputAsset, outputAsset, exactOutput]
+      properties:
+        inputAsset: { type: string }
+        outputAsset: { type: string }
+        exactOutput: { $ref: '#/components/schemas/AtomicAmount' }
+        expiresInMs:
+          type: integer
+          minimum: 1
+          maximum: 120000
+          default: 15000
+        participantId: { type: string, default: sandbox-customer }
+        accountRef: { type: string, default: 'sandbox-customer:wallet' }
+    Quote:
+      type: object
+      required: [id, routeId, state, inputAsset, outputAsset, maxInput, output, expiresAt, sources]
+      properties:
+        id: { type: string }
+        routeId: { type: string }
+        state: { type: string, enum: [RESERVED, SUBMITTED, CONFIRMED, FAILED, EXPIRED] }
+        inputAsset: { type: string }
+        outputAsset: { type: string }
+        inputSymbol: { type: string }
+        outputSymbol: { type: string }
+        maxInput: { $ref: '#/components/schemas/AtomicAmount' }
+        output: { $ref: '#/components/schemas/AtomicAmount' }
+        expiresAt: { type: integer, format: int64 }
+        participantId: { type: string }
+        sources:
+          type: array
+          items: { $ref: '#/components/schemas/SourceAllocation' }
+        finality:
+          type: object
+          additionalProperties: true
+        submissionRef: { type: [string, 'null'] }
+        eventId: { type: [string, 'null'] }
+        failureReason: { type: [string, 'null'] }
+    Route:
+      type: object
+      required: [routeId, quoteId, state, inputAsset, outputAsset, totalInput, totalOutput, sources]
+      properties:
+        routeId: { type: string }
+        quoteId: { type: string }
+        state: { type: string }
+        createdAt: { type: integer, format: int64 }
+        expiresAt: { type: integer, format: int64 }
+        inputAsset: { type: string }
+        outputAsset: { type: string }
+        totalInput: { $ref: '#/components/schemas/AtomicAmount' }
+        totalOutput: { $ref: '#/components/schemas/AtomicAmount' }
+        sources:
+          type: array
+          items: { $ref: '#/components/schemas/SourceAllocation' }
+        finality: { type: object, additionalProperties: true }
+    MakerOrder:
+      type: object
+      required: [maker, sellToken, buyToken, sellAmount, buyAmount, recipient, validAfter, validUntil, epoch, salt]
+      properties:
+        maker: { type: string }
+        sellToken: { type: string }
+        buyToken: { type: string }
+        sellAmount: { $ref: '#/components/schemas/AtomicAmount' }
+        buyAmount: { $ref: '#/components/schemas/AtomicAmount' }
+        recipient: { type: string }
+        validAfter: { type: integer }
+        validUntil: { type: integer }
+        epoch: { type: integer }
+        salt: { type: string }
+    OrderAdmission:
+      type: object
+      required: [orderHash, order, signature, policyAuthorizationId, policySnapshotHash]
+      properties:
+        orderHash: { type: string }
+        order: { $ref: '#/components/schemas/MakerOrder' }
+        signature: { type: string }
+        policyAuthorizationId: { type: string }
+        policySnapshotHash: { type: string }
+    FiatIntentRequest:
+      type: object
+      required: [intentId, routeId, edgeId, edgeType, finalityClass, payerParticipantId, payeeParticipantId, payerAccountRef, payeeAccountRef, currency, amount, rail, providerId, policyAuthorizationId, createdAt, expiresAt, nonce]
+      properties:
+        intentId: { type: string }
+        routeId: { type: string }
+        edgeId: { type: string }
+        edgeType: { type: string }
+        finalityClass: { type: string }
+        payerParticipantId: { type: string }
+        payeeParticipantId: { type: string }
+        payerAccountRef: { type: string }
+        payeeAccountRef: { type: string }
+        currency: { type: string }
+        amount: { $ref: '#/components/schemas/AtomicAmount' }
+        rail: { type: string }
+        providerId: { type: string }
+        policyAuthorizationId: { type: string }
+        createdAt: { type: integer, format: int64 }
+        expiresAt: { type: integer, format: int64 }
+        nonce: { type: string }
+    FiatIntent:
+      allOf:
+        - $ref: '#/components/schemas/FiatIntentRequest'
+        - type: object
+          properties:
+            intentHash: { type: string }
+            state:
+              type: string
+              enum: [CREATED, RESERVED, SUBMITTED, PAYMENT_OBSERVED, VERIFIED, SETTLED, CANCELLED, EXPIRED, FAILED, MANUAL_REVIEW]
+            submissionRef: { type: [string, 'null'] }
+            paymentObservedAt: { type: [integer, 'null'], format: int64 }
+            attestationId: { type: [string, 'null'] }
+            settledAt: { type: [integer, 'null'], format: int64 }
+            failureReason: { type: [string, 'null'] }
+    SettlementRoute:
+      type: object
+      required: [edgeIds, fromAsset, toAsset, edges, guarantee]
+      properties:
+        edgeIds: { type: array, items: { type: string } }
+        fromAsset: { type: string }
+        toAsset: { type: string }
+        edges:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        guarantee:
+          type: object
+          required: [atomic, class]
+          properties:
+            atomic: { type: boolean }
+            class: { type: string }
+            finalityClasses: { type: array, items: { type: string } }

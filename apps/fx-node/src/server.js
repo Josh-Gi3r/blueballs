@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
+
+const OPENAPI_YAML = readFileSync(new URL('../openapi.yaml', import.meta.url), 'utf8');
 
 function apiError(code, status, message, details = undefined) {
   const error = new Error(message);
@@ -14,6 +17,9 @@ function errorResponse(error) {
     PAYMENT_REPLAY: 409,
     RISK_LIMIT: 409,
     POLICY_AUTHORIZATION_INVALID: 403,
+    POLICY_REJECTED: 403,
+    NO_LIQUIDITY: 409,
+    INSUFFICIENT_LIQUIDITY: 409,
     EXECUTION_UNAVAILABLE: 503,
     EXECUTION_REJECTED: 409,
     QUOTE_EXPIRED: 409,
@@ -28,14 +34,23 @@ function errorResponse(error) {
   if (!error.code) {
     if (/not found/i.test(message)) { code = 'NOT_FOUND'; status = 404; }
     else if (/expired/i.test(message)) { code = 'QUOTE_EXPIRED'; status = 409; }
-    else if (/insufficient eligible liquidity/i.test(message)) {
+    else if (/insufficient eligible liquidity|insufficient executable liquidity/i.test(message)) {
       code = 'INSUFFICIENT_LIQUIDITY'; status = 409;
     } else if (/required|invalid|must|mismatch|cannot/i.test(message)) {
       code = 'VALIDATION_ERROR'; status = 400;
     }
   }
 
-  return { status, body: { error: { code, message, ...(error.details ? { details: error.details } : {}) } } };
+  return {
+    status,
+    body: {
+      error: {
+        code,
+        message,
+        ...(error.details ? { details: error.details } : {}),
+      },
+    },
+  };
 }
 
 async function readJson(req, maxBytes = 1_000_000) {
@@ -63,6 +78,14 @@ function send(res, status, body) {
   res.end(payload);
 }
 
+function sendText(res, status, body, contentType = 'text/plain; charset=utf-8') {
+  res.writeHead(status, {
+    'content-type': contentType,
+    'content-length': Buffer.byteLength(body),
+  });
+  res.end(body);
+}
+
 function match(pathname, pattern) {
   const names = [];
   const expression = pattern
@@ -84,15 +107,36 @@ export function createFxNodeServer({
   market,
   quotes,
   fiat,
+  inspector = null,
   executionAdapter = null,
   apiKey,
   publicDepth = false,
+  corsOrigins = [],
   now = () => Date.now(),
 } = {}) {
   if (!market) throw new TypeError('market service required');
   if (!quotes) throw new TypeError('quote coordinator required');
   if (!fiat) throw new TypeError('fiat settlement store required');
+  if (inspector !== null && typeof inspector.status !== 'function') {
+    throw new TypeError('inspector must expose status()');
+  }
+  if (!Array.isArray(corsOrigins) || corsOrigins.some((origin) => typeof origin !== 'string')) {
+    throw new TypeError('corsOrigins must be an array of strings');
+  }
   if (typeof apiKey !== 'string' || apiKey.length < 8) throw new TypeError('apiKey of at least 8 characters required');
+
+  const allowedOrigins = new Set(corsOrigins);
+
+  function applyCors(req, res) {
+    const origin = req.headers.origin;
+    if (!origin || !allowedOrigins.has(origin)) return false;
+    res.setHeader('access-control-allow-origin', origin);
+    res.setHeader('vary', 'origin');
+    res.setHeader('access-control-allow-headers', 'authorization, content-type');
+    res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+    res.setHeader('access-control-max-age', '600');
+    return true;
+  }
 
   function authenticate(req) {
     const authorization = req.headers.authorization;
@@ -104,9 +148,26 @@ export function createFxNodeServer({
       const url = new URL(req.url, 'http://fx-node.local');
       const method = req.method ?? 'GET';
       const path = url.pathname;
+      const corsAllowed = applyCors(req, res);
+
+      if (method === 'OPTIONS') {
+        if (req.headers.origin && !corsAllowed) {
+          return send(res, 403, { error: { code: 'ORIGIN_NOT_ALLOWED', message: 'browser origin is not allowed' } });
+        }
+        res.writeHead(204);
+        return res.end();
+      }
 
       if (method === 'GET' && path === '/health') {
-        return send(res, 200, { status: 'ok', service: 'blueballs-fx-node' });
+        return send(res, 200, {
+          status: 'ok',
+          service: 'blueballs-fx-node',
+          ...(inspector ? { runtime: inspector.status().mode } : {}),
+        });
+      }
+
+      if (method === 'GET' && path === '/openapi.yaml') {
+        return sendText(res, 200, OPENAPI_YAML, 'application/yaml; charset=utf-8');
       }
 
       if (method === 'GET' && path === '/v2/fx/depth') {
@@ -121,6 +182,28 @@ export function createFxNodeServer({
       }
 
       authenticate(req);
+
+      if (inspector && method === 'GET' && path === '/v2/fx/reference/status') {
+        return send(res, 200, inspector.status());
+      }
+      if (inspector && method === 'GET' && path === '/v2/fx/reference/policy') {
+        return send(res, 200, inspector.policy());
+      }
+      if (inspector && method === 'GET' && path === '/v2/fx/reference/liquidity') {
+        const inputAsset = url.searchParams.get('inputAsset');
+        const outputAsset = url.searchParams.get('outputAsset');
+        const exactOutput = url.searchParams.get('exactOutput') ?? undefined;
+        if (!inputAsset || !outputAsset) {
+          throw apiError('VALIDATION_ERROR', 400, 'inputAsset and outputAsset required');
+        }
+        return send(res, 200, {
+          object: 'list',
+          data: inspector.liquidity({ inputAsset, outputAsset, exactOutput }),
+        });
+      }
+      if (inspector && method === 'GET' && path === '/v2/fx/reference/settlement-route') {
+        return send(res, 200, inspector.settlementRoute());
+      }
 
       if (method === 'POST' && path === '/v2/fx/orders') {
         return send(res, 201, await market.admitOrder(await readJson(req)));
@@ -143,11 +226,13 @@ export function createFxNodeServer({
         if (!body.inputAsset || !body.outputAsset || body.exactOutput == null) {
           throw apiError('VALIDATION_ERROR', 400, 'inputAsset, outputAsset and exactOutput required');
         }
-        return send(res, 201, quotes.reserveExactOutput({
+        return send(res, 201, await quotes.reserveExactOutput({
           inputAsset: body.inputAsset,
           outputAsset: body.outputAsset,
           exactOutput: String(body.exactOutput),
           expiresInMs: body.expiresInMs ?? 15_000,
+          participantId: body.participantId,
+          accountRef: body.accountRef,
         }));
       }
       params = match(path, '/v2/fx/quotes/:quoteId');
@@ -168,7 +253,7 @@ export function createFxNodeServer({
         // Revalidation occurs inside markSubmitted before any external call. From this
         // point the route is intentionally non-releasable and must be reconciled.
         const submissionRef = `submit_${randomUUID()}`;
-        const committed = quotes.markSubmitted(params.quoteId, submissionRef);
+        const committed = await quotes.markSubmitted(params.quoteId, submissionRef);
         let outcome;
         try {
           outcome = await executionAdapter.submit(privateQuote, { submissionRef });
@@ -181,7 +266,7 @@ export function createFxNodeServer({
 
         const status = outcome?.status ?? 'ACCEPTED';
         if (status === 'REJECTED') {
-          quotes.fail(params.quoteId, {
+          await quotes.fail(params.quoteId, {
             eventId: outcome.eventId ?? `reject_${submissionRef}`,
             reason: outcome.reason ?? 'EXECUTION_ADAPTER_REJECTED',
           });
@@ -211,7 +296,9 @@ export function createFxNodeServer({
 
       params = match(path, '/v2/fx/routes/:routeId');
       if (method === 'GET' && params) {
-        const route = market.getRoute(params.routeId);
+        const route = typeof quotes.getRoute === 'function'
+          ? quotes.getRoute(params.routeId)
+          : market.getRoute(params.routeId);
         if (!route) throw apiError('NOT_FOUND', 404, 'route not found');
         return send(res, 200, route);
       }
@@ -244,12 +331,12 @@ export function createFxNodeServer({
       params = match(path, '/v2/fx/ops/quotes/:quoteId/confirmed');
       if (method === 'POST' && params) {
         const body = await readJson(req);
-        return send(res, 200, quotes.confirm(params.quoteId, { eventId: body.eventId, fills: body.fills }));
+        return send(res, 200, await quotes.confirm(params.quoteId, { eventId: body.eventId, fills: body.fills }));
       }
       params = match(path, '/v2/fx/ops/quotes/:quoteId/failed');
       if (method === 'POST' && params) {
         const body = await readJson(req);
-        return send(res, 200, quotes.fail(params.quoteId, { eventId: body.eventId ?? null, reason: body.reason }));
+        return send(res, 200, await quotes.fail(params.quoteId, { eventId: body.eventId ?? null, reason: body.reason }));
       }
 
       throw apiError('NOT_FOUND', 404, 'endpoint not found');

@@ -2,19 +2,35 @@ name: FX node
 
 on:
   push:
-    branches: [fx-policy]
+    branches: [fx-policy, fx-public-reference]
     paths:
       - 'apps/fx-node/**'
       - 'packages/fx-market/**'
       - 'packages/fx-fiat/**'
+      - 'packages/fx-policy/**'
+      - 'packages/fx-pricing/**'
+      - 'packages/fx-liquidity/**'
+      - 'scripts/dev.mjs'
+      - 'Dockerfile.reference'
+      - 'compose.reference.yml'
+      - '.dockerignore'
       - 'spec/fx/API-RUNTIME.md'
+      - 'spec/fx/PUBLIC-REFERENCE.md'
       - '.github/workflows/fx-node.yml'
   pull_request:
     paths:
       - 'apps/fx-node/**'
       - 'packages/fx-market/**'
       - 'packages/fx-fiat/**'
+      - 'packages/fx-policy/**'
+      - 'packages/fx-pricing/**'
+      - 'packages/fx-liquidity/**'
+      - 'scripts/dev.mjs'
+      - 'Dockerfile.reference'
+      - 'compose.reference.yml'
+      - '.dockerignore'
       - 'spec/fx/API-RUNTIME.md'
+      - 'spec/fx/PUBLIC-REFERENCE.md'
       - '.github/workflows/fx-node.yml'
 
 concurrency:
@@ -44,10 +60,26 @@ jobs:
         run: |
           node --check src/server.js
           node --check src/quote-coordinator.js
+          node --check src/integrated-quote-coordinator.js
+          node --check src/reference-liquidity.js
+          node --check src/source-adapters.js
+          node --check src/reference-runtime.js
           node --check src/cli.js
 
       - name: Tests
         run: node --test --test-reporter=spec test/*.test.js
 
-      - name: Docker build
+      - name: OpenAPI contract present
+        run: |
+          grep -q '^openapi: 3.1.0' openapi.yaml
+          grep -q '^  /v2/fx/quotes:' openapi.yaml
+          grep -q '^  /v2/fx/reference/status:' openapi.yaml
+
+      - name: FX node Docker build
         run: docker build -f Dockerfile -t blueballs-fx:test ../..
+
+      - name: Complete reference image and Compose config
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          docker compose -f compose.reference.yml config >/dev/null
+          docker build -f Dockerfile.reference -t blueballs-reference:test .

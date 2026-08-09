@@ -47,6 +47,15 @@ export class BlueballsFxClient {
 
   health() { return this.#request('/health', { auth: false }); }
 
+  referenceStatus() { return this.#request('/v2/fx/reference/status'); }
+  referencePolicy() { return this.#request('/v2/fx/reference/policy'); }
+  referenceLiquidity({ inputAsset, outputAsset, exactOutput }) {
+    const query = new URLSearchParams({ inputAsset, outputAsset });
+    if (exactOutput !== undefined) query.set('exactOutput', String(exactOutput));
+    return this.#request(`/v2/fx/reference/liquidity?${query.toString()}`);
+  }
+  referenceSettlementRoute() { return this.#request('/v2/fx/reference/settlement-route'); }
+
   createOrder(order) { return this.#request('/v2/fx/orders', { method: 'POST', body: order }); }
   listOrders(maker) { return this.#request(`/v2/fx/orders?maker=${encodeURIComponent(maker)}`); }
   cancelOrder(orderHash, options = {}) {
@@ -58,7 +67,7 @@ export class BlueballsFxClient {
     return this.#request(`/v2/fx/depth?inputAsset=${encodeURIComponent(inputAsset)}&outputAsset=${encodeURIComponent(outputAsset)}`);
   }
 
-  quote({ inputAsset, outputAsset, exactOutput, expiresInMs }) {
+  quote({ inputAsset, outputAsset, exactOutput, expiresInMs, participantId, accountRef }) {
     return this.#request('/v2/fx/quotes', {
       method: 'POST',
       body: {
@@ -66,6 +75,8 @@ export class BlueballsFxClient {
         outputAsset,
         exactOutput: String(exactOutput),
         ...(expiresInMs === undefined ? {} : { expiresInMs }),
+        ...(participantId === undefined ? {} : { participantId }),
+        ...(accountRef === undefined ? {} : { accountRef }),
       },
     });
   }

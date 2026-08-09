@@ -5,7 +5,14 @@
   "type": "module",
   "description": "Dependency-free JavaScript client for the Blueballs FX node",
   "engines": { "node": ">=18" },
-  "exports": "./src/index.js",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    }
+  },
+  "types": "./src/index.d.ts",
   "scripts": {
     "test": "node --test test/*.test.js",
     "test:ci": "node --test --test-reporter=spec test/*.test.js"

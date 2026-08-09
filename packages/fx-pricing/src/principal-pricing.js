@@ -34,7 +34,14 @@ export class PrincipalQuoteEngine {
     this.now = now;
   }
 
-  quoteExactOutput({
+  /**
+   * Build the exact principal economics without consuming balance-sheet capacity.
+   *
+   * The public reference router uses this to compare bank principal with other
+   * already-authorised liquidity. A quote only becomes firm when quoteExactOutput
+   * subsequently reserves the returned risk deltas.
+   */
+  previewExactOutput({
     quoteId,
     inputAsset,
     outputAsset,
@@ -85,7 +92,6 @@ export class PrincipalQuoteEngine {
       [inputAsset]: totalInput.toString(),
       [outputAsset]: (-output).toString(),
     };
-    this.riskBook.reserve({ quoteId, deltas: riskDeltas, expiresAt });
 
     return {
       quoteId,
@@ -106,5 +112,15 @@ export class PrincipalQuoteEngine {
       riskDeltas,
       expiresAt,
     };
+  }
+
+  quoteExactOutput(args) {
+    const quote = this.previewExactOutput(args);
+    this.riskBook.reserve({
+      quoteId: quote.quoteId,
+      deltas: quote.riskDeltas,
+      expiresAt: quote.expiresAt,
+    });
+    return quote;
   }
 }
