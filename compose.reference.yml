@@ -1,0 +1,61 @@
+name: blueballs-reference
+
+x-blueballs-image: &blueballs-image
+  build:
+    context: .
+    dockerfile: Dockerfile.reference
+  image: blueballs/reference:local
+
+services:
+  fx:
+    <<: *blueballs-image
+    command: ["node", "apps/fx-node/src/cli.js"]
+    environment:
+      FX_NODE_MODE: reference-sandbox
+      FX_NODE_HOST: 0.0.0.0
+      FX_NODE_PORT: 8788
+      FX_NODE_API_KEY: bb_test_local_fx
+      FX_NODE_DATA_DIR: /data
+      FX_NODE_CORS_ORIGINS: http://localhost:5280,http://127.0.0.1:5280
+    ports:
+      - "8788:8788"
+    volumes:
+      - fx-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8788/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+      start_period: 3s
+
+  api:
+    <<: *blueballs-image
+    command: ["node", "apps/api/src/server.js"]
+    environment:
+      PORT: 5290
+    ports:
+      - "5290:5290"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5290/v2').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+      start_period: 3s
+
+  site:
+    <<: *blueballs-image
+    command: ["pnpm", "exec", "vite", "--host", "0.0.0.0", "--port", "5280"]
+    environment:
+      VITE_API_BASE: http://localhost:5290
+      VITE_FX_NODE_BASE: http://localhost:8788
+      VITE_FX_NODE_KEY: bb_test_local_fx
+    ports:
+      - "5280:5280"
+    depends_on:
+      fx:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+volumes:
+  fx-data:
