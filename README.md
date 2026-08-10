@@ -1,53 +1,98 @@
 # Blueballs
 
-An MIT-licensed, self-hostable **open-source neobank stack**. Fork it, run it, and you have a reference implementation of the primitives a modern financial product needs: multi-currency accounts, issued cards, transfers, savings, credit, ledger infrastructure and a modular institutional FX stack.
+Blueballs is an MIT-licensed, self-hostable **open-source neobank reference stack**. It combines product UI, a 144-endpoint banking API, double-entry ledger infrastructure and a modular institutional FX system in one repository.
+
+The project is for founders and teams building a bank, neobank, embedded-finance product or stablecoin-enabled financial product. It gives them a working foundation they can run, inspect, modify and replace provider by provider.
+
+## What is included
+
+### Banking foundation
+
+- multi-currency accounts;
+- cards and controls;
+- transfers and rail metadata;
+- onboarding and identity workflows;
+- savings, credit and business-banking primitives;
+- double-entry ledger and event history;
+- product screens, journeys and executable API documentation.
+
+All 144 catalogued banking endpoints respond. Some are reference implementations rather than production-provider integrations. Consumer iOS and Android applications are not included.
+
+### Canonical FX foundation
+
+The canonical FX implementation lives in `apps/fx-node` and the `packages/fx-*` packages. It includes:
+
+- institution policy, participants, credentials and short-lived authorisations;
+- signed private customer or member liquidity;
+- issuer, institutional LP, other-institution and treasury adapters;
+- deterministic reference-price consensus;
+- bank-principal pricing and hard balance-sheet limits;
+- exact-output multi-source optimisation;
+- all-leg reservation before a quote becomes firm;
+- mixed fiat and token settlement states;
+- Solidity Vault, settlement, cancellation, policy registry and AtomicRouter contracts;
+- typed JavaScript SDK, OpenAPI contract and deterministic simulator;
+- unit, integration, fuzz, invariant, controlled-EVM and Docker release gates.
+
+## The connected public reference trade
+
+The FX page and node follow one BRL to EUR customer request through the same runtime:
+
+```text
+BRL through an attested PIX-style payment
+    → BRLX
+    → policy-approved, multi-source BRLX/EURC token FX
+    → EURC issuer redemption
+    → EUR
+```
+
+The customer sees one exchange. The institution can inspect which sources were eligible, which were excluded, the selected allocation, principal risk and the finality of every settlement leg.
+
+The reference token market can combine:
+
+```text
+private customer liquidity
+issuer liquidity
+another financial institution
+institutional LP liquidity
+bank treasury
+bank principal
+```
+
+A preview reads current policy-approved capacity but reserves nothing. A firm sandbox trade is returned only after every selected source and principal risk capacity has been reserved.
 
 ## Honest status
 
-### General banking API
+- The local reference market and provider inventory are deterministic adapters, not live commercial providers.
+- The default FX node has **no execution adapter**. Execution fails closed with `EXECUTION_UNAVAILABLE`; it never invents a transaction hash.
+- The Solidity kernel has internal unit, fuzz, invariant and controlled-Anvil execution evidence. This is not an independent audit or production-mainnet proof.
+- Fiat payment and redemption legs are not made atomic by the token leg. The BRL to EUR route is correctly classified as `MIXED_FINALITY`.
+- The reference persistence model uses SQLite and is designed for local development and single-writer deployments, not a clustered production bank.
+- This repository ships software, not a bank, licence, insured account or regulated financial service.
 
-- **144/144 catalogued endpoints respond.** Every endpoint either does the implemented reference behaviour or returns a deliberate response; the catalogue is not padded with generic 404s.
-- **Consumer applications are not shipped.** The repository contains product UI demonstrations and journey screens, not production iOS/Android banking apps.
-- **Statements PDF is still a stand-in.** CSV and JSON exports are real; the PDF response identifies itself as a placeholder.
-- **The general API is a single-process SQLite reference deployment.** It is suitable for local development and one process, not a clustered production bank.
-
-### FX reference runtime
-
-- The modular FX packages include policy authorisation, private signed liquidity, reference pricing, principal risk, exact-output multi-source routing, fiat settlement states, Solidity settlement contracts, SDK, simulator and a standalone node.
-- `reference-sandbox` composes the policy, market, pricing, liquidity, risk and fiat packages into one runnable local market.
-- A reference quote is returned only after every selected source reserves capacity; principal balance-sheet risk is reserved with it.
-- The default node has **no execution adapter**. Execution fails closed rather than inventing a transaction hash.
-- The contract kernel passed internal unit, fuzz, invariant and controlled-Anvil execution gates at its frozen release-candidate commit. This is not an independent security audit or production-mainnet proof.
-
-### Regulatory and provider boundary
-
-- This repository ships software, not a bank or licensed financial service.
-- Reference identity results, issuer capacity, LP capacity, bank rails and treasury inventory are local adapters. Production deployments must replace them with real providers and institution policy.
-- Nothing here is regulated, insured or certified for a particular jurisdiction.
-
-See `SCOPE.md` for the general banking scope, `spec/fx/` for the FX architecture and `spec/fx/PUBLIC-REFERENCE.md` for the public distribution contract.
+See `spec/fx/KNOWN-LIMITATIONS.md` and `SECURITY.md` before deploying anything beyond local evaluation.
 
 ## Quickstart
 
-Requires Node **24.15+** and [pnpm](https://pnpm.io).
+Requires Node **24.15+** and pnpm.
 
 ```bash
-git clone <this repo>
+git clone <this repository>
 cd blueballs
 pnpm install
 pnpm dev
 ```
 
-That starts the complete local reference stack:
+This starts:
 
-- Site → `http://localhost:5280`
-- Banking API → `http://localhost:5290/v2`
-- FX node → `http://localhost:8788`
-- Local FX key → `bb_test_local_fx`
+- site: `http://localhost:5280`
+- banking API: `http://localhost:5290/v2`
+- canonical FX node: `http://localhost:8788`
+- local FX key: `bb_test_local_fx`
 
-The website receives the local sandbox FX URL and key automatically.
+Open `http://localhost:5280/fx`. The page calls the running FX node directly. It does not recreate pricing, policy or source capacity in React.
 
-Only need one part?
+Run individual services:
 
 ```bash
 pnpm dev:site
@@ -57,73 +102,56 @@ pnpm dev:fx
 
 ### Docker Compose
 
-Build and start the same three-service stack without installing Node or pnpm locally:
-
 ```bash
 docker compose -f compose.reference.yml up --build
 ```
 
-The FX databases persist in the `fx-data` volume. Stop the stack with:
+The FX databases persist in the `fx-data` volume.
 
 ```bash
 docker compose -f compose.reference.yml down
 ```
 
-Use `down -v` only when you deliberately want to delete the seeded FX state.
+Use `down -v` only when you deliberately want to remove the seeded reference state.
 
-## General banking API key
+## Try the public FX trade
 
-```bash
-curl -X POST http://localhost:5290/v2/auth/signup \
-  -H "content-type: application/json" \
-  -d '{"email":"you@example.com"}'
-
-# → { "key": "bb_sandbox_…", ... }
-```
-
-Use it against authenticated banking endpoints:
+Preview without reserving:
 
 ```bash
-curl -X POST http://localhost:5290/v2/customers \
-  -H "content-type: application/json" \
-  -H "x-api-key: bb_sandbox_…" \
-  -d '{"type":"individual","name":"Ada Lovelace"}'
-```
-
-The `/developers` page can issue a sandbox key and run the general API directly from the browser.
-
-## FX reference quote
-
-The seeded token corridor uses these proof asset identifiers:
-
-```text
-USDC  0x0000000000000000000000000000000000000011
-EURC  0x0000000000000000000000000000000000000022
-```
-
-Request a quote that is deliberately large enough to use private customer liquidity, an issuer, another neobank, an institutional LP, treasury and bank principal:
-
-```bash
-curl -X POST http://localhost:8788/v2/fx/quotes \
+curl -X POST http://localhost:8788/v2/fx/reference/trades/preview \
   -H 'Authorization: Bearer bb_test_local_fx' \
   -H 'content-type: application/json' \
-  -d '{
-    "inputAsset":"0x0000000000000000000000000000000000000011",
-    "outputAsset":"0x0000000000000000000000000000000000000022",
-    "exactOutput":"450000000000",
-    "expiresInMs":30000
-  }'
+  -d '{"inputAmount":"50000.00","from":"BRL","to":"EUR"}'
 ```
 
-Inspect the canonical runtime:
+Reserve the same trade:
 
 ```bash
-curl \
+curl -X POST http://localhost:8788/v2/fx/reference/trades \
   -H 'Authorization: Bearer bb_test_local_fx' \
-  http://localhost:8788/v2/fx/reference/status
+  -H 'content-type: application/json' \
+  -d '{"inputAmount":"50000.00","expiresInMs":60000}'
 ```
 
-The machine-readable REST contract is available in the repository at `apps/fx-node/openapi.yaml` and from the running node at `http://localhost:8788/openapi.yaml`.
+Inspect the runtime and alter the reference market:
+
+```bash
+curl -H 'Authorization: Bearer bb_test_local_fx' \
+  http://localhost:8788/v2/fx/reference/status
+
+curl -X POST http://localhost:8788/v2/fx/reference/scenario \
+  -H 'Authorization: Bearer bb_test_local_fx' \
+  -H 'content-type: application/json' \
+  -d '{"id":"issuer_policy_blocked"}'
+```
+
+The complete REST contract is available at:
+
+```text
+apps/fx-node/openapi.yaml
+http://localhost:8788/openapi.yaml
+```
 
 ## Architecture
 
@@ -131,54 +159,58 @@ The machine-readable REST contract is available in the repository at `apps/fx-no
 blueballs/
 ├─ src/                         website, product UI and live API documentation
 ├─ apps/api/                    general banking API and double-entry ledger
-├─ apps/fx-node/                canonical self-hostable FX reference runtime
+├─ apps/fx-node/                canonical self-hostable FX runtime
 ├─ packages/
 │  ├─ fx-contracts/             Vault, settlement, cancellation, policy registry, router
-│  ├─ fx-market/                private signed orders, matching, reservations, reconciliation
-│  ├─ fx-pricing/               exact arithmetic, reference consensus, principal risk and pricing
-│  ├─ fx-liquidity/             cross-source exact-output optimisation and reservation coordination
-│  ├─ fx-policy/                participants, credentials, account attribution and authorisations
-│  ├─ fx-fiat/                  fiat intents, attestations, settlement graph and finality
-│  ├─ fx-sdk/                   dependency-free JavaScript client
+│  ├─ fx-market/                private signed orders, reservations and reconciliation
+│  ├─ fx-pricing/               exact arithmetic, reference consensus, risk and principal pricing
+│  ├─ fx-liquidity/             cross-source optimisation and reservation coordination
+│  ├─ fx-policy/                participants, credentials, accounts and authorisations
+│  ├─ fx-fiat/                  fiat intents, attestations, finality and settlement graph
+│  ├─ fx-sdk/                   typed dependency-free JavaScript client
 │  └─ fx-simulator/             deterministic economic and failure scenarios
-├─ spec/fx/                     architecture, invariants, threat model and release contracts
+├─ spec/fx/                     architecture, threat model, invariants and release contracts
 └─ scripts/dev.mjs              starts site, banking API and FX node together
 ```
 
-The general banking API uses decimal strings and double-entry ledger postings.
-
-The modular FX stack keeps identity, policy, private orders, pricing and routing off-chain while using the contract kernel to constrain token settlement authority, cancellation, replay, policy validity, backing and atomicity.
+Identity, policy, private orders, pricing and route construction remain off-chain. The contract kernel constrains token backing, maker and taker authority, cancellation, replay, live institution policy and atomic settlement.
 
 ## Canonical versus legacy FX
 
-The modular packages and `apps/fx-node` are the canonical FX architecture.
+`apps/fx-node` and `packages/fx-*` define all new FX economics, policy, risk, routing and public claims.
 
-Older FX routes inside `apps/api` remain compatibility/reference surfaces while migration is completed. New economic, policy, risk and website behaviour must be implemented against the canonical FX node rather than extending a second FX model.
+The older FX routes under `apps/api/src/routes/` are frozen compatibility demonstrations. They are not the source of truth and must not receive new FX features. See `spec/fx/LEGACY-MIGRATION.md`.
 
-## Testing
+## Verification
 
 The aggregate FX release gate covers:
 
-- market;
-- pricing and principal risk;
-- liquidity routing;
-- policy integration;
-- fiat settlement;
-- SDK;
-- node;
-- deterministic simulator;
-- Solidity compile, tests, fuzzing and invariants;
+- market, policy, pricing, liquidity, fiat, SDK, node and simulator tests;
+- Solidity format, build, unit tests, fuzzing and invariants;
 - controlled EVM execution through Anvil;
-- Docker image build.
+- self-hosted Docker image build;
+- complete reference-stack build;
+- TypeScript and Vite production build.
 
-The FX node workflow additionally builds the complete reference image and validates the Docker Compose file.
+The visual workflow also renders the complete `/fx` page against the local reference stack and stores desktop and mobile screenshots as CI artifacts.
 
-Internal green gates prove the tested reference behaviour. They do not replace an external audit or production operating controls.
+Internal green gates prove the tested reference behaviour. They do not replace independent security review or production operating controls.
+
+## Documentation
+
+- `apps/fx-node/README.md` - run and inspect the FX node
+- `packages/fx-sdk/README.md` - use the SDK
+- `spec/fx/PUBLIC-REFERENCE.md` - public product and evidence contract
+- `spec/fx/ADAPTERS.md` - replace reference providers
+- `spec/fx/KNOWN-LIMITATIONS.md` - explicit deployment boundaries
+- `packages/fx-contracts/DEPLOYMENT.md` - contract deployment and binding order
+- `RELEASE.md` - reproducible release procedure
+- `SECURITY.md` - vulnerability reporting and security status
 
 ## Contributing
 
-See `CONTRIBUTING.md`.
+Read `CONTRIBUTING.md` before changing banking or FX contracts.
 
 ## Licence
 
-MIT — see `LICENSE`.
+MIT. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.

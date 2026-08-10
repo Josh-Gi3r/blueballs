@@ -1,116 +1,188 @@
-# Blueballs FX — Visual Laboratory
+# Blueballs FX - Visual Product Contract
 
-Status: **FX-11 visual product contract**
+Status: **connected runtime implementation**
 
-The visual layer starts only after the backend aggregate release gate is green. It must visualize the implementation that exists; it must not create a second economic or compliance model in React.
+The FX page is a product demonstration for founders and teams building banks. It must show what they can ship, what the institution controls and where the implementation lives.
 
-## Primary message
+It must never create a second pricing, policy, capacity or settlement model in React.
 
-**Compliant FX infrastructure for financial institutions.**
+## Primary audience
 
-Blueballs lets an institution assemble an FX market from its own treasury, approved customer/member liquidity, institutional LPs, stablecoin issuers, other neobanks and verified fiat providers while retaining control over exactly who can participate and under what policy.
+- founders building a bank or neobank;
+- product and technology leaders building embedded finance;
+- treasury, risk and compliance teams evaluating control;
+- developers deciding whether to clone and extend the stack.
 
-The product is not marketed as generic P2P FX.
+## Primary question
 
-## Visual hierarchy
+> What FX capability do I get when I build on Blueballs, and can I inspect and run the machinery underneath it?
 
-The page should make this sequence obvious before explaining implementation details:
+## One connected trade
 
-`IDENTITY → POLICY → AUTHORIZED LIQUIDITY → PRICE / ROUTE → POLICY AUTHORIZATION → SETTLEMENT → RECONCILIATION`
+The page follows one BRL to EUR request:
 
-A source that fails policy is removed before price competition. A cryptographically valid maker/taker signature is still insufficient when institution policy authorization is expired or revoked.
+```text
+Customer view
+BRL → EUR
 
-## Six modes
+Institution view
+policy → eligible sources → allocation → risk → settlement
 
-### SEE IT
-Show the route as a financial system, not a generic swap widget:
-- requested exchange;
-- eligible liquidity sources;
-- source allocation;
-- institution principal participation;
-- price/reference provenance;
-- policy state;
-- finality per leg;
-- settlement/reconciliation state.
+Developer view
+request → response → IDs → source → tests
+```
 
-### TRY IT
-Interactive inputs must run real implementation logic:
-- deterministic simulator imported from `packages/fx-simulator` for economic scenarios;
-- live `fx-node` firm quotes when a sandbox node is configured.
+The customer, institution and developer views must share the same runtime response, including amount, source allocation, quote ID, route ID, expiry and finality.
 
-No duplicated React-only pricing formula is permitted.
+## Product sequence
 
-### BREAK IT
-Allow a visitor to select proven hostile scenarios:
-- 90% one-way flow;
-- LP disappearance;
-- issuer disappearance;
-- principal hard limit;
-- reference outage;
-- price shock;
-- cancellation storm;
-- chain congestion;
-- recovery.
+### 1. Customer product
 
-Results must come from the same deterministic simulator used in CI.
+Show a credible banking exchange experience:
 
-### INSPECT IT
-Expose implementation evidence:
-- route composition;
-- rejection reason;
-- principal exposure / hard limit;
-- settlement finality class;
-- policy gate explanation;
-- API request/response where live node is connected;
-- source/package links.
+- enter BRL amount;
+- receive live EUR preview;
+- review and reserve;
+- see rate, expiry and delivery boundary;
+- encounter honest execution availability;
+- never expose internal source classes inside the customer experience unless the visitor opens the bank view.
 
-### READ IT
-Plain language must distinguish:
-- policy/compliance framework from KYC vendor;
-- atomic token settlement from asynchronous fiat settlement;
-- firm/reserved liquidity from indicative depth;
-- internal release gates from independent external audit.
+### 2. Open the same trade
 
-### TAKE IT
-Direct developers to:
-- `apps/fx-node`
-- `packages/fx-sdk`
-- `packages/fx-contracts`
-- `packages/fx-market`
-- `packages/fx-pricing`
-- `packages/fx-liquidity`
-- `packages/fx-policy`
-- `packages/fx-fiat`
-- `packages/fx-simulator`
-- `spec/fx`
+Show:
+
+- all potential source classes;
+- which sources are eligible;
+- which are excluded and why;
+- selected allocation;
+- capacity used;
+- current policy and reference state.
+
+Values must come from `apps/fx-node`.
+
+### 3. Explain the infrastructure
+
+Use four editorial stories:
+
+1. liquidity network;
+2. policy before price;
+3. treasury and principal risk;
+4. mixed fiat and token settlement.
+
+Each editorial visual is paired with live or coded evidence. Artwork does not prove behaviour by itself.
+
+### 4. Break the market
+
+Two different tools must remain visibly separate:
+
+- backend reference scenarios alter the live local market used by the customer trade;
+- the deterministic simulator runs larger economic and failure scenarios used in CI.
+
+The simulator must always be labelled `NOT A LIVE QUOTE`.
+
+### 5. Inspect and take it
+
+Expose:
+
+- request and response;
+- lifecycle identifiers;
+- OpenAPI;
+- implementation files;
+- integration tests;
+- controlled EVM proof;
+- every FX package;
+- one-command local run instructions.
+
+## Visual language
+
+The FX page remains part of the existing Blueballs site:
+
+- light grey page background;
+- white rounded cards;
+- Archivo and IBM Plex Mono;
+- restrained blue accent;
+- customer phone UI;
+- dark code panels;
+- no generic futuristic fintech styling;
+- no decorative control that does nothing.
+
+## Editorial assets
+
+The final page uses scalable 2400 × 1350 SVG artwork:
+
+```text
+src/assets/fx-editorial-liquidity.svg
+src/assets/fx-editorial-policy.svg
+src/assets/fx-editorial-treasury.svg
+src/assets/fx-editorial-route.svg
+```
+
+Do not stretch tiny raster thumbnails across large sections. Generated concepts may inform composition, but labels, typography and diagrams used in the product must remain crisp and reviewable.
 
 ## Live-node mode
 
-The marketing/docs site and FX node are deliberately separate runtimes.
-
 Browser configuration:
-- `VITE_FX_NODE_BASE`
-- `VITE_FX_NODE_KEY`
 
-The key must be a sandbox/demo credential only. Production credentials must never be embedded in a public browser build.
+```text
+VITE_FX_NODE_BASE
+VITE_FX_NODE_KEY
+```
 
-When the live node is not configured, the page must say so clearly. It may still run the real in-browser simulator because that simulator is deterministic application code, not mocked API output.
+Only a sandbox or demo credential may be embedded in a browser build.
 
-The page must never silently fall back to the older hardcoded monolithic `/v2/fx/route` implementation.
+When the node is unavailable, the page must say so. It must not silently fall back to:
+
+- hardcoded rates;
+- hardcoded source capacity;
+- the legacy `/v2/fx/route` API;
+- fabricated quote or transaction identifiers.
+
+## Evidence labels
+
+Use precise labels:
+
+```text
+LIVE LOCAL FX NODE
+LIVE FX NODE PREVIEW
+FIRM RESERVED SANDBOX QUOTE
+DETERMINISTIC SIMULATOR · NOT A LIVE QUOTE
+CONTROLLED EVM PROOF
+EXECUTION ADAPTER NOT CONFIGURED
+INTERNAL ENGINEERING GATE
+NOT INDEPENDENTLY AUDITED
+```
 
 ## Claims discipline
 
-Allowed:
-- internal backend release gate passed for the frozen reference commit;
-- deterministic simulator behavior;
-- controlled Anvil JSON-RPC execution proof;
-- provider-neutral compliance architecture;
-- on-chain institution policy authorization exists.
+Supported by current evidence:
 
-Not allowed without separate evidence:
-- independently audited;
-- regulator approved;
-- production bank certified;
-- production public-mainnet proven;
+- policy-controlled, provider-neutral FX architecture;
+- six reference liquidity classes in one reserved route;
+- hard principal risk limits;
+- live policy revocation before pricing;
+- mixed-finality BRL to EUR route;
+- atomic token settlement kernel;
+- controlled Anvil JSON-RPC proof;
+- deterministic stress scenarios;
+- self-hosted reference node, SDK and Docker distribution.
+
+Not supported without separate evidence:
+
+- independent audit;
+- regulator approval;
+- production bank certification;
+- production public-mainnet settlement;
 - guaranteed cheapest FX;
-- every fiat leg atomic.
+- real PIX or issuer integration;
+- end-to-end atomic fiat settlement.
+
+## Visual QA gate
+
+Every pull request changing the FX page must:
+
+- pass TypeScript and production build;
+- start the complete local stack;
+- render the live page against the FX node;
+- capture full-page desktop and mobile screenshots;
+- capture the runtime status and trade preview used by the render;
+- upload them as CI artefacts for human review.

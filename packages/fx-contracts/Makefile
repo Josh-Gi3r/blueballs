@@ -1,7 +1,7 @@
 OZ_VERSION := v5.6.1
 FORGE_STD_VERSION := v1.16.2
 
-.PHONY: deps fmt build test ci stress clean
+.PHONY: deps fmt build test ci stress abi clean
 
 deps:
 	@if [ ! -d lib/openzeppelin-contracts ]; then \
@@ -34,5 +34,9 @@ ci: deps
 stress: deps
 	FOUNDRY_PROFILE=stress forge test -vv
 
+abi: deps
+	bash script/export-abis.sh
+
 clean:
 	forge clean
+	rm -rf abi

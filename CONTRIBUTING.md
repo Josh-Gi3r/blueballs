@@ -1,48 +1,127 @@
 # Contributing
 
-Thanks for looking. This is a young project — read `SCOPE.md` and `PLAN-V3.md` first so you
-know what's actually in scope right now versus deliberately deferred.
+Blueballs is a young open-source banking reference stack. Read `SCOPE.md`, `spec/conventions.md` and `spec/fx/PUBLIC-REFERENCE.md` before changing financial behaviour.
 
 ## Ground rules
 
-1. **The contract is the product.** `spec/conventions.md` and `src/endpoints.ts` are frozen.
-   If a change needs to touch either, open an issue and discuss it before writing code —
-   changing them invalidates work in every resource family at once.
-2. **Money is never a float.** Amounts are decimal strings with an explicit currency. Use the
-   `toMinor` / `fromMinor` helpers in `apps/api/src/kernel.js`.
-3. **Double-entry or it doesn't post.** Every ledger movement goes through `post()`. Entries
-   that don't sum to zero are rejected — don't work around that.
-4. **No vendor names.** Providers sit behind adapters. Don't name a third-party FX, KYC, or
-   rail provider anywhere — code, comments, commit messages, or docs.
-5. **One family, one file.** Each resource family lives in exactly one file under
-   `apps/api/src/routes/`. Don't edit `kernel.js` or `server.js` to add a family — import from
-   `kernel.js` and register routes with `route(...)`.
-6. **Honest states, not generic errors.** Compliance holds, quote expiry, closed rails, tier
-   blocks, refunds and reversals should be modelled as real states, not swallowed into a
-   catch-all failure.
+1. **The contract is the product.** Do not casually change the endpoint catalogue, money conventions, signed payloads, state machines or public evidence labels.
+2. **Money is not a float.** General banking amounts use decimal strings and minor-unit helpers. Canonical FX calculations use integer atomic units and exact rational prices.
+3. **Double-entry or it does not post.** General ledger movements go through `post()` and must balance.
+4. **Compliance precedes FX price.** A liquidity source must have live institution authority before it can compete economically.
+5. **A firm quote reserves capacity.** An indicative calculation must never be labelled reserved or firm.
+6. **Submission is not settlement.** Once an external attempt may have occurred, preserve `SUBMITTED` or ambiguous state until reconciliation.
+7. **Fiat is not magically atomic.** Preserve the finality class of every payment, issuer, ledger and token edge.
+8. **Providers stay behind adapters.** Canonical policy, pricing and route code must remain provider-neutral.
+9. **The website does not invent a second market.** Live FX product interactions read `apps/fx-node`. Simulator output must be labelled as simulation.
+10. **No claim stronger than its evidence.** Internal gates are not an independent audit, regulator approval or production proof.
 
-## Local dev
+## Canonical FX ownership
+
+New FX work belongs in:
+
+```text
+apps/fx-node
+packages/fx-contracts
+packages/fx-market
+packages/fx-pricing
+packages/fx-liquidity
+packages/fx-policy
+packages/fx-fiat
+packages/fx-sdk
+packages/fx-simulator
+spec/fx
+```
+
+The historical FX modules under `apps/api/src/routes/` are frozen compatibility surfaces. Read `spec/fx/LEGACY-MIGRATION.md` before touching them.
+
+## Local development
 
 ```bash
 pnpm install
-pnpm dev          # site :5280 + API :5290 together
-pnpm exec tsc -b  # type-check the site before opening a PR
+pnpm dev
 ```
 
-The API is Node stdlib + `node:sqlite` — no external services, no Docker.
+Services:
 
-## Adding an endpoint
+```text
+site          http://localhost:5280
+banking API   http://localhost:5290/v2
+FX node       http://localhost:8788
+```
 
-1. Check `src/endpoints.ts` — if the route is catalogued but unimplemented, it currently
-   answers a deliberate `501`. Implement it in the owning family's file under
-   `apps/api/src/routes/`.
-2. If the route isn't catalogued at all, that's a scope question — raise it before building,
-   don't quietly extend the surface.
-3. Run the server and hit your new route with `curl` or the docs page's "Try it" console
-   before opening a PR.
+Build the website:
 
-## Reporting bugs / security issues
+```bash
+pnpm build
+```
 
-There's no public repo yet, so there's no issue tracker or disclosure address live either.
-Both get set up as part of publishing — check back once this ships, or ask whoever gave you
-this codebase directly.
+Run the complete FX JavaScript suites:
+
+```bash
+for dir in \
+  packages/fx-market \
+  packages/fx-pricing \
+  packages/fx-liquidity \
+  packages/fx-policy \
+  packages/fx-fiat \
+  packages/fx-sdk \
+  packages/fx-simulator \
+  apps/fx-node
+do
+  (cd "$dir" && npm run test:ci)
+done
+```
+
+Contracts:
+
+```bash
+cd packages/fx-contracts
+make ci
+```
+
+## Adding an FX adapter
+
+Read `spec/fx/ADAPTERS.md`.
+
+A pull request must include tests for:
+
+- exact amounts and rounding;
+- reservation and release idempotency;
+- expiry;
+- concurrent capacity protection;
+- policy revocation;
+- submission ambiguity;
+- reconciliation replay;
+- public/private data separation.
+
+Do not place provider credentials, brand-specific economics or production endpoints in the canonical reference configuration.
+
+## Changing the FX page
+
+The page must continue to show one connected trade through customer, institution and developer views.
+
+Before review:
+
+- run the production build;
+- run the full local stack;
+- inspect desktop and mobile layouts;
+- confirm live values match the FX node response;
+- confirm every control either changes the backend reference runtime or is explicitly labelled simulation;
+- confirm unavailable execution is shown honestly.
+
+## Pull requests
+
+Keep one coherent purpose per pull request. Include:
+
+- problem and intended invariant;
+- implementation summary;
+- tests and evidence;
+- migration impact;
+- public claim impact;
+- known limitations.
+
+Do not merge release work directly into `main` without a green aggregate gate and visual review.
+
+## Security reports
+
+Follow `SECURITY.md`. Do not disclose exploitable details in a public issue.

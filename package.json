@@ -3,14 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Blueballs — an open-source, self-hostable neobank stack (site + API + FX reference runtime)",
+  "description": "Blueballs - an open-source, self-hostable neobank stack (site + API + FX reference runtime)",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:site": "vite",
     "dev:api": "node apps/api/src/server.js",
     "dev:fx": "node apps/fx-node/src/cli.js",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:fx": "node scripts/test-fx.mjs",
+    "sbom": "node scripts/dependency-inventory.mjs",
+    "sdk:pack": "npm --prefix packages/fx-sdk pack --dry-run"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -1,44 +1,75 @@
-# Blueballs FX — Public Reference Distribution
+# Blueballs FX - Public Reference Distribution
 
-Status: **implementation in progress**
+Status: **release-candidate integration**
 
-This document is the product and engineering contract for turning the modular FX release candidate into a public open-source reference distribution.
+This document is the product and engineering contract for the public open-source FX reference.
 
-The goal is not another landing page. A developer who has never met the contributors must be able to:
+The goal is not a landing page. A developer who has never met the contributors must be able to:
 
 1. clone the repository;
 2. start the site, banking API and canonical FX node with one command;
-3. request a policy-approved, multi-source sandbox quote;
-4. inspect the exact route and source reservations behind it;
-5. observe hard treasury/principal limits and policy exclusions;
-6. inspect a mixed fiat/token settlement route without false atomicity claims;
-7. follow submission, confirmation, failure and ambiguity states;
-8. locate the implementation, specification and tests for every public claim;
-9. replace the reference adapters with real providers;
+3. use one BRL to EUR customer exchange;
+4. inspect the exact policy, source allocation, token route and settlement graph behind it;
+5. reserve every selected source before the quote is called firm;
+6. observe policy exclusions and hard treasury/principal limits;
+7. distinguish live node behaviour from deterministic simulation;
+8. locate implementation, API, source and tests for every public claim;
+9. replace reference providers through documented adapters;
 10. redistribute and modify the system under the MIT licence.
 
 ## Canonical architecture
 
-The modular FX stack is canonical:
+```text
+apps/fx-node
+packages/fx-contracts
+packages/fx-market
+packages/fx-pricing
+packages/fx-liquidity
+packages/fx-policy
+packages/fx-fiat
+packages/fx-sdk
+packages/fx-simulator
+spec/fx
+```
 
-- `apps/fx-node`
-- `packages/fx-contracts`
-- `packages/fx-market`
-- `packages/fx-pricing`
-- `packages/fx-liquidity`
-- `packages/fx-policy`
-- `packages/fx-fiat`
-- `packages/fx-sdk`
-- `packages/fx-simulator`
-- `spec/fx`
+Historical FX code under `apps/api` is a frozen compatibility surface. It must not define new economics, policy, risk, settlement or website claims. See `LEGACY-MIGRATION.md`.
 
-The older monolithic FX routes inside `apps/api` are legacy compatibility surfaces. They must not define new FX economics, risk rules, policy rules or website claims. Their eventual destination is a facade over the canonical FX node or explicit deprecation.
+## Connected public trade
+
+The public product follows one request:
+
+```text
+customer asks for BRL → EUR
+        ↓
+attested BRL payment creates BRLX settlement capacity
+        ↓
+BRLX → EURC token FX uses the canonical multi-source market
+        ↓
+EURC is redeemed and EUR is delivered
+```
+
+The token corridor can combine:
+
+```text
+private customer liquidity
+issuer
+other institution
+institutional LP
+bank treasury
+bank principal
+```
+
+The same runtime object drives:
+
+- customer phone;
+- institution source and policy view;
+- developer request, response and evidence view;
+- settlement route;
+- quote and reconciliation identifiers.
 
 ## Reference runtime
 
-`FX_NODE_MODE=reference-sandbox` is the canonical local mode.
-
-It composes:
+`FX_NODE_MODE=reference-sandbox` composes:
 
 ```text
 FxPolicyEngine
@@ -49,147 +80,214 @@ ReferencePriceEngine + PrincipalRiskBook + PrincipalQuoteEngine
       ↓
 planExactOutput + reservePlan
       ↓
-private market / issuer / LP / neobank / treasury / principal adapters
+private market / issuer / LP / institution / treasury / principal adapters
       ↓
 IntegratedQuoteCoordinator
       ↓
-FX REST node + SDK
+ReferenceTradeCoordinator
+      ↓
+FX REST node + SDK + website
       ↓
 FiatSettlementStore + SettlementGraph
 ```
 
-The reference provider inventory is deliberately local and replaceable. It exercises the real policy, pricing, routing and reservation contracts without claiming to be a connected commercial provider.
+Reference provider inventory is deterministic and replaceable. It exercises real policy, pricing, routing and reservation contracts without claiming to be a connected commercial provider.
 
-## Quote semantics
+## Preview and firm quote semantics
 
-A public reference quote may be called **firm sandbox liquidity** only when:
+### Preview
+
+```text
+POST /v2/fx/reference/trades/preview
+```
+
+A preview:
+
+- uses current policy-approved source capacity;
+- calculates the full exact-input customer trade;
+- exposes eligible and excluded sources;
+- reserves nothing;
+- is labelled `LIVE FX NODE PREVIEW`;
+- has `evidence.reserved: false`.
+
+### Firm sandbox trade
+
+```text
+POST /v2/fx/reference/trades
+```
+
+A trade may be called firm sandbox liquidity only when:
 
 - the customer is policy-authorised;
-- every source is policy-authorised;
-- the exact-output planner finds a complete route;
-- every selected source reserves its capacity;
+- every selected source is policy-authorised;
+- the planner finds a complete route;
+- every selected source reserves capacity;
 - principal balance-sheet deltas are reserved;
-- the route and quote are durably recorded;
-- the quote has an explicit expiry.
+- quote and trade are durably recorded;
+- expiry is explicit.
 
-An indicative calculation that does not reserve capacity must never be labelled firm or reserved.
+The result is labelled `FIRM RESERVED SANDBOX QUOTE` and includes `tradeId`, `quoteId` and `routeId`.
+
+## Policy semantics
+
+Policy decides who may enter the market before price competition.
+
+The reference market demonstrates:
+
+- participant status and type;
+- KYC/KYB, sanctions and AML credential state;
+- jurisdiction and corridor rules;
+- account attribution;
+- ticket limits;
+- short-lived authorisation;
+- participant and policy epochs;
+- revocation before quote construction.
+
+A cheaper raw source cannot bypass policy.
+
+## Principal semantics
+
+The bank-principal engine separates economic pricing from risk permission.
+
+A principal quote can include:
+
+```text
+reference mid
+base spread
+volatility
+size
+corridor
+rail
+inventory adjustment
+```
+
+The risk book separately enforces hard per-asset limits and reserves quote deltas transactionally. A larger spread cannot override the hard limit.
 
 ## Execution semantics
 
 The default reference runtime has no execution adapter.
 
-`POST /v2/fx/quotes/:quoteId/execute` must fail closed with `EXECUTION_UNAVAILABLE` until an operator supplies one.
+```text
+POST /v2/fx/reference/trades/:tradeId/execute
+POST /v2/fx/quotes/:quoteId/execute
+```
 
-Before any external execution call:
+Both fail closed with `EXECUTION_UNAVAILABLE` until an operator supplies one.
+
+Before an external attempt:
 
 1. policy and reservations are revalidated;
 2. the route becomes `SUBMITTED`;
-3. the route becomes non-releasable;
-4. an ambiguous external result remains submitted for reconciliation.
+3. it becomes non-releasable;
+4. an ambiguous result remains submitted for reconciliation.
 
-The runtime must never invent a transaction hash or treat submission as settlement.
+The runtime never invents a transaction hash or treats submission as settlement.
+
+The controlled Anvil proof is separate evidence for the Solidity kernel. It is not silently substituted for an operational adapter.
 
 ## Settlement semantics
 
-Token routes can be described as atomic only when executed through one AtomicRouter transaction boundary.
+The public route includes:
 
-Fiat, issuer and bank-rail legs retain their real finality classes:
+```text
+VERIFIED_FIAT_PAYMENT   ATTESTED_EXTERNAL
+TOKEN_SWAP              ATOMIC
+ISSUER_REDEEM           ASYNC_EXTERNAL
+```
 
-- `ATOMIC`
-- `AUTHORITATIVE_LEDGER`
-- `ATTESTED_EXTERNAL`
-- `ASYNC_EXTERNAL`
-
-A route spanning more than one class is not end-to-end atomic.
+A route spanning these classes is `MIXED_FINALITY`. Only token fills in the same AtomicRouter transaction boundary may be described as atomic.
 
 ## Website contract
 
-The FX page must show the same trade through three connected views:
+The `/fx` page shows the same trade through three views.
 
 ### Customer
 
-- amount paid;
-- amount received;
-- rate and cost;
+- BRL amount;
+- EUR amount;
+- effective rate;
+- live preview versus reserved quote;
 - quote expiry;
-- arrival expectation;
-- review, confirmation, processing and receipt states.
+- delivery boundary;
+- honest execution availability.
 
 ### Institution
 
 - eligible and excluded sources;
-- selected source allocation;
-- reference-price provenance;
-- treasury/principal exposure and limits;
-- settlement legs and current state;
-- reconciliation outcome.
+- selected allocation;
+- policy reason;
+- source capacity;
+- treasury/principal behaviour;
+- settlement edges and finality.
 
 ### Developer
 
 - request;
 - response;
-- event;
-- source file;
-- test proving the behaviour.
+- lifecycle identifiers;
+- source map;
+- OpenAPI;
+- tests and controlled proof.
 
-The page must not create a second pricing, policy or settlement model in React. Live interactions read the FX node; hostile economic scenarios call `packages/fx-simulator` directly and are labelled as simulation.
+The page must not define FX rates, capacities or policy authority in React. Live product interactions read the FX node. The economic stress lab imports `packages/fx-simulator` directly and is labelled as simulation.
 
 ## Visual system
 
-Use both editorial artwork and coded schematics.
+The page combines:
 
-### Editorial artwork
+- four scalable 2400 × 1350 editorial SVGs for liquidity, policy, settlement and treasury stories;
+- coded live source allocation;
+- interactive policy and risk scenarios;
+- customer phone states;
+- code and evidence panels;
+- desktop and mobile visual CI screenshots.
 
-High-resolution artwork explains scale and gives the page visual rhythm:
-
-1. liquidity network;
-2. policy filtering before price competition;
-3. fiat/token route anatomy;
-4. one-way demand and treasury pressure.
-
-Large desktop artwork must be exported at a real display resolution, normally 2400–3200 pixels wide, then served as an appropriately compressed WebP/PNG. Tiny raster thumbnails must not be stretched across the page.
-
-### Coded schematics
-
-Interactive SVG/React diagrams prove behaviour with live values:
-
-- source allocation;
-- policy inclusion/exclusion;
-- reference-price consensus;
-- treasury exposure;
-- route finality;
-- quote and settlement state machines.
-
-Editorial artwork is not a substitute for live evidence, and live diagrams are not a substitute for visual storytelling.
+Editorial artwork explains the idea. Live UI demonstrates current behaviour. Source and tests provide evidence.
 
 ## Evidence labels
 
-Every public demonstration must identify itself as one of:
+Public demonstrations identify themselves as:
 
-- live FX node;
+- live local FX node;
+- live unreserved preview;
 - firm reserved sandbox quote;
 - deterministic simulator;
 - controlled EVM proof;
-- illustrative customer UI;
-- editorial diagram;
-- external adapter not configured;
+- external execution adapter not configured;
 - internal engineering gate;
 - independent audit status.
 
-## Public packaging exit gate
+## Public packaging
 
-The distribution is ready for public release only when:
+The reference distribution includes or generates:
 
-- one command starts the complete reference stack;
-- one Docker Compose command starts the same stack;
-- OpenAPI covers the canonical node;
-- SDK and package documentation are publishable;
-- contract ABIs and deployment instructions are exported;
-- legacy FX surfaces are explicitly deprecated or delegated;
+- one-command local stack;
+- Docker Compose stack;
+- OpenAPI 3.1 contract;
+- typed JavaScript SDK;
+- provider adapter guide;
+- contract deployment guide;
+- generated contract ABIs and checksums;
+- CycloneDX dependency inventory;
+- security policy, third-party notices and known limitations;
+- release workflow and evidence bundle;
+- build and visual artefacts.
+
+## Release exit gate
+
+A tag may be described as a Blueballs reference release only when:
+
 - the website reads the integrated runtime;
-- all public claims link to implementation and evidence;
-- the aggregate release gate is green on the exact release commit;
-- security policy, third-party notices and known limitations are present;
-- a reproducible versioned release is created.
+- the full BRL to EUR trade and scenarios pass node integration tests;
+- TypeScript and production site build are green;
+- market, pricing, liquidity, policy, fiat, SDK, node and simulator suites are green;
+- Solidity build, unit tests, fuzzing and invariants are green;
+- controlled Anvil execution proof is green;
+- Docker images and Compose configuration build;
+- desktop and mobile screenshots are reviewed;
+- SDK pack dry-run, ABI export and dependency inventory succeed;
+- legacy FX status is explicit;
+- known limitations and security status are published;
+- release artefacts resolve to the exact reviewed commit.
 
-Passing internal gates does not mean regulator approval, an independent audit or production-mainnet proof.
+Passing this gate does not mean regulator approval, independent audit, production provider certification or production-mainnet proof.

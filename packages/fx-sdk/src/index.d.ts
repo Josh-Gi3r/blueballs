@@ -8,13 +8,26 @@ export type FxSourceType =
   | 'BANK_TREASURY'
   | 'BANK_PRINCIPAL';
 
-export type FxQuoteState = 'RESERVED' | 'SUBMITTED' | 'CONFIRMED' | 'FAILED' | 'EXPIRED';
+export type FxQuoteState = 'RESERVED' | 'SUBMITTED' | 'CONFIRMED' | 'RELEASED' | 'FAILED' | 'EXPIRED';
 
 export interface SourceAllocation {
   type: FxSourceType;
   sourceId: string;
-  input: string;
-  output: string;
+  input?: string;
+  output?: string;
+  inputAtomic?: string;
+  outputAtomic?: string;
+  inputAmount?: string;
+  outputAmount?: string;
+}
+
+export interface SourceStatus {
+  sourceType: FxSourceType;
+  sourceId: string;
+  label: string;
+  eligible: boolean;
+  availableOutput: string;
+  reason: string;
 }
 
 export interface FxQuote {
@@ -68,6 +81,72 @@ export interface QuoteRequest {
   accountRef?: string;
 }
 
+export interface PublicTradeRequest {
+  inputAmount: string;
+  from?: 'BRL';
+  to?: 'EUR';
+  expiresInMs?: number;
+  participantId?: string;
+  accountRef?: string;
+}
+
+export interface PublicTradeAmount {
+  asset: string;
+  symbol: string;
+  requested?: string;
+  charged?: string;
+  amount?: string;
+  atomic: string;
+}
+
+export interface SettlementEdge {
+  edgeId: string;
+  edgeType: string;
+  finalityClass: string;
+  fromAsset: string;
+  toAsset: string;
+  providerId: string;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface PublicReferenceTrade {
+  object: 'fx_trade_preview' | 'fx_trade';
+  mode?: 'REFERENCE_SANDBOX';
+  id?: string;
+  quoteId?: string;
+  routeId?: string;
+  state: 'PREVIEW' | FxQuoteState;
+  createdAt?: number;
+  expiresAt: number;
+  from: PublicTradeAmount;
+  to: PublicTradeAmount;
+  rate: string;
+  sources: SourceAllocation[];
+  sourceStatus: SourceStatus[];
+  tokenRoute: {
+    inputAsset: string;
+    inputSymbol: string;
+    inputAtomic: string;
+    outputAsset: string;
+    outputSymbol: string;
+    outputAtomic: string;
+  };
+  settlement: {
+    guarantee: Record<string, unknown>;
+    edges: SettlementEdge[];
+  };
+  evidence: {
+    reserved: boolean;
+    label: string;
+    note: string;
+  };
+  submissionRef?: string | null;
+  eventId?: string | null;
+  failureReason?: string | null;
+  customerAuthorization?: FxQuote['customerAuthorization'];
+}
+
 export interface ReferenceAsset {
   id: string;
   symbol: string;
@@ -89,6 +168,20 @@ export interface ReferenceStatus {
     configured: boolean;
     note: string;
   };
+  publicReferenceTrade?: {
+    from: 'BRL';
+    to: 'EUR';
+    tokenCorridor: 'BRLX/EURC';
+    previewEndpoint: string;
+    reserveEndpoint: string;
+  };
+  scenarios?: Array<{ id: string; label: string }>;
+}
+
+export interface ReferenceMarket {
+  id: string;
+  sources: SourceStatus[];
+  reference: { available: boolean; [key: string]: unknown };
 }
 
 export interface ReferenceLiquiditySlice {
@@ -149,12 +242,23 @@ export class BlueballsFxClient {
   health(): Promise<{ status: string; service: string; runtime?: string }>;
   referenceStatus(): Promise<ReferenceStatus>;
   referencePolicy(): Promise<Record<string, unknown>>;
+  referenceMarket(): Promise<ReferenceMarket>;
+  referenceScenario(): Promise<{ current: ReferenceMarket; available: Array<{ id: string; label: string }> }>;
+  applyReferenceScenario(id: string): Promise<ReferenceMarket>;
   referenceLiquidity(args: {
     inputAsset: string;
     outputAsset: string;
     exactOutput?: AtomicAmount;
   }): Promise<{ object: 'list'; data: ReferenceLiquiditySlice[] }>;
   referenceSettlementRoute(): Promise<Record<string, unknown>>;
+  previewReferenceTrade(request: PublicTradeRequest): Promise<PublicReferenceTrade>;
+  reserveReferenceTrade(request: PublicTradeRequest): Promise<PublicReferenceTrade>;
+  getReferenceTrade(tradeId: string): Promise<PublicReferenceTrade>;
+  releaseReferenceTrade(tradeId: string): Promise<PublicReferenceTrade>;
+  executeReferenceTrade(tradeId: string): Promise<{
+    trade: PublicReferenceTrade;
+    execution: Record<string, unknown>;
+  }>;
 
   createOrder(order: Record<string, unknown>): Promise<Record<string, unknown>>;
   listOrders(maker: string): Promise<{ object: 'list'; data: Record<string, unknown>[] }>;

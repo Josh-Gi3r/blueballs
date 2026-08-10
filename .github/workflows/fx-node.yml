@@ -2,7 +2,7 @@ name: FX node
 
 on:
   push:
-    branches: [fx-policy, fx-public-reference]
+    branches: [fx-policy, fx-public-reference, fx-final-integration, main]
     paths:
       - 'apps/fx-node/**'
       - 'packages/fx-market/**'
@@ -63,7 +63,10 @@ jobs:
           node --check src/integrated-quote-coordinator.js
           node --check src/reference-liquidity.js
           node --check src/source-adapters.js
+          node --check src/composite-principal-adapter.js
           node --check src/reference-runtime.js
+          node --check src/reference-trade-coordinator.js
+          node --check src/public-reference-runtime.js
           node --check src/cli.js
 
       - name: Tests
@@ -74,6 +77,8 @@ jobs:
           grep -q '^openapi: 3.1.0' openapi.yaml
           grep -q '^  /v2/fx/quotes:' openapi.yaml
           grep -q '^  /v2/fx/reference/status:' openapi.yaml
+          grep -q '^  /v2/fx/reference/trades/preview:' openapi.yaml
+          grep -q '^  /v2/fx/reference/scenario:' openapi.yaml
 
       - name: FX node Docker build
         run: docker build -f Dockerfile -t blueballs-fx:test ../..

@@ -49,12 +49,32 @@ export class BlueballsFxClient {
 
   referenceStatus() { return this.#request('/v2/fx/reference/status'); }
   referencePolicy() { return this.#request('/v2/fx/reference/policy'); }
+  referenceMarket() { return this.#request('/v2/fx/reference/market'); }
+  referenceScenario() { return this.#request('/v2/fx/reference/scenario'); }
+  applyReferenceScenario(id) {
+    return this.#request('/v2/fx/reference/scenario', { method: 'POST', body: { id } });
+  }
   referenceLiquidity({ inputAsset, outputAsset, exactOutput }) {
     const query = new URLSearchParams({ inputAsset, outputAsset });
     if (exactOutput !== undefined) query.set('exactOutput', String(exactOutput));
     return this.#request(`/v2/fx/reference/liquidity?${query.toString()}`);
   }
   referenceSettlementRoute() { return this.#request('/v2/fx/reference/settlement-route'); }
+  previewReferenceTrade(request) {
+    return this.#request('/v2/fx/reference/trades/preview', { method: 'POST', body: request });
+  }
+  reserveReferenceTrade(request) {
+    return this.#request('/v2/fx/reference/trades', { method: 'POST', body: request });
+  }
+  getReferenceTrade(tradeId) {
+    return this.#request(`/v2/fx/reference/trades/${encodeURIComponent(tradeId)}`);
+  }
+  releaseReferenceTrade(tradeId) {
+    return this.#request(`/v2/fx/reference/trades/${encodeURIComponent(tradeId)}`, { method: 'DELETE' });
+  }
+  executeReferenceTrade(tradeId) {
+    return this.#request(`/v2/fx/reference/trades/${encodeURIComponent(tradeId)}/execute`, { method: 'POST' });
+  }
 
   createOrder(order) { return this.#request('/v2/fx/orders', { method: 'POST', body: order }); }
   listOrders(maker) { return this.#request(`/v2/fx/orders?maker=${encodeURIComponent(maker)}`); }
