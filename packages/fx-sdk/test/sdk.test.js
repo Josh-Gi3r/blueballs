@@ -10,7 +10,7 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-test('SDK sends authenticated firm quote request with exact string amount and participant context', async () => {
+test('SDK sends authenticated firm quote request with exact string amount', async () => {
   let seen;
   const client = new BlueballsFxClient({
     baseUrl: 'http://localhost:8788/',
@@ -22,52 +22,14 @@ test('SDK sends authenticated firm quote request with exact string amount and pa
   });
 
   const quote = await client.quote({
-    inputAsset: 'USDC',
-    outputAsset: 'EURC',
-    exactOutput: 100000000n,
-    expiresInMs: 15_000,
-    participantId: 'customer-1',
-    accountRef: 'customer-1:wallet',
+    inputAsset: 'USDC', outputAsset: 'EURC', exactOutput: 100000000n, expiresInMs: 15_000,
   });
   assert.equal(quote.id, 'quote-1');
   assert.equal(seen.url, 'http://localhost:8788/v2/fx/quotes');
   assert.equal(seen.options.headers.authorization, 'Bearer secret-key');
   assert.deepEqual(JSON.parse(seen.options.body), {
-    inputAsset: 'USDC',
-    outputAsset: 'EURC',
-    exactOutput: '100000000',
-    expiresInMs: 15_000,
-    participantId: 'customer-1',
-    accountRef: 'customer-1:wallet',
+    inputAsset: 'USDC', outputAsset: 'EURC', exactOutput: '100000000', expiresInMs: 15_000,
   });
-});
-
-test('SDK exposes the canonical reference runtime inspection surface', async () => {
-  const urls = [];
-  const client = new BlueballsFxClient({
-    baseUrl: 'http://localhost:8788',
-    apiKey: 'secret-key',
-    fetchImpl: async (url) => {
-      urls.push(url);
-      return jsonResponse({ ok: true });
-    },
-  });
-
-  await client.referenceStatus();
-  await client.referencePolicy();
-  await client.referenceLiquidity({
-    inputAsset: '0x input/value',
-    outputAsset: '0x output/value',
-    exactOutput: 100n,
-  });
-  await client.referenceSettlementRoute();
-
-  assert.deepEqual(urls, [
-    'http://localhost:8788/v2/fx/reference/status',
-    'http://localhost:8788/v2/fx/reference/policy',
-    'http://localhost:8788/v2/fx/reference/liquidity?inputAsset=0x+input%2Fvalue&outputAsset=0x+output%2Fvalue&exactOutput=100',
-    'http://localhost:8788/v2/fx/reference/settlement-route',
-  ]);
 });
 
 test('health request is intentionally unauthenticated', async () => {
@@ -117,4 +79,31 @@ test('SDK encodes resource identifiers and query values', async () => {
   });
   await client.listOrders('0x maker/value');
   assert.equal(urls[0], 'http://localhost:8788/v2/fx/orders?maker=0x%20maker%2Fvalue');
+});
+
+test('SDK exposes the connected public reference trade and scenario API', async () => {
+  const requests = [];
+  const client = new BlueballsFxClient({
+    baseUrl: 'http://localhost:8788',
+    apiKey: 'secret-key',
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      if (url.endsWith('/preview')) return jsonResponse({ object: 'fx_trade_preview', state: 'PREVIEW' });
+      if (url.endsWith('/scenario')) return jsonResponse({ id: 'issuer_policy_blocked' });
+      if (options.method === 'DELETE') return jsonResponse({ object: 'fx_trade', state: 'RELEASED' });
+      return jsonResponse({ object: 'fx_trade', id: 'trade_1', state: 'RESERVED' }, 201);
+    },
+  });
+
+  await client.previewReferenceTrade({ inputAmount: '50000.00' });
+  await client.reserveReferenceTrade({ inputAmount: '50000.00', expiresInMs: 30_000 });
+  await client.applyReferenceScenario('issuer_policy_blocked');
+  await client.releaseReferenceTrade('trade/1');
+
+  assert.equal(requests[0].url, 'http://localhost:8788/v2/fx/reference/trades/preview');
+  assert.deepEqual(JSON.parse(requests[0].options.body), { inputAmount: '50000.00' });
+  assert.equal(requests[1].url, 'http://localhost:8788/v2/fx/reference/trades');
+  assert.deepEqual(JSON.parse(requests[2].options.body), { id: 'issuer_policy_blocked' });
+  assert.equal(requests[3].url, 'http://localhost:8788/v2/fx/reference/trades/trade%2F1');
+  assert.equal(requests[3].options.method, 'DELETE');
 });
