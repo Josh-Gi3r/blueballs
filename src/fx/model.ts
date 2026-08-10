@@ -88,7 +88,7 @@ export type SimulationResult = {
   filledOrders: number;
   fillRatePct: number;
   volumeFillPct: number;
-  routeComposition: Record<SourceType, string>;
+  routeComposition: Record<string, string>;
   rejections: { RISK_LIMIT: number; NO_LIQUIDITY: number };
   settlementFailures: number;
   peakPrincipalExposureAbs: string;
