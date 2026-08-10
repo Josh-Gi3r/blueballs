@@ -5,6 +5,7 @@
 .fxp-live{display:flex;align-items:center;gap:7px;color:var(--fx-muted);font:9.5px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.08em}
 .fxp-live span{width:8px;height:8px;border-radius:50%;background:#c5cad5;box-shadow:0 0 0 4px rgba(197,202,213,.18)}
 .fxp-live.on span{background:#31a267;box-shadow:0 0 0 4px rgba(49,162,103,.14)}
+.fxp-live.on.demo span{background:var(--fx-accent);box-shadow:0 0 0 4px rgba(90,109,184,.14)}
 .fxp-live.off span{background:#c76860;box-shadow:0 0 0 4px rgba(199,104,96,.12)}
 .fxp-hero-copy h1{font-size:clamp(43px,5.1vw,68px);line-height:.99;margin:22px 0 20px;font-weight:630;max-width:12ch}
 .fxp-hero-copy>p{font-size:18px;line-height:1.58;max-width:61ch;margin-bottom:0}
