@@ -74,7 +74,7 @@ jobs:
           echo $! > /tmp/blueballs-dev.pid
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8788/health >/dev/null \
-              && curl -fsS http://127.0.0.1:5280/fx >/dev/null; then
+              && curl -fsS http://localhost:5280/fx >/dev/null; then
               exit 0
             fi
             sleep 1
@@ -90,14 +90,14 @@ jobs:
             --device="Desktop Chrome" \
             --full-page \
             --wait-for-timeout=3000 \
-            http://127.0.0.1:5280/fx \
+            http://localhost:5280/fx \
             artifacts/fx-visual/fx-desktop.png
           pnpm dlx playwright@1.54.2 screenshot \
             --browser=chromium \
             --device="iPhone 13" \
             --full-page \
             --wait-for-timeout=3000 \
-            http://127.0.0.1:5280/fx \
+            http://localhost:5280/fx \
             artifacts/fx-visual/fx-mobile.png
           test -s artifacts/fx-visual/fx-desktop.png
           test -s artifacts/fx-visual/fx-mobile.png
