@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FX_NODE_BASE, fxCall, fxNodeConfigured } from "./api";
+import { FX_RUNTIME_LABEL, FX_RUNTIME_MODE, fxCall } from "./api";
 import liquidityArtwork from "./assets/fx-editorial-liquidity.svg";
 import policyArtwork from "./assets/fx-editorial-policy.svg";
 import routeArtwork from "./assets/fx-editorial-route.svg";
@@ -31,12 +31,11 @@ export default function FxPage() {
   const [phoneMode, setPhoneMode] = useState<"quote" | "review" | "execution">("quote");
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [nodeReachable, setNodeReachable] = useState(false);
+  const [runtimeReachable, setRuntimeReachable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const previewSequence = useRef(0);
-  const connected = fxNodeConfigured() && nodeReachable;
 
   async function releaseCurrentTrade() {
     if (!trade?.id || trade.state !== "RESERVED") return;
@@ -56,12 +55,12 @@ export default function FxPage() {
     if (sequence !== previewSequence.current) return;
     setLoading(false);
     if (!result.ok) {
-      setNodeReachable(result.status !== 0);
+      setRuntimeReachable(result.status !== 0);
       setTrade(null);
       setError(errorMessage(result));
       return;
     }
-    setNodeReachable(true);
+    setRuntimeReachable(true);
     const nextTrade = result.body as PublicTrade;
     setTrade(nextTrade);
     setSelectedSource((current) => current ?? nextTrade.sourceStatus[0]?.sourceId ?? null);
@@ -70,14 +69,9 @@ export default function FxPage() {
   useEffect(() => {
     let cancelled = false;
     async function start() {
-      if (!fxNodeConfigured()) {
-        setLoading(false);
-        setError("Start the complete reference stack with pnpm dev.");
-        return;
-      }
       const scenarioResult = await fxCall("GET", "/v2/fx/reference/scenario");
       if (cancelled) return;
-      setNodeReachable(scenarioResult.ok || scenarioResult.status !== 0);
+      setRuntimeReachable(scenarioResult.ok || scenarioResult.status !== 0);
       if (scenarioResult.ok) {
         const payload = scenarioResult.body as { current: MarketState; available: Scenario[] };
         setMarket(payload.current);
@@ -154,7 +148,7 @@ export default function FxPage() {
   return <div className="fxp">
     <section className="fxp-hero">
       <div className="fxp-hero-copy">
-        <div className="fxp-hero-top"><Label>FX FOR THE BANK YOU'RE BUILDING</Label><LiveBadge connected={connected} loading={loading} /></div>
+        <div className="fxp-hero-top"><Label>FX FOR THE BANK YOU'RE BUILDING</Label><LiveBadge connected={runtimeReachable} loading={loading} mode={FX_RUNTIME_MODE} /></div>
         <h1>Give customers FX. Keep control of the market underneath.</h1>
         <p>The customer sees one exchange. Your institution decides which liquidity can price it, how much balance-sheet risk to take and which rails settle it.</p>
         <div className="fxp-hero-tabs">{(["customer", "bank", "api"] as HeroView[]).map((view) => <button type="button" key={view} className={heroView === view ? "active" : ""} onClick={() => setHeroView(view)}>{view}</button>)}</div>
@@ -162,11 +156,11 @@ export default function FxPage() {
         {heroView === "bank" && <BankView trade={trade} selected={selectedSource} onSelect={setSelectedSource} />}
         {heroView === "api" && <ApiView trade={trade} amount={amount} />}
       </div>
-      <div className="fxp-hero-phone"><Phone amount={amount} trade={trade} mode={phoneMode} busy={busy || loading} error={phoneMode === "execution" ? executionError : error} onAmount={(value) => setAmount(sanitizeAmount(value))} onReview={reviewAndReserve} onBack={backToQuote} onExecute={execute} /></div>
+      <div className="fxp-hero-phone"><Phone amount={amount} trade={trade} mode={phoneMode} runtimeMode={FX_RUNTIME_MODE} busy={busy || loading} error={phoneMode === "execution" ? executionError : error} onAmount={(value) => setAmount(sanitizeAmount(value))} onReview={reviewAndReserve} onBack={backToQuote} onExecute={execute} /></div>
     </section>
 
     <section className="fxp-section fxp-live-market">
-      <div className="fxp-section-head"><div><Label>THE SAME TRADE · OPENED UP</Label><h2>See exactly where the quote came from.</h2><p>Change the amount. Select a source. The allocation below is returned by the running FX node, not recreated in the page.</p></div><a href="#fx-developer"><Pill>See the call ↓</Pill></a></div>
+      <div className="fxp-section-head"><div><Label>THE SAME TRADE · OPENED UP</Label><h2>See exactly where the quote came from.</h2><p>Change the amount or remove a source. The same demo reroutes the trade immediately.</p></div><a href="#fx-developer"><Pill>See the call ↓</Pill></a></div>
       <div className="fxp-market-scenarios">{scenarios.map((item) => { const copy = SCENARIO_COPY[item.id] ?? { title: item.label, short: "" }; return <button type="button" key={item.id} className={activeScenario === item.id ? "active" : ""} onClick={() => void changeScenario(item.id)} disabled={busy}><b>{copy.title}</b><span>{copy.short}</span></button>; })}</div>
       <div className="fxp-market-note"><span className={currentMarket?.reference.available ? "ok" : "bad"} /><b>{selectedScenario.title}</b><span>{selectedScenario.short}</span></div>
       <AllocationMap trade={trade} selected={selectedSource} onSelect={setSelectedSource} />
@@ -180,17 +174,17 @@ export default function FxPage() {
       <button type="button" className="fxp-inline-action" onClick={() => void changeScenario(activeScenario === "issuer_policy_blocked" ? "balanced" : "issuer_policy_blocked")} disabled={busy}>{activeScenario === "issuer_policy_blocked" ? "Restore issuer" : "Revoke issuer authorisation"}</button>
     </ArtworkSection>
 
-    <ArtworkSection image={treasuryArtwork} label="TREASURY AND PRINCIPAL" title="Your balance sheet can quote. It cannot cross the limit you set." copy="Blueballs reserves risk with the quote. When capacity is gone, principal disappears from the route rather than charging an absurd spread.">
+    <ArtworkSection image={treasuryArtwork} label="TREASURY AND PRINCIPAL" title="Your balance sheet can quote. It cannot cross the limit you set." copy="The demo reserves risk with the quote. When capacity is gone, principal disappears from the route instead of pretending the trade can still be filled.">
       <div className="fxp-inline-buttons"><button type="button" onClick={() => void changeScenario("treasury_near_limit")} disabled={busy}>Use most treasury inventory</button><button type="button" onClick={() => void changeScenario("principal_limit")} disabled={busy}>Hit the principal limit</button></div>
     </ArtworkSection>
 
-    <ArtworkSection reverse image={routeArtwork} label="FIAT OUTSIDE · TOKEN FX INSIDE" title="The customer asks for euros. The route can use PIX and stablecoins underneath." copy="Each leg keeps its real finality. The token exchange can be atomic; the payment in and redemption out are not made atomic by association.">
+    <ArtworkSection reverse image={routeArtwork} label="FIAT OUTSIDE · TOKEN FX INSIDE" title="The customer asks for euros. The route can use PIX and stablecoins underneath." copy="Each leg keeps its own settlement state. The token exchange can complete together while the payment in and payout out remain separate steps.">
       <SettlementRoute trade={trade} />
     </ArtworkSection>
 
     <SimulatorLab />
     <DeveloperInspector trade={trade} amount={amount} />
     <Packages />
-    <div className="fxp-runtime-note">Live runtime: <code>{FX_NODE_BASE || "http://localhost:8788"}</code></div>
+    <div className="fxp-runtime-note">Demo runtime: <code>{FX_RUNTIME_LABEL}</code></div>
   </div>;
 }
