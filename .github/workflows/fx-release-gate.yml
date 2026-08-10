@@ -2,17 +2,39 @@ name: FX release gate
 
 on:
   push:
-    branches: [main, fx-policy]
+    branches: [main, fx-policy, fx-final-integration]
     paths:
       - 'packages/fx-**/**'
       - 'apps/fx-node/**'
+      - 'src/**'
+      - 'scripts/**'
       - 'spec/fx/**'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'CHANGELOG.md'
+      - 'RELEASE.md'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'Dockerfile.reference'
+      - 'compose.reference.yml'
       - '.github/workflows/fx-release-gate.yml'
   pull_request:
     paths:
       - 'packages/fx-**/**'
       - 'apps/fx-node/**'
+      - 'src/**'
+      - 'scripts/**'
       - 'spec/fx/**'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'CHANGELOG.md'
+      - 'RELEASE.md'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'Dockerfile.reference'
+      - 'compose.reference.yml'
       - '.github/workflows/fx-release-gate.yml'
 
 concurrency:
@@ -58,9 +80,12 @@ jobs:
           node-version: '24.15.0'
       - name: Test
         run: npm run test:ci
+      - name: SDK package dry-run
+        if: matrix.name == 'sdk'
+        run: npm pack --dry-run
 
   contracts:
-    name: contracts + fuzz
+    name: contracts + fuzz + ABIs
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -82,6 +107,15 @@ jobs:
         run: forge test -vvv
       - name: Fuzz and invariants
         run: FOUNDRY_PROFILE=ci forge test -vv
+      - name: Export release ABIs
+        run: |
+          make abi
+          test -s abi/FxVault.json
+          test -s abi/FxSettlement.json
+          test -s abi/AtomicRouter.json
+          test -s abi/OrderCancellation.json
+          test -s abi/PolicyAuthorizationRegistry.json
+          test -s abi/SHA256SUMS
 
   controlled-proof:
     name: controlled EVM proof
@@ -134,11 +168,59 @@ jobs:
         run: |
           if [ -f /tmp/blueballs-anvil.pid ]; then kill $(cat /tmp/blueballs-anvil.pid) || true; fi
 
+  public-distribution:
+    name: public distribution contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Production build
+        run: pnpm build
+      - name: Generate dependency inventory
+        run: |
+          node scripts/dependency-inventory.mjs /tmp/blueballs-sbom.cdx.json
+          test -s /tmp/blueballs-sbom.cdx.json
+          grep -q '"bomFormat": "CycloneDX"' /tmp/blueballs-sbom.cdx.json
+      - name: Verify public documentation
+        run: |
+          test -s SECURITY.md
+          test -s THIRD_PARTY_NOTICES.md
+          test -s RELEASE.md
+          test -s CHANGELOG.md
+          test -s spec/fx/KNOWN-LIMITATIONS.md
+          test -s spec/fx/ADAPTERS.md
+          test -s spec/fx/LEGACY-MIGRATION.md
+          test -s packages/fx-contracts/DEPLOYMENT.md
+          grep -q '/v2/fx/reference/trades/preview' apps/fx-node/openapi.yaml
+      - name: Verify page uses canonical FX node
+        run: |
+          grep -q '/v2/fx/reference/trades/preview' src/FxPage.tsx
+          if grep -q 'const SOURCES' src/FxPage.tsx; then exit 1; fi
+          if grep -q 'planExactOutput' src/FxPage.tsx; then exit 1; fi
+          grep -q 'width="2400"' src/assets/fx-editorial-liquidity.svg
+          grep -q 'width="2400"' src/assets/fx-editorial-policy.svg
+          grep -q 'width="2400"' src/assets/fx-editorial-route.svg
+          grep -q 'width="2400"' src/assets/fx-editorial-treasury.svg
+      - name: Validate Compose
+        run: docker compose -f compose.reference.yml config >/dev/null
+
   docker:
-    name: self-host Docker image
+    name: self-host Docker images
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Build FX node image
         run: docker build -f apps/fx-node/Dockerfile -t blueballs-fx:release-gate .
+      - name: Build complete reference image
+        run: docker build -f Dockerfile.reference -t blueballs-reference:release-gate .

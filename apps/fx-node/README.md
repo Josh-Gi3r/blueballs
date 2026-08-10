@@ -1,39 +1,45 @@
 # Blueballs FX Node
 
-Self-hostable reference runtime for the Blueballs FX engine.
+`apps/fx-node` is the canonical self-hostable runtime for Blueballs FX.
 
-## Canonical local mode
+It composes institution policy, signed private liquidity, reference pricing, principal risk, multi-source route construction, source reservation, fiat settlement state and the public BRL to EUR reference trade.
+
+## Start the reference runtime
+
+From the repository root:
+
+```bash
+pnpm install
+pnpm dev:fx
+```
+
+Or start the full product:
+
+```bash
+pnpm dev
+```
+
+Defaults:
+
+```text
+host             127.0.0.1
+port             8788
+mode             reference-sandbox
+API key          bb_test_local_fx
+data directory   ./blueballs-fx-data
+execution        not configured
+```
+
+Run directly:
 
 ```bash
 cd apps/fx-node
 FX_NODE_API_KEY=bb_test_change_me npm start
 ```
 
-The default mode is `reference-sandbox`. It composes the real modular packages:
+The reference inventory is local and replaceable. Policy admission is not bypassed: participants, credentials, account attribution, corridor rules, limits and authorisations flow through `FxPolicyEngine`.
 
-- policy and participant authorisation;
-- signed private-market liquidity;
-- reference-price consensus;
-- bank-principal pricing and hard risk reservations;
-- issuer, LP, neobank and treasury reference adapters;
-- exact-output multi-source routing;
-- all-leg reservation before a firm quote is returned;
-- fiat intents and mixed-finality settlement graph;
-- durable quote, route and reconciliation states.
-
-Defaults:
-
-- host: `127.0.0.1`
-- port: `8788`
-- mode: `reference-sandbox`
-- data directory: `./blueballs-fx-data`
-- execution adapter: **not configured**
-
-The reference provider inventory is local and replaceable. It exists so developers can exercise real policy, pricing, routing and reservation behaviour without a commercial integration.
-
-Sandbox signature verification accepts syntactically valid maker signatures. Policy admission is **not bypassed** in the canonical reference mode: seeded participants, credentials, account attribution and short-lived authorisations flow through `FxPolicyEngine`.
-
-A smaller historical private-order-only sandbox remains available through:
+A smaller historical private-order-only mode remains available for isolated market tests:
 
 ```bash
 FX_NODE_MODE=private-sandbox npm start
@@ -41,96 +47,163 @@ FX_NODE_MODE=private-sandbox npm start
 
 No production mode silently falls back to either sandbox.
 
-## One-command repository demo
+## One customer trade, one runtime object
 
-From repository root:
-
-```bash
-pnpm install
-pnpm dev
-```
-
-This starts:
-
-- site: `http://localhost:5280`
-- banking API: `http://localhost:5290/v2`
-- FX node: `http://localhost:8788`
-
-The site receives the local sandbox FX URL and key automatically.
-
-## Inspect the reference runtime
-
-```bash
-curl \
-  -H 'Authorization: Bearer bb_test_change_me' \
-  http://localhost:8788/v2/fx/reference/status
-```
-
-Other inspection endpoints:
+The public reference trade is:
 
 ```text
-GET /v2/fx/reference/policy
-GET /v2/fx/reference/liquidity?inputAsset=...&outputAsset=...&exactOutput=...
-GET /v2/fx/reference/settlement-route
-```
-
-## Firm multi-source quote
-
-The seeded token corridor is USDC → EURC:
-
-```text
-USDC  0x0000000000000000000000000000000000000011
-EURC  0x0000000000000000000000000000000000000022
-```
-
-Example:
-
-```bash
-curl -X POST http://localhost:8788/v2/fx/quotes \
-  -H 'Authorization: Bearer bb_test_change_me' \
-  -H 'content-type: application/json' \
-  -d '{
-    "inputAsset":"0x0000000000000000000000000000000000000011",
-    "outputAsset":"0x0000000000000000000000000000000000000022",
-    "exactOutput":"450000000000",
-    "expiresInMs":30000
-  }'
-```
-
-The reference inventory is sized so this request spans:
-
-- private signed customer liquidity;
-- issuer liquidity;
-- another neobank;
-- an institutional LP;
-- bank treasury;
-- bank principal.
-
-A quote is returned only after every selected source reserves its capacity. Principal risk is reserved at the same time.
-
-## Execution semantics
-
-`POST /v2/fx/quotes/:quoteId/execute` fails with `EXECUTION_UNAVAILABLE` unless an execution adapter is configured.
-
-The runtime never invents a transaction hash. Before an outbound execution attempt, Blueballs revalidates the route and commits it to its non-releasable submission state with an idempotency key. If the external call becomes ambiguous, the route remains submitted and requires reconciliation rather than releasing possibly-spent liquidity.
-
-## Fiat route semantics
-
-The seeded reference graph demonstrates:
-
-```text
-BRL through an attested PIX payment
+BRL through an attested PIX-style payment
     → BRLX
-    → atomic BRLX/EURC token FX
+    → policy-approved, multi-source BRLX/EURC token FX
     → EURC issuer redemption
     → EUR
 ```
 
-The overall route is classified `MIXED_FINALITY`. The token leg can be atomic; the external payment and issuer redemption are not made atomic by association.
+The same trade object contains:
+
+- customer amount and rate;
+- quote and route identifiers;
+- eligible and excluded sources;
+- selected source allocation;
+- token corridor amounts;
+- mixed-finality settlement edges;
+- policy-authorisation evidence;
+- quote expiry and lifecycle state.
+
+### Preview
+
+Preview uses live policy-approved capacity but does not reserve it:
+
+```bash
+curl -X POST http://localhost:8788/v2/fx/reference/trades/preview \
+  -H 'Authorization: Bearer bb_test_local_fx' \
+  -H 'content-type: application/json' \
+  -d '{"inputAmount":"50000.00"}'
+```
+
+The response is labelled `LIVE FX NODE PREVIEW` and has `evidence.reserved: false`.
+
+### Reserve
+
+```bash
+curl -X POST http://localhost:8788/v2/fx/reference/trades \
+  -H 'Authorization: Bearer bb_test_local_fx' \
+  -H 'content-type: application/json' \
+  -d '{"inputAmount":"50000.00","expiresInMs":60000}'
+```
+
+A firm sandbox trade is returned only after all selected source capacity and principal risk have been reserved. The response includes `tradeId`, `quoteId` and `routeId`.
+
+Retrieve or release it:
+
+```bash
+curl -H 'Authorization: Bearer bb_test_local_fx' \
+  http://localhost:8788/v2/fx/reference/trades/trade_...
+
+curl -X DELETE \
+  -H 'Authorization: Bearer bb_test_local_fx' \
+  http://localhost:8788/v2/fx/reference/trades/trade_...
+```
+
+A submitted route cannot be released. It must be reconciled.
+
+## Reference market scenarios
+
+Inspect the current market:
+
+```bash
+curl -H 'Authorization: Bearer bb_test_local_fx' \
+  http://localhost:8788/v2/fx/reference/scenario
+```
+
+Apply one backend scenario:
+
+```bash
+curl -X POST http://localhost:8788/v2/fx/reference/scenario \
+  -H 'Authorization: Bearer bb_test_local_fx' \
+  -H 'content-type: application/json' \
+  -d '{"id":"issuer_policy_blocked"}'
+```
+
+Available scenarios:
+
+```text
+balanced
+lp_offline
+issuer_policy_blocked
+treasury_near_limit
+principal_limit
+reference_outage
+```
+
+These mutate the reference runtime. They are distinct from the deterministic economic simulator exposed on the website.
+
+## Runtime inspection
+
+```text
+GET  /v2/fx/reference/status
+GET  /v2/fx/reference/policy
+GET  /v2/fx/reference/market
+GET  /v2/fx/reference/scenario
+POST /v2/fx/reference/scenario
+GET  /v2/fx/reference/liquidity
+GET  /v2/fx/reference/settlement-route
+```
+
+The machine-readable contract is served without authentication:
+
+```text
+GET /openapi.yaml
+```
+
+## Token quote API
+
+The underlying exact-output token API remains available for builders who already know the token pair and desired output:
+
+```text
+POST /v2/fx/quotes
+GET  /v2/fx/quotes/:quoteId
+POST /v2/fx/quotes/:quoteId/execute
+GET  /v2/fx/routes/:routeId
+```
+
+The reference runtime includes proof-token corridors for USDC/EURC and BRLX/EURC.
+
+## Execution semantics
+
+The default runtime does not configure an execution adapter.
+
+```text
+POST /v2/fx/reference/trades/:tradeId/execute
+POST /v2/fx/quotes/:quoteId/execute
+```
+
+Both fail closed with `EXECUTION_UNAVAILABLE` until an operator supplies an adapter. The node never invents a transaction hash or treats submission as settlement.
+
+Before an outbound attempt:
+
+1. live policy and reservations are revalidated;
+2. the route becomes `SUBMITTED`;
+3. it becomes non-releasable;
+4. an ambiguous external result remains submitted for reconciliation.
+
+The repository separately contains a controlled Anvil proof for the Solidity AtomicRouter. That proof demonstrates the contract kernel; it is not silently substituted for an operational execution adapter.
+
+## Fiat and finality
+
+The BRL to EUR route is `MIXED_FINALITY`:
+
+```text
+VERIFIED_FIAT_PAYMENT   ATTESTED_EXTERNAL
+TOKEN_SWAP              ATOMIC
+ISSUER_REDEEM           ASYNC_EXTERNAL
+```
+
+Only token edges in the same AtomicRouter transaction boundary may be called atomic.
 
 ## Docker
 
-From repository root:
+From the repository root:
 
 ```bash
 docker build -f apps/fx-node/Dockerfile -t blueballs-fx .
@@ -141,35 +214,36 @@ docker run --rm \
   blueballs-fx
 ```
 
-Health:
+Or run the full site, banking API and FX node:
 
 ```bash
-curl http://localhost:8788/health
+docker compose -f compose.reference.yml up --build
 ```
 
-## Data
+## Persistence
 
-The canonical reference runtime persists separate stores for:
+The reference runtime persists separate SQLite stores for:
 
 - policy;
 - private market;
 - reference liquidity;
 - principal risk;
 - integrated quotes;
+- customer-facing trades;
 - fiat settlement.
 
 Set `FX_NODE_DATA_DIR` to choose the directory.
 
-## Production boundary
+## Replacing reference providers
 
-This reference runtime is software, not licensed financial activity. A production composition must supply:
+Read `spec/fx/ADAPTERS.md`. Production deployments must provide real:
 
-- real maker signature verification and key custody;
-- production identity/compliance providers;
-- real issuer, LP, bank-rail and treasury adapters;
-- a contract or institutional execution adapter;
-- production database/HA strategy;
-- monitoring and reconciliation operations;
-- independent security review.
+- maker signature verification and key custody;
+- identity and compliance facts;
+- issuer, LP, institution and treasury adapters;
+- bank-rail and payment-verification adapters;
+- execution and reconciliation integration;
+- production database and high-availability design;
+- monitoring, operational controls and independent security review.
 
-See `spec/fx/PUBLIC-REFERENCE.md` for the public-distribution contract.
+See `spec/fx/PUBLIC-REFERENCE.md` and `spec/fx/KNOWN-LIMITATIONS.md` for the complete boundary.

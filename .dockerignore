@@ -4,6 +4,7 @@ node_modules
 **/node_modules
 dist
 .data
+artifacts
 *.db
 *.db-wal
 *.db-shm
@@ -16,3 +17,4 @@ packages/fx-contracts/lib
 packages/fx-contracts/out
 packages/fx-contracts/cache
 packages/fx-contracts/broadcast
+packages/fx-contracts/abi

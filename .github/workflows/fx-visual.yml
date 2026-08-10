@@ -2,25 +2,37 @@ name: FX visual
 
 on:
   push:
-    branches: [fx-visual]
+    branches: [fx-visual, fx-final-integration]
     paths:
       - 'src/**'
+      - 'apps/fx-node/**'
       - 'packages/fx-simulator/**'
       - 'packages/fx-liquidity/**'
+      - 'packages/fx-policy/**'
+      - 'packages/fx-pricing/**'
+      - 'packages/fx-market/**'
+      - 'packages/fx-fiat/**'
       - 'spec/fx/VISUAL-LAB.md'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'tsconfig.json'
+      - 'scripts/dev.mjs'
       - '.github/workflows/fx-visual.yml'
   pull_request:
     paths:
       - 'src/**'
+      - 'apps/fx-node/**'
       - 'packages/fx-simulator/**'
       - 'packages/fx-liquidity/**'
+      - 'packages/fx-policy/**'
+      - 'packages/fx-pricing/**'
+      - 'packages/fx-market/**'
+      - 'packages/fx-fiat/**'
       - 'spec/fx/VISUAL-LAB.md'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'tsconfig.json'
+      - 'scripts/dev.mjs'
       - '.github/workflows/fx-visual.yml'
 
 concurrency:
@@ -31,20 +43,90 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-and-render:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Node
         uses: actions/setup-node@v4
         with:
           node-version: '24.15.0'
+
       - name: pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 9
+
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Build
+
+      - name: Production build
         run: pnpm build
+
+      - name: Install pinned Chromium renderer
+        run: pnpm dlx playwright@1.54.2 install --with-deps chromium
+
+      - name: Start complete reference stack
+        run: |
+          pnpm dev > /tmp/blueballs-dev.log 2>&1 &
+          echo $! > /tmp/blueballs-dev.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8788/health >/dev/null \
+              && curl -fsS http://127.0.0.1:5280/fx >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/blueballs-dev.log
+          exit 1
+
+      - name: Render desktop and mobile FX page
+        run: |
+          mkdir -p artifacts/fx-visual
+          pnpm dlx playwright@1.54.2 screenshot \
+            --browser=chromium \
+            --device="Desktop Chrome" \
+            --full-page \
+            --wait-for-timeout=3000 \
+            http://127.0.0.1:5280/fx \
+            artifacts/fx-visual/fx-desktop.png
+          pnpm dlx playwright@1.54.2 screenshot \
+            --browser=chromium \
+            --device="iPhone 13" \
+            --full-page \
+            --wait-for-timeout=3000 \
+            http://127.0.0.1:5280/fx \
+            artifacts/fx-visual/fx-mobile.png
+          test -s artifacts/fx-visual/fx-desktop.png
+          test -s artifacts/fx-visual/fx-mobile.png
+          file artifacts/fx-visual/*.png
+
+      - name: Capture runtime state used by the page
+        run: |
+          curl -fsS \
+            -H 'Authorization: Bearer bb_test_local_fx' \
+            http://127.0.0.1:8788/v2/fx/reference/status \
+            > artifacts/fx-visual/runtime-status.json
+          curl -fsS -X POST \
+            -H 'Authorization: Bearer bb_test_local_fx' \
+            -H 'content-type: application/json' \
+            -d '{"inputAmount":"50000.00"}' \
+            http://127.0.0.1:8788/v2/fx/reference/trades/preview \
+            > artifacts/fx-visual/trade-preview.json
+          cp /tmp/blueballs-dev.log artifacts/fx-visual/dev.log
+
+      - name: Stop complete reference stack
+        if: always()
+        run: |
+          if [ -f /tmp/blueballs-dev.pid ]; then kill $(cat /tmp/blueballs-dev.pid) || true; fi
+
+      - name: Upload visual QA artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fx-visual-${{ github.sha }}
+          path: artifacts/fx-visual/
+          if-no-files-found: warn
+          retention-days: 30
