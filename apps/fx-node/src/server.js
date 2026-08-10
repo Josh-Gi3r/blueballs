@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import http from 'node:http';
 
 const OPENAPI_YAML = readFileSync(new URL('../openapi.yaml', import.meta.url), 'utf8');
@@ -108,6 +108,8 @@ export function createFxNodeServer({
   quotes,
   fiat,
   inspector = null,
+  trades = null,
+  scenario = null,
   executionAdapter = null,
   apiKey,
   publicDepth = false,
@@ -119,6 +121,12 @@ export function createFxNodeServer({
   if (!fiat) throw new TypeError('fiat settlement store required');
   if (inspector !== null && typeof inspector.status !== 'function') {
     throw new TypeError('inspector must expose status()');
+  }
+  if (trades !== null && typeof trades.previewExactInput !== 'function') {
+    throw new TypeError('trades must expose previewExactInput()');
+  }
+  if (scenario !== null && typeof scenario.apply !== 'function') {
+    throw new TypeError('scenario must expose apply()');
   }
   if (!Array.isArray(corsOrigins) || corsOrigins.some((origin) => typeof origin !== 'string')) {
     throw new TypeError('corsOrigins must be an array of strings');
@@ -133,7 +141,7 @@ export function createFxNodeServer({
     res.setHeader('access-control-allow-origin', origin);
     res.setHeader('vary', 'origin');
     res.setHeader('access-control-allow-headers', 'authorization, content-type');
-    res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+    res.setHeader('access-control-allow-methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('access-control-max-age', '600');
     return true;
   }
@@ -141,6 +149,63 @@ export function createFxNodeServer({
   function authenticate(req) {
     const authorization = req.headers.authorization;
     if (authorization !== `Bearer ${apiKey}`) throw apiError('AUTH_REQUIRED', 401, 'valid API key required');
+  }
+
+  async function submitQuote(quoteId) {
+    const privateQuote = quotes.getPrivateQuote(quoteId);
+    if (!privateQuote) throw apiError('NOT_FOUND', 404, 'quote not found');
+    if (privateQuote.row.expires_at <= now()) throw apiError('QUOTE_EXPIRED', 409, 'quote expired');
+    if (!executionAdapter || typeof executionAdapter.submit !== 'function') {
+      throw apiError('EXECUTION_UNAVAILABLE', 503, 'execution adapter is not configured');
+    }
+
+    const submissionRef = `submit_${randomUUID()}`;
+    const committed = await quotes.markSubmitted(quoteId, submissionRef);
+    let outcome;
+    try {
+      outcome = await executionAdapter.submit(privateQuote, { submissionRef });
+    } catch (error) {
+      return {
+        status: 202,
+        body: {
+          ...committed,
+          execution: { status: 'UNKNOWN', submissionRef, reason: error.message },
+        },
+      };
+    }
+
+    const status = outcome?.status ?? 'ACCEPTED';
+    if (status === 'REJECTED') {
+      await quotes.fail(quoteId, {
+        eventId: outcome.eventId ?? `reject_${submissionRef}`,
+        reason: outcome.reason ?? 'EXECUTION_ADAPTER_REJECTED',
+      });
+      throw apiError('EXECUTION_REJECTED', 409, outcome.reason ?? 'execution adapter rejected submission');
+    }
+    if (status === 'UNKNOWN' || status !== 'ACCEPTED') {
+      return {
+        status: 202,
+        body: {
+          ...committed,
+          execution: {
+            status: 'UNKNOWN',
+            submissionRef,
+            reason: outcome?.reason ?? (status === 'UNKNOWN' ? null : `unexpected adapter status: ${status}`),
+          },
+        },
+      };
+    }
+    return {
+      status: 202,
+      body: {
+        ...committed,
+        execution: {
+          status: 'ACCEPTED',
+          submissionRef,
+          externalRef: outcome.externalRef ?? null,
+        },
+      },
+    };
   }
 
   async function handle(req, res) {
@@ -204,6 +269,43 @@ export function createFxNodeServer({
       if (inspector && method === 'GET' && path === '/v2/fx/reference/settlement-route') {
         return send(res, 200, inspector.settlementRoute());
       }
+      if (inspector && typeof inspector.marketState === 'function' && method === 'GET' && path === '/v2/fx/reference/market') {
+        return send(res, 200, inspector.marketState());
+      }
+
+      if (scenario && method === 'GET' && path === '/v2/fx/reference/scenario') {
+        return send(res, 200, { current: scenario.current(), available: scenario.list() });
+      }
+      if (scenario && method === 'POST' && path === '/v2/fx/reference/scenario') {
+        const body = await readJson(req);
+        return send(res, 200, scenario.apply(body.id));
+      }
+
+      if (trades && method === 'POST' && path === '/v2/fx/reference/trades/preview') {
+        return send(res, 200, trades.previewExactInput(await readJson(req)));
+      }
+      if (trades && method === 'POST' && path === '/v2/fx/reference/trades') {
+        return send(res, 201, await trades.reserveExactInput(await readJson(req)));
+      }
+      let params = match(path, '/v2/fx/reference/trades/:tradeId');
+      if (trades && method === 'GET' && params) {
+        const trade = trades.getTrade(params.tradeId);
+        if (!trade) throw apiError('NOT_FOUND', 404, 'trade not found');
+        return send(res, 200, trade);
+      }
+      if (trades && method === 'DELETE' && params) {
+        return send(res, 200, await trades.releaseTrade(params.tradeId));
+      }
+      params = match(path, '/v2/fx/reference/trades/:tradeId/execute');
+      if (trades && method === 'POST' && params) {
+        const trade = trades.getTrade(params.tradeId);
+        if (!trade) throw apiError('NOT_FOUND', 404, 'trade not found');
+        const result = await submitQuote(trade.quoteId);
+        return send(res, result.status, {
+          trade: trades.getTrade(params.tradeId),
+          execution: result.body.execution,
+        });
+      }
 
       if (method === 'POST' && path === '/v2/fx/orders') {
         return send(res, 201, await market.admitOrder(await readJson(req)));
@@ -213,7 +315,7 @@ export function createFxNodeServer({
         if (!maker) throw apiError('VALIDATION_ERROR', 400, 'maker required');
         return send(res, 200, { object: 'list', data: market.listOrdersForMaker(maker) });
       }
-      let params = match(path, '/v2/fx/orders/:orderHash/cancel');
+      params = match(path, '/v2/fx/orders/:orderHash/cancel');
       if (method === 'POST' && params) {
         const body = await readJson(req);
         return send(res, 200, market.cancelOrderOffchain(params.orderHash, {
@@ -243,55 +345,8 @@ export function createFxNodeServer({
       }
       params = match(path, '/v2/fx/quotes/:quoteId/execute');
       if (method === 'POST' && params) {
-        const privateQuote = quotes.getPrivateQuote(params.quoteId);
-        if (!privateQuote) throw apiError('NOT_FOUND', 404, 'quote not found');
-        if (privateQuote.row.expires_at <= now()) throw apiError('QUOTE_EXPIRED', 409, 'quote expired');
-        if (!executionAdapter || typeof executionAdapter.submit !== 'function') {
-          throw apiError('EXECUTION_UNAVAILABLE', 503, 'execution adapter is not configured');
-        }
-
-        // Revalidation occurs inside markSubmitted before any external call. From this
-        // point the route is intentionally non-releasable and must be reconciled.
-        const submissionRef = `submit_${randomUUID()}`;
-        const committed = await quotes.markSubmitted(params.quoteId, submissionRef);
-        let outcome;
-        try {
-          outcome = await executionAdapter.submit(privateQuote, { submissionRef });
-        } catch (error) {
-          return send(res, 202, {
-            ...committed,
-            execution: { status: 'UNKNOWN', submissionRef, reason: error.message },
-          });
-        }
-
-        const status = outcome?.status ?? 'ACCEPTED';
-        if (status === 'REJECTED') {
-          await quotes.fail(params.quoteId, {
-            eventId: outcome.eventId ?? `reject_${submissionRef}`,
-            reason: outcome.reason ?? 'EXECUTION_ADAPTER_REJECTED',
-          });
-          throw apiError('EXECUTION_REJECTED', 409, outcome.reason ?? 'execution adapter rejected submission');
-        }
-        if (status === 'UNKNOWN') {
-          return send(res, 202, {
-            ...committed,
-            execution: { status: 'UNKNOWN', submissionRef, reason: outcome.reason ?? null },
-          });
-        }
-        if (status !== 'ACCEPTED') {
-          return send(res, 202, {
-            ...committed,
-            execution: { status: 'UNKNOWN', submissionRef, reason: `unexpected adapter status: ${status}` },
-          });
-        }
-        return send(res, 202, {
-          ...committed,
-          execution: {
-            status: 'ACCEPTED',
-            submissionRef,
-            externalRef: outcome.externalRef ?? null,
-          },
-        });
+        const result = await submitQuote(params.quoteId);
+        return send(res, result.status, result.body);
       }
 
       params = match(path, '/v2/fx/routes/:routeId');

@@ -2,7 +2,7 @@ import { FiatSettlementStore } from '../../../packages/fx-fiat/src/index.js';
 import { FxMarketService } from '../../../packages/fx-market/src/index.js';
 
 import { PrivateMarketQuoteCoordinator } from './quote-coordinator.js';
-import { createReferenceRuntime } from './reference-runtime.js';
+import { createPublicReferenceRuntime } from './public-reference-runtime.js';
 import { createFxNodeServer } from './server.js';
 
 const mode = process.env.FX_NODE_MODE ?? 'reference-sandbox';
@@ -25,7 +25,7 @@ let runtime;
 let node;
 
 if (mode === 'reference-sandbox') {
-  runtime = await createReferenceRuntime({
+  runtime = await createPublicReferenceRuntime({
     dataDir: process.env.FX_NODE_DATA_DIR ?? './blueballs-fx-data',
   });
   node = createFxNodeServer({
@@ -33,6 +33,8 @@ if (mode === 'reference-sandbox') {
     quotes: runtime.quotes,
     fiat: runtime.fiat,
     inspector: runtime.inspector,
+    trades: runtime.trades,
+    scenario: runtime.scenario,
     apiKey,
     corsOrigins,
   });
@@ -65,7 +67,8 @@ console.log(`API key: ${apiKey}`);
 console.log(`Browser origins: ${corsOrigins.join(', ') || 'none'}`);
 console.log('Execution adapter: NOT CONFIGURED (execute will fail closed)');
 if (mode === 'reference-sandbox') {
-  console.log('Reference market: policy + private orders + issuer + LP + neobank + treasury + principal');
+  console.log('Reference trade: BRL → BRLX → multi-source EURC → EUR');
+  console.log('Reference market: customer orders + issuer + LP + neobank + treasury + principal');
 }
 
 async function shutdown(signal) {
