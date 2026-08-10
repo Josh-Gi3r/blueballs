@@ -179,7 +179,13 @@ export class ReferenceTradeCoordinator {
     const chargedToken = BigInt(result.plan.totalInput);
     const chargedMinor = convertAtomicCeil(chargedToken, this.assets.BRLX.decimals, this.assets.BRL.decimals);
     const outputMinor = result.outputCents;
-    if (chargedMinor + 1n < inputMinor) {
+    // A fiat payout is rounded to its currency precision. Accept a sub-BRL
+    // rounding remainder smaller than one output-cent price step, expose the
+    // exact charged amount, and fail when materially less of the request can
+    // be routed. At the seeded BRL/EUR rate one EUR cent is roughly six BRL
+    // cents, so ten minor units is a conservative hard ceiling.
+    const maximumRoundingRemainder = 10n;
+    if (chargedMinor + maximumRoundingRemainder < inputMinor) {
       const error = new Error('eligible liquidity cannot consume the full BRL amount');
       error.code = 'NO_LIQUIDITY';
       error.details = {
