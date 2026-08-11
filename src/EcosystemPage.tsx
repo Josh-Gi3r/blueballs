@@ -10,6 +10,22 @@ type EcosystemPageProps = {
   onNavigate: (path: string) => void;
 };
 
+const FILLER_COPY = [
+  ["OPEN CORE", "Your product logic stays yours."],
+  ["ADAPTER READY", "Replace providers without rebuilding the product."],
+  ["VERIFY FIRST", "Publish compatibility evidence before claiming an integration."],
+] as const;
+
+function EcosystemFillers({ count, columns, featured = false }: { count: number; columns: 2 | 3 | 4; featured?: boolean }) {
+  const missing = (columns - (count % columns)) % columns;
+  return <>{Array.from({ length: missing }, (_, index) => {
+    const [label, copy] = FILLER_COPY[index % FILLER_COPY.length];
+    return <div aria-hidden="true" className={`eco-provider-filler eco-fill-${columns} ${featured ? "eco-provider-featured" : ""}`} key={`${columns}-${index}`}>
+      <span>{label}</span><strong>{copy}</strong><small>BLUEBALLS · OPEN SOURCE</small>
+    </div>;
+  })}</>;
+}
+
 export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
   const [active, setActive] = useState<FilterId>("all");
   const [query, setQuery] = useState("");
@@ -39,7 +55,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
       <section className="eco-hero">
         <div className="eco-hero-copy">
           <div className="eco-eyebrow">THE INFRASTRUCTURE LANDSCAPE</div>
-          <h1>Own the core. Connect the regulated edge.</h1>
+          <h1><span>Own the core.</span><span>Connect the regulated edge.</span></h1>
           <p>
             Blueballs is the open-source product, ledger and orchestration layer. This map shows where adapters meet the licensed banks, networks, custody, cards, identity data and real liquidity a deployment may need.
           </p>
@@ -48,6 +64,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             <button type="button" className="secondary" onClick={() => onNavigate("/developers")}>See integration surfaces</button>
           </div>
           <div className="eco-hero-facts">
+            <div className="eco-hero-fact-message"><span>CONTROL PLANE</span><strong>One open core. Any regulated edge.</strong></div>
             <div><strong>{CATEGORIES.length}</strong><span>infrastructure layers</span></div>
             <div><strong>{PROVIDERS.length}</strong><span>candidates to evaluate</span></div>
             <div><strong>None</strong><span>implied partnerships</span></div>
@@ -81,6 +98,8 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
         </div>
         <div className="eco-featured-grid">
           {featured.map((provider) => <ProviderCard provider={provider} featured key={provider.id} />)}
+          <EcosystemFillers count={featured.length} columns={4} featured />
+          <EcosystemFillers count={featured.length} columns={2} featured />
         </div>
       </section>
 
@@ -128,6 +147,8 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
 
         <div className="eco-provider-grid">
           {filtered.map((provider) => <ProviderCard provider={provider} key={provider.id} />)}
+          <EcosystemFillers count={filtered.length} columns={3} />
+          <EcosystemFillers count={filtered.length} columns={2} />
         </div>
         {filtered.length === 0 && (
           <div className="eco-empty">No providers match “{query}” in this layer.</div>

@@ -8,5 +8,6 @@ export default function CategoryMap({ active, setActive }: { active: FilterId; s
     <div className="eco-map-grid">{CATEGORIES.map((category, index) => <button key={category.id} type="button" className={active === category.id ? "active" : ""} onClick={() => setActive(category.id)}>
       <span>{String(index + 1).padStart(2, "0")}</span><b>{category.label}</b><small>{PROVIDERS.filter((provider) => provider.categories.includes(category.id)).length} options</small>
     </button>)}</div>
+    <div className="eco-map-note"><span>ADAPTER STANDARD</span><strong>Providers stay replaceable.</strong><small>Blueballs owns the product contract; adapters connect the regulated edge.</small></div>
   </div>;
 }

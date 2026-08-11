@@ -89,10 +89,10 @@ function EcosystemShell() {
           </div>
         </div>
         <EcosystemPage onNavigate={navigate} />
-        <div data-col data-pad style={{ background: "#FFFFFF", border: "1px solid #D7DBE4", borderRadius: 18, padding: "30px 38px", display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr", gap: 26 }}>
-          <div><div style={{ fontSize: 15, fontWeight: 600 }}>Blueballs</div><p style={{ fontSize: 13.5, lineHeight: 1.6, color: "#5B6376", maxWidth: "36ch" }}>Open-source banking software, connected to the regulated providers your product needs.</p><div style={{ fontFamily: MONO, fontSize: 10.5, color: "#7A8296" }}>© 2026 · MIT LICENCE</div></div>
-          <div><div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296", marginBottom: 10 }}>BUILD</div><button type="button" onClick={() => navigate("/products")} className="eco-shell-link">Products</button><button type="button" onClick={() => navigate("/fx")} className="eco-shell-link">Stablecoin FX</button></div>
-          <div><div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296", marginBottom: 10 }}>DEVELOPERS</div><button type="button" onClick={() => navigate("/developers")} className="eco-shell-link">Documentation</button><a href="https://github.com/Josh-Gi3r/blueballs" target="_blank" rel="noreferrer" className="eco-shell-link">GitHub ↗</a></div>
+        <div data-pad className="eco-shell-footer" style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 18, padding: "26px", display: "grid", gap: 12 }}>
+          <div><div style={{ fontSize: 15, fontWeight: 600 }}>Blueballs</div><p style={{ fontSize: 13.5, lineHeight: 1.6, color: "#C5CAD7", maxWidth: "36ch" }}>Open-source banking software with a replaceable regulated edge.</p><div style={{ fontFamily: MONO, fontSize: 10.5, color: "#8F98AC" }}>© 2026 · MIT LICENCE</div></div>
+          <div><div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8F98AC", marginBottom: 10 }}>BUILD</div><button type="button" onClick={() => navigate("/products")} className="eco-shell-link">Products</button><button type="button" onClick={() => navigate("/fx")} className="eco-shell-link">Stablecoin FX</button></div>
+          <div><div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8F98AC", marginBottom: 10 }}>DEVELOPERS</div><button type="button" onClick={() => navigate("/developers")} className="eco-shell-link">Documentation</button><a href="https://github.com/Josh-Gi3r/blueballs" target="_blank" rel="noreferrer" className="eco-shell-link">GitHub ↗</a></div>
         </div>
       </div>
     </div>

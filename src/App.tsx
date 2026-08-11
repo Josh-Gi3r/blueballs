@@ -151,6 +151,23 @@ const footer = [
   { head: "DEVELOPERS", links: ["Documentation", "API reference", "Status", "Changelog"] },
   { head: "PROJECT", links: ["GitHub", "Licence", "Sponsors", "Security"] },
 ];
+const GRID_FILLER_COPY = [
+  ["OPEN SOURCE", "Fork the stack. Keep the product logic."],
+  ["ADAPTER READY", "Replace the regulated edge without rebuilding the core."],
+  ["BUILD NEXT", "Add a module and expose it through the same contract."],
+] as const;
+
+function GridFillers({ count }: { count: number }) {
+  return <>{([2, 3, 4] as const).flatMap((columns) => {
+    const missing = (columns - (count % columns)) % columns;
+    return Array.from({ length: missing }, (_, index) => {
+      const [label, copy] = GRID_FILLER_COPY[index % GRID_FILLER_COPY.length];
+      return <div aria-hidden="true" className={`bb-grid-filler bb-fill-cols-${columns}`} key={`${columns}-${index}`}>
+        <span>{label}</span><strong>{copy}</strong><small>BLUEBALLS · MIT LICENCE</small>
+      </div>;
+    });
+  })}</>;
+}
 const quickstart = 'git clone <this repo>\ncd blueballs && pnpm install\npnpm dev            # site → :5280, api → :5290\n\ncurl -X POST http://localhost:5290/v2/auth/signup \\\n  -H "content-type: application/json" \\\n  -d \'{"email":"you@example.com"}\'\n\n// → { "key": "bb_sandbox_…", "scope": "sandbox", … }';
 const devInstall = "$ git clone <this repo>\n$ cd blueballs && pnpm install\n$ pnpm dev\n\n  site   http://localhost:5280\n  api    http://localhost:5290/v2";
 const devCall = 'curl -X POST http://localhost:5290/v2/auth/signup \\\n  -H "content-type: application/json" \\\n  -d \'{"email":"you@example.com"}\'\n\n// → { "key": "bb_sandbox_…", "scope": "sandbox",\n//     "note": "…only time the key is shown." }';
@@ -393,6 +410,7 @@ export default function App() {
                   </H>
                 );
               })}
+              <GridFillers count={products.length} />
             </div>
 
             {/* quickstart + platform */}
@@ -479,6 +497,7 @@ export default function App() {
                   </div>
                 </div>
               ))}
+              <GridFillers count={products.length} />
             </div>
 
             <H onClick={() => setPage("fx")}
@@ -526,6 +545,7 @@ export default function App() {
                     <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "#5B6376" }}>{f.blurb}</div>
                   </H>
                 ))}
+                <GridFillers count={FAMILIES.length} />
               </div>
             </div>
 
@@ -701,16 +721,16 @@ export default function App() {
         )}
 
         {/* FOOTER */}
-        <div data-col data-pad style={{ ...card, padding: "32px 38px 28px", display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: 26 }}>
+        <div data-pad className="bb-footer" style={{ padding: "26px", display: "grid", gap: 12, background: "#14161C", color: "#FFFFFF", borderRadius: 18 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>Blueballs</div>
-            <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "#5B6376", maxWidth: "34ch" }}>An open-source banking stack. Free to use, free to fork, no accounts sold.</div>
-            <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", color: "#7A8296", marginTop: 6 }}>© 2026 · MIT LICENCE</div>
+            <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "#C5CAD7", maxWidth: "34ch" }}>An open-source banking stack. Free to use, free to fork, no accounts sold.</div>
+            <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", color: "#8F98AC", marginTop: 6 }}>© 2026 · MIT LICENCE</div>
           </div>
           {footer.map((col) => (
             <div key={col.head} style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296" }}>{col.head}</div>
-              {col.links.map((l) => (<a key={l} href="#" style={{ fontSize: 13.5, color: "#454B5C" }}>{l}</a>))}
+              <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8F98AC" }}>{col.head}</div>
+              {col.links.map((l) => (<a key={l} href="#" style={{ fontSize: 13.5, color: "#E4E7EE" }}>{l}</a>))}
             </div>
           ))}
         </div>
