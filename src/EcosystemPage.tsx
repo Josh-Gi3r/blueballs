@@ -39,8 +39,11 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
       return [
         provider.name,
         provider.kind,
+        provider.provides,
+        provider.access,
         provider.regions.join(" "),
         provider.capabilities.join(" "),
+        provider.modules.join(" "),
         provider.categories.map((id) => CATEGORY_MAP[id].label).join(" "),
       ].join(" ").toLowerCase().includes(q);
     });
@@ -56,7 +59,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
           <div className="eco-eyebrow">PROVIDER DIRECTORY</div>
           <h1><span>Find services</span><span>your neobank may need.</span></h1>
           <p>
-            Blueballs provides the reference software. A production product still needs services such as banking, identity checks, payment rails, cards or custody. This directory is a place to start looking.
+            Blueballs is free to use, fork and self-host. Create sandbox keys here without asking us. For real banking, identity, payment, card or custody services, open an account and get credentials directly from the provider you choose.
           </p>
           <div className="eco-hero-actions">
             <button type="button" onClick={() => document.getElementById("eco-directory")?.scrollIntoView({ behavior: "smooth" })}>Browse the directory</button>
@@ -74,16 +77,16 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
 
       <section className="eco-principle">
         <div>
-          <span>01 · BLUEBALLS SOFTWARE</span>
-          <strong>Reference APIs, ledger, product flows and FX tooling.</strong>
+          <span>01 · FREE SOFTWARE</span>
+          <strong>MIT licensed. Fork it, run it and create sandbox keys yourself.</strong>
         </div>
         <div className="highlight">
-          <span>02 · YOUR INTEGRATIONS</span>
-          <strong>Adapters your team builds and tests for the services it chooses.</strong>
+          <span>02 · YOUR PROVIDERS</span>
+          <strong>Open provider accounts and obtain production credentials directly.</strong>
         </div>
         <div>
-          <span>03 · PROVIDER DIRECTORY</span>
-          <strong>Companies to assess for location, licences, product fit and access.</strong>
+          <span>03 · YOUR DEPLOYMENT</span>
+          <strong>Choose and replace services without asking Blueballs for permission.</strong>
         </div>
       </section>
 
@@ -93,11 +96,10 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             <span>STARTING POINTS</span>
             <h2>A short list across the main categories.</h2>
           </div>
-          <p>These companies are listed for research. Blueballs does not currently include adapters for them.</p>
+          <p>Start here, then compare access, coverage and product fit. None of these services is connected to Blueballs yet.</p>
         </div>
         <div className="eco-featured-grid">
           {featured.map((provider) => <ProviderCard provider={provider} featured key={provider.id} />)}
-          <EcosystemFillers count={featured.length} columns={4} featured />
           <EcosystemFillers count={featured.length} columns={2} featured />
         </div>
       </section>
@@ -141,7 +143,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
 
         <div className="eco-results-line">
           <span>{filtered.length} {filtered.length === 1 ? "listing" : "listings"}</span>
-          <span>Official links open in a new tab</span>
+          <span>Reviewed against official provider information · 12 Aug 2026</span>
         </div>
 
         <div className="eco-provider-grid">
@@ -158,7 +160,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
         <div>
           <span>BUILDING AN ADAPTER?</span>
           <h2>Start with the API your product already uses.</h2>
-          <p>Match the provider to the relevant Blueballs request and response, then test the connection against the sandbox flow.</p>
+          <p>Blueballs adapters are free and open source. Match the provider to the relevant request and response, test it against the sandbox, and supply credentials obtained directly from that provider.</p>
         </div>
         <div className="eco-bottom-actions">
           <button type="button" onClick={() => onNavigate("/developers")}>View API reference</button>
@@ -168,7 +170,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
 
       <div className="eco-disclaimer">
         <span style={{ fontFamily: MONO }}>ABOUT THIS DIRECTORY</span>
-        <p>Listings are for research only. Check services, licences, availability, pricing and technical fit directly with each company.</p>
+        <p>Access and sandbox details were checked against official provider information on 12 Aug 2026. Products and availability change, so check the current technical documentation before building.</p>
       </div>
     </div>
   );

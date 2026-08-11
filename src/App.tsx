@@ -329,13 +329,13 @@ export default function App() {
               {/* hero + the call behind this screen */}
               <div data-pad style={{ ...card, padding: "56px 46px 44px", display: "flex", flexDirection: "column", gap: 24 }}>
                 <div style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 8, background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 999, padding: "6px 13px", fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.14em", color: "#4E5FA6" }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#5A6DB8" }} />MIT LICENSED · SELF-HOSTABLE
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#5A6DB8" }} />FREE · MIT LICENSED · SELF-HOSTABLE
                 </div>
                 <h1 style={{ margin: 0, fontSize: "clamp(30px, 3.6vw, 50px)", lineHeight: 1.1, fontWeight: 600, letterSpacing: "-0.035em", textWrap: "balance" as CSSProperties["textWrap"] }}>
                   Open-source software<br />for building a neobank.<br /><span style={{ color: "#5A6DB8" }}>Run it. Read it. Extend it.</span>
                 </h1>
                 <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "50ch", color: "#454B5C" }}>
-                  Blueballs is a reference stack for accounts, cards, transfers, onboarding, ledger and FX. Run the sandbox, inspect the code, then connect the regulated services your production deployment needs. The goal is to lower the cost of building financial products so more teams can serve people traditional banks overlook or exclude.
+                  Blueballs is free, MIT-licensed software for accounts, cards, transfers, onboarding, ledger and FX. Create a sandbox key yourself, run the code locally and connect the services your production deployment needs. The goal is to lower the cost of building financial products so more teams can serve people traditional banks overlook or exclude.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <H as="button" onClick={() => setPage("dev")} style={ink} hover={{ background: "#5A6DB8", borderColor: "#5A6DB8" }}>Try the sandbox</H>

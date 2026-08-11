@@ -2,6 +2,8 @@
 
 Blueballs is an MIT-licensed, self-hostable **open-source neobank reference stack**. It combines product UI, a 144-endpoint banking API, double-entry ledger infrastructure and a modular institutional FX system in one repository.
 
+Blueballs is free to use, fork and self-host. Sandbox keys are created directly from the running API; no approval from the Blueballs project is required. Production banking, identity, payment, card, custody and liquidity credentials come directly from whichever external providers a deployment chooses.
+
 The project is for founders and teams building a bank, neobank, embedded-finance product or stablecoin-enabled financial product. It gives them a working foundation they can run, inspect, modify and replace provider by provider.
 
 ## What is included

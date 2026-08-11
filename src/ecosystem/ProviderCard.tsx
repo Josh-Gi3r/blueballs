@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { CATEGORY_MAP, type Provider } from "./data";
 
 function domainFor(url: string) {
@@ -6,43 +6,34 @@ function domainFor(url: string) {
   catch { return url; }
 }
 
-function logoCandidates(url: string) {
-  try {
-    const origin = new URL(url).origin;
-    return [
-      `${origin}/favicon.svg`,
-      `${origin}/favicon.ico`,
-      `${origin}/favicon-32x32.png`,
-      `${origin}/favicon.png`,
-      `${origin}/apple-touch-icon.png`,
-      `${origin}/logo.svg`,
-    ];
-  } catch { return []; }
-}
-
 function ProviderLogo({ provider, large = false }: { provider: Provider; large?: boolean }) {
-  const candidates = useMemo(() => logoCandidates(provider.url), [provider.url]);
-  const [index, setIndex] = useState(0);
-  const failed = index >= candidates.length;
+  const [failed, setFailed] = useState(false);
   const initials = provider.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
   return <span className={`eco-logo ${large ? "eco-logo-large" : ""}`} aria-hidden="true">
-    {failed ? <span>{initials}</span> : <img src={candidates[index]} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setIndex((current) => current + 1)} />}
+    {failed ? <span>{initials}</span> : <img src={`/provider-logos/${provider.id}.png`} alt="" loading="lazy" onError={() => setFailed(true)} />}
   </span>;
 }
 
 export default function ProviderCard({ provider, featured = false }: { provider: Provider; featured?: boolean }) {
   const primary = CATEGORY_MAP[provider.categories[0]];
-  return <a className={`eco-provider-card ${featured ? "eco-provider-featured" : ""}`} href={provider.url} target="_blank" rel="noreferrer" aria-label={`${provider.name} official website`}>
+  return <article className={`eco-provider-card ${featured ? "eco-provider-featured" : ""}`}>
     <div className="eco-provider-top">
-      <div className="eco-provider-brand"><ProviderLogo provider={provider} large={featured} /><div><strong>{provider.name}</strong><span>{domainFor(provider.url)}</span></div></div>
+      <a className="eco-provider-brand" href={provider.url} target="_blank" rel="noreferrer" aria-label={`${provider.name} official website`}><ProviderLogo provider={provider} large={featured} /><div><strong>{provider.name}</strong><span>{domainFor(provider.url)}</span></div></a>
       <span className="eco-provider-kind">{provider.kind}</span>
     </div>
+    <p>{provider.provides}</p>
     <div className="eco-chip-row">{provider.capabilities.map((capability) => <span key={capability}>{capability}</span>)}</div>
+    <div className="eco-provider-access">
+      <div><small>ACCESS</small><b>{provider.access}</b></div>
+      <div><small>SANDBOX</small><b>{provider.sandbox}</b></div>
+      <div><small>BLUEBALLS STATUS</small><b>{provider.status}</b></div>
+    </div>
+    <div className="eco-provider-modules"><small>COULD CONNECT TO</small><span>{provider.modules.join(" · ")}</span></div>
     <div className="eco-provider-meta">
       <div><small>PRIMARY LAYER</small><b>{primary.label}</b></div>
       <div><small>REGION</small><b>{provider.regions.join(" · ")}</b></div>
     </div>
-    <div className="eco-provider-link">Open company website <span>↗</span></div>
-  </a>;
+    <div className="eco-provider-links"><a href={provider.docsUrl} target="_blank" rel="noreferrer">Technical docs <span>↗</span></a><a href={provider.url} target="_blank" rel="noreferrer">Company <span>↗</span></a></div>
+  </article>;
 }
