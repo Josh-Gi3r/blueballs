@@ -59,35 +59,19 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
           <div className="eco-eyebrow">PROVIDER DIRECTORY</div>
           <h1><span>Find services</span><span>your neobank may need.</span></h1>
           <p>
-            Blueballs is free to use, fork and self-host. Create sandbox keys here without asking us. For real banking, identity, payment, card or custody services, open an account and get credentials directly from the provider you choose.
+            Compare companies that provide banking, identity, payments, cards, custody and liquidity. Blueballs stays free, and you choose which services to connect.
           </p>
           <div className="eco-hero-actions">
             <button type="button" onClick={() => document.getElementById("eco-directory")?.scrollIntoView({ behavior: "smooth" })}>Browse the directory</button>
             <button type="button" className="secondary" onClick={() => onNavigate("/developers")}>See Blueballs APIs</button>
           </div>
-          <div className="eco-hero-facts">
-            <div className="eco-hero-fact-message"><span>DIRECTORY STATUS</span><strong>No provider integrations are included yet.</strong></div>
-            <div><strong>{CATEGORIES.length}</strong><span>service categories</span></div>
-            <div><strong>{PROVIDERS.length}</strong><span>companies listed</span></div>
-            <div><strong>0</strong><span>verified adapters</span></div>
+          <div className="eco-hero-guide">
+            <div><span>BLUEBALLS</span><strong>Fork and self-host the MIT-licensed software.</strong></div>
+            <div><span>SANDBOX</span><strong>Create a key immediately. No application or approval.</strong></div>
+            <div><span>PROVIDERS</span><strong>Open provider accounts and get their credentials directly.</strong></div>
           </div>
         </div>
         <CategoryMap active={active} setActive={setActive} />
-      </section>
-
-      <section className="eco-principle">
-        <div>
-          <span>01 · FREE SOFTWARE</span>
-          <strong>MIT licensed. Fork it, run it and create sandbox keys yourself.</strong>
-        </div>
-        <div className="highlight">
-          <span>02 · YOUR PROVIDERS</span>
-          <strong>Open provider accounts and obtain production credentials directly.</strong>
-        </div>
-        <div>
-          <span>03 · YOUR DEPLOYMENT</span>
-          <strong>Choose and replace services without asking Blueballs for permission.</strong>
-        </div>
       </section>
 
       <section className="eco-featured">
