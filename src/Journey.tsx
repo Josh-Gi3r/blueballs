@@ -27,9 +27,9 @@ export default function Journey() {
     <div data-pad style={{ background: "#FFFFFF", border: "1px solid #D7DBE4", borderRadius: 18, padding: "34px 34px 30px" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>WALK THE JOURNEY</div>
+          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>EXAMPLE PRODUCT FLOWS</div>
           <h2 style={{ margin: "10px 0 0", fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em" }}>
-            {SCREENS.length} screens. Every one is a real API call.
+            {SCREENS.length} screens paired with API requests.
           </h2>
         </div>
         <div style={{ fontFamily: MONO, fontSize: 11, color: "#7A8296" }}>
@@ -37,8 +37,7 @@ export default function Journey() {
         </div>
       </div>
       <p style={{ margin: "12px 0 18px", fontSize: 15.5, lineHeight: 1.6, maxWidth: "72ch", color: "#454B5C" }}>
-        A screenshot proves nothing on its own. Each screen below is paired with the request that
-        produces it, so you can see exactly what your users would see and exactly what you would call.
+        Each screen illustrates how a sandbox response could appear in a product. The request beside it shows the matching reference API call.
       </p>
 
       {/* journey picker */}
@@ -98,14 +97,14 @@ export default function Journey() {
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h3 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: "-0.025em" }}>{meta.title}</h3>
                 <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.1em", color: meta.live ? "#2E7D53" : "#7A8296", background: meta.live ? "#E3F1E9" : "#ECEEF2", border: `1px solid ${meta.live ? "#BFE0CD" : "#D7DBE4"}`, borderRadius: 999, padding: "3px 9px" }}>
-                  {meta.live ? "LIVE DATA" : "ILLUSTRATIVE"}
+                  {meta.live ? "LIVE SANDBOX DATA" : "ILLUSTRATIVE · SAMPLE DATA"}
                 </span>
               </div>
               <p style={{ margin: "8px 0 0", fontSize: 14.5, lineHeight: 1.6, color: "#454B5C", maxWidth: "60ch" }}>{meta.blurb}</p>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>THE CALL BEHIND THIS SCREEN</div>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>MATCHING API REQUEST</div>
               <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6", border: "1px solid #DADFF2", background: "#EEF1FA", borderRadius: 999, padding: "5px 12px" }}>{meta.endpoint}</div>
             </div>
             <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 14, padding: "20px 22px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre-wrap", overflowX: "auto", maxHeight: 420 }}>{meta.code}</div>

@@ -29,12 +29,12 @@ export default function TierLimitsScreen() {
       </div>
       <div style={{ padding: "0 20px 14px" }}>
         <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 18, padding: "20px 20px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8B93A6" }}>TIER 3 · VERIFIED</div>
-          <div style={{ fontSize: 15.5, fontWeight: 500 }}>Full transfer limits, every rail, physical cards and credit lines.</div>
+          <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8B93A6" }}>REFERENCE TIER 3</div>
+          <div style={{ fontSize: 15.5, fontWeight: 500 }}>Configured sandbox limits for the reference product.</div>
         </div>
       </div>
       <div style={{ flex: 1, background: "#FFFFFF", borderTop: "1px solid #E3E6EE", padding: "15px 20px 0", overflow: "hidden" }}>
-        <div style={{ ...label, marginBottom: 6 }}>RAILS · NOTHING OUTSTANDING</div>
+        <div style={{ ...label, marginBottom: 6 }}>CONFIGURED CAPABILITIES</div>
         {rails.map((r, i) => (
           <div key={r.name} style={{ display: "flex", alignItems: "center", gap: 12, ...(i === rails.length - 1 ? { padding: "11px 0" } : rowB) }}>
             <div style={{ width: 7, height: 7, borderRadius: 999, background: "#2E7D53", flexShrink: 0 }} />
@@ -48,7 +48,7 @@ export default function TierLimitsScreen() {
       </div>
       <div style={{ padding: "14px 20px 22px" }}>
         <div style={{ background: "#5A6DB8", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
-          Increase limits
+          Limit changes are illustrative
         </div>
       </div>
     </div>
@@ -59,13 +59,9 @@ export const meta: ScreenMeta = {
   id: "tier-limits",
   journey: "onboarding",
   title: "Verification tier",
-  blurb: "Every rail unlocked to its real per-rail ceiling once identity is verified.",
+  blurb: "Shows configured rail limits after the sandbox records approval.",
   endpoint: "GET /v2/customers/:id/capabilities",
-  code: `await bb.customers.capabilities("cus_9f2k3ah7");
-
-// → [
-//   { rail: "sepa_instant", status: "active", requirements: [], limit: "100000.00" },
-//   { rail: "wire",         status: "active", requirements: [], limit: "1000000.00" },
-//   { rail: "paynow",       status: "active", requirements: [], limit: "200000.00" }
-// ]`,
+  code: `fetch("/v2/customers/cus_9f2k3ah7/capabilities", {
+  headers: { "x-api-key": key }
+}).then((response) => response.json());`,
 };

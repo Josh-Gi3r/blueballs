@@ -68,7 +68,7 @@ export default function DepositPending() {
       </div>
 
       <div style={{ marginTop: "auto", padding: "14px 20px 22px", background: "#FFFFFF", borderTop: "1px solid #E3E6EE", fontSize: 11.5, lineHeight: 1.55, color: "#7A8296" }}>
-        <span style={{ fontFamily: MONO, color: "#14161C" }}>trf_9k2ncQ81pR</span> was issued the moment this payment was submitted. It is a real reference, not proof of settlement — the balance updates only once the rail confirms.
+        <span style={{ fontFamily: MONO, color: "#14161C" }}>trf_9k2ncQ81pR</span> is a sample transfer reference, not proof of settlement. The example balance changes only after the sandbox rail confirms.
       </div>
     </div>
   );
@@ -78,8 +78,8 @@ export const meta: ScreenMeta = {
   id: "deposit-pending",
   journey: "funding",
   title: "Deposit pending",
-  blurb: "A transfer's status is derived from its legs, never guessed — this one is still confirming on ACH.",
+  blurb: "Shows a sandbox transfer whose ACH leg is still pending.",
   endpoint: "GET /v2/transfers/:id",
   code:
-    'await bb.transfers.retrieve("trf_9k2ncQ81pR");\n\n// → { status: "confirming",\n//     rail: "ach",\n//     amount: { amount: "12000.00", currency: "USD" } }',
+    'fetch("/v2/transfers/trf_9k2ncQ81pR", {\n  headers: { "x-api-key": key }\n}).then((response) => response.json());',
 };

@@ -49,7 +49,7 @@ function EcosystemNavBridge() {
       onMouseEnter={(event: MouseEvent<HTMLButtonElement>) => { event.currentTarget.style.color = "#14161C"; }}
       onMouseLeave={(event: MouseEvent<HTMLButtonElement>) => { event.currentTarget.style.color = "#5B6376"; }}
     >
-      Ecosystem
+      Providers
     </button>,
     mount,
   );
@@ -60,11 +60,11 @@ function EcosystemShell() {
     ["Home", "/"],
     ["Products", "/products"],
     ["Stablecoin FX", "/fx"],
-    ["Ecosystem", "/ecosystem"],
+    ["Providers", "/ecosystem"],
     ["Developers", "/developers"],
-    ["Bulletin", "/bulletin"],
+    ["Build notes", "/bulletin"],
   ] as const;
-  const ticker = ["REGULATED ACCOUNTS", "KYC · KYB · AML", "FIAT RAILS", "STABLECOINS", "WALLETS & CUSTODY", "CARD ISSUING", "FX LIQUIDITY", "OPEN BANKING", "RECONCILIATION"];
+  const ticker = ["PROVIDER DIRECTORY", "ACCOUNTS", "IDENTITY AND COMPLIANCE", "PAYMENT RAILS", "STABLECOINS", "WALLETS AND CUSTODY", "CARD ISSUING", "FX AND LIQUIDITY", "OPEN BANKING", "OPERATIONS"];
 
   return (
     <div style={{ fontFamily: "Archivo, system-ui, sans-serif", color: "#14161C", background: "#E8EAEF", minHeight: "100vh", padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
@@ -79,7 +79,7 @@ function EcosystemShell() {
             <button key={path} type="button" onClick={() => navigate(path)} style={{ fontSize: 13.5, fontWeight: 500, padding: "9px 14px", cursor: "pointer", border: "none", borderRadius: 8, background: path === "/ecosystem" ? "#F0F2F7" : "transparent", color: path === "/ecosystem" ? "#14161C" : "#5B6376" }}>{label}</button>
           ))}
         </div>
-        <button type="button" onClick={() => navigate("/contact")} style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #14161C", borderRadius: 10, background: "#14161C", color: "#FFFFFF" }}>Get a key</button>
+        <button type="button" onClick={() => navigate("/developers")} style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #14161C", borderRadius: 10, background: "#14161C", color: "#FFFFFF" }}>Try the sandbox</button>
       </div>
 
       <div style={{ width: "100%", maxWidth: 1200, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -90,8 +90,8 @@ function EcosystemShell() {
         </div>
         <EcosystemPage onNavigate={navigate} />
         <div data-pad className="eco-shell-footer" style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 18, padding: "26px", display: "grid", gap: 12 }}>
-          <div><div style={{ fontSize: 15, fontWeight: 600 }}>Blueballs</div><p style={{ fontSize: 13.5, lineHeight: 1.6, color: "#C5CAD7", maxWidth: "36ch" }}>Open-source banking software with a replaceable regulated edge.</p><div style={{ fontFamily: MONO, fontSize: 10.5, color: "#8F98AC" }}>© 2026 · MIT LICENCE</div></div>
-          <div><div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8F98AC", marginBottom: 10 }}>BUILD</div><button type="button" onClick={() => navigate("/products")} className="eco-shell-link">Products</button><button type="button" onClick={() => navigate("/fx")} className="eco-shell-link">Stablecoin FX</button></div>
+          <div><div style={{ fontSize: 15, fontWeight: 600 }}>Blueballs</div><p style={{ fontSize: 13.5, lineHeight: 1.6, color: "#C5CAD7", maxWidth: "36ch" }}>MIT-licensed reference software for building neobank products.</p><div style={{ fontFamily: MONO, fontSize: 10.5, color: "#8F98AC" }}>© 2026 · MIT LICENCE</div></div>
+          <div><div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8F98AC", marginBottom: 10 }}>PRODUCT</div><button type="button" onClick={() => navigate("/products")} className="eco-shell-link">Products</button><button type="button" onClick={() => navigate("/fx")} className="eco-shell-link">Stablecoin FX</button><button type="button" onClick={() => navigate("/ecosystem")} className="eco-shell-link">Providers</button></div>
           <div><div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8F98AC", marginBottom: 10 }}>DEVELOPERS</div><button type="button" onClick={() => navigate("/developers")} className="eco-shell-link">Documentation</button><a href="https://github.com/Josh-Gi3r/blueballs" target="_blank" rel="noreferrer" className="eco-shell-link">GitHub ↗</a></div>
         </div>
       </div>

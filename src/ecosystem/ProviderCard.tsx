@@ -38,12 +38,11 @@ export default function ProviderCard({ provider, featured = false }: { provider:
       <div className="eco-provider-brand"><ProviderLogo provider={provider} large={featured} /><div><strong>{provider.name}</strong><span>{domainFor(provider.url)}</span></div></div>
       <span className="eco-provider-kind">{provider.kind}</span>
     </div>
-    <p>{provider.summary}</p>
     <div className="eco-chip-row">{provider.capabilities.map((capability) => <span key={capability}>{capability}</span>)}</div>
     <div className="eco-provider-meta">
       <div><small>PRIMARY LAYER</small><b>{primary.label}</b></div>
       <div><small>REGION</small><b>{provider.regions.join(" · ")}</b></div>
     </div>
-    <div className="eco-provider-link">Official site <span>↗</span></div>
+    <div className="eco-provider-link">Open company website <span>↗</span></div>
   </a>;
 }

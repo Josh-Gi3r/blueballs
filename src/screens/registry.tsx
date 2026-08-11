@@ -46,11 +46,11 @@ export type ScreenModule = { meta: ScreenMeta; Component: ComponentType<any> };
 
 /** Journeys in the order a developer would walk them. */
 export const JOURNEYS: { id: ScreenMeta["journey"]; label: string; blurb: string }[] = [
-  { id: "onboarding", label: "Onboarding", blurb: "Sign a customer up, run KYC, open the account." },
-  { id: "funding", label: "Funding", blurb: "Get money in — bank rails or on-chain." },
-  { id: "spending", label: "Spending", blurb: "Issue a card and spend the balance." },
-  { id: "payout", label: "Payout", blurb: "Send money out and settle to a bank account." },
-  { id: "product", label: "Products", blurb: "The rest of the surface at a glance." },
+  { id: "onboarding", label: "Onboarding", blurb: "Create a customer, model verification and open a sandbox account." },
+  { id: "funding", label: "Funding", blurb: "Illustrate funding through a configured rail or wallet record." },
+  { id: "spending", label: "Spending", blurb: "Create a sandbox card and test its controls and decisions." },
+  { id: "payout", label: "Payout", blurb: "Model a recipient, destination and settled sandbox transfer." },
+  { id: "product", label: "Products", blurb: "See the remaining reference product screens." },
 ];
 
 /** Every screen in the journey. Order matters — this is the sequence a visitor walks. */

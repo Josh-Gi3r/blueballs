@@ -52,7 +52,7 @@ export default function ReceivingDetails() {
       </div>
 
       <div style={{ padding: "2px 20px 12px", fontSize: 12.5, lineHeight: 1.5, color: "#7A8296" }}>
-        Share these so someone can pay this account directly on their own bank's rail.
+        Sample receiving fields for the reference account. They cannot receive real payments.
       </div>
 
       <div style={{ padding: "0 20px", display: "flex", flexDirection: "column", gap: 10, overflow: "auto" }}>
@@ -92,8 +92,8 @@ export const meta: ScreenMeta = {
   id: "receiving-details",
   journey: "funding",
   title: "Receiving details",
-  blurb: "The account's own IBAN and ABA details, issued per rail, ready to hand to a payer.",
+  blurb: "Shows sample IBAN and ABA fields. They are not usable bank details.",
   endpoint: "GET /v2/accounts/:id/details",
   code:
-    'await bb.accounts.details("acc_92f");\n\n// → [\n//     { type: "iban", iban: "DE89…", bic: "BLBLDEB2" },\n//     { type: "aba", account_number: "4417053200",\n//       routing_number: "050000885" }\n//   ]',
+    'fetch("/v2/accounts/acc_92f/details", {\n  headers: { "x-api-key": key }\n}).then((response) => response.json());',
 };

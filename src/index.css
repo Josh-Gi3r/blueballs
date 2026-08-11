@@ -204,9 +204,9 @@ input, button, textarea, select { font: inherit; color: inherit; }
   gap: 14px;
   grid-template-columns: 1fr;
 }
-@media (min-width: 700px)  { .bb-product-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1040px) { .bb-product-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1360px) { .bb-product-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 700px)  { .bb-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1040px) { .bb-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1360px) { .bb-product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 .bb-grid-filler {
   display: none;
@@ -236,8 +236,8 @@ input, button, textarea, select { font: inherit; color: inherit; }
   gap: 14px;
   grid-template-columns: 1fr;
 }
-@media (min-width: 760px)  { .bb-screen-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1180px) { .bb-screen-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 760px)  { .bb-screen-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1180px) { .bb-screen-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 760px) and (max-width: 1179px) { .bb-screen-grid > .bb-fill-cols-2 { display: flex; } }
 @media (min-width: 1180px) { .bb-screen-grid > .bb-fill-cols-3 { display: flex; } }
 

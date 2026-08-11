@@ -11,9 +11,9 @@ type EcosystemPageProps = {
 };
 
 const FILLER_COPY = [
-  ["OPEN CORE", "Your product logic stays yours."],
-  ["ADAPTER READY", "Replace providers without rebuilding the product."],
-  ["VERIFY FIRST", "Publish compatibility evidence before claiming an integration."],
+  ["DIRECTORY", "Provider candidates."],
+  ["STATUS", "No verified integrations yet."],
+  ["SOURCES", "Official provider websites."],
 ] as const;
 
 function EcosystemFillers({ count, columns, featured = false }: { count: number; columns: 2 | 3 | 4; featured?: boolean }) {
@@ -39,7 +39,6 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
       return [
         provider.name,
         provider.kind,
-        provider.summary,
         provider.regions.join(" "),
         provider.capabilities.join(" "),
         provider.categories.map((id) => CATEGORY_MAP[id].label).join(" "),
@@ -54,20 +53,20 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
     <div className="eco-page">
       <section className="eco-hero">
         <div className="eco-hero-copy">
-          <div className="eco-eyebrow">THE INFRASTRUCTURE LANDSCAPE</div>
-          <h1><span>Own the core.</span><span>Connect the regulated edge.</span></h1>
+          <div className="eco-eyebrow">PROVIDER DIRECTORY</div>
+          <h1><span>Find services</span><span>your neobank may need.</span></h1>
           <p>
-            Blueballs is the open-source product, ledger and orchestration layer. This map shows where adapters meet the licensed banks, networks, custody, cards, identity data and real liquidity a deployment may need.
+            Blueballs provides the reference software. A production product still needs services such as banking, identity checks, payment rails, cards or custody. This directory is a place to start looking.
           </p>
           <div className="eco-hero-actions">
-            <button type="button" onClick={() => document.getElementById("eco-directory")?.scrollIntoView({ behavior: "smooth" })}>Browse providers</button>
-            <button type="button" className="secondary" onClick={() => onNavigate("/developers")}>See integration surfaces</button>
+            <button type="button" onClick={() => document.getElementById("eco-directory")?.scrollIntoView({ behavior: "smooth" })}>Browse the directory</button>
+            <button type="button" className="secondary" onClick={() => onNavigate("/developers")}>See Blueballs APIs</button>
           </div>
           <div className="eco-hero-facts">
-            <div className="eco-hero-fact-message"><span>CONTROL PLANE</span><strong>One open core. Any regulated edge.</strong></div>
-            <div><strong>{CATEGORIES.length}</strong><span>infrastructure layers</span></div>
-            <div><strong>{PROVIDERS.length}</strong><span>candidates to evaluate</span></div>
-            <div><strong>None</strong><span>implied partnerships</span></div>
+            <div className="eco-hero-fact-message"><span>DIRECTORY STATUS</span><strong>No provider integrations are included yet.</strong></div>
+            <div><strong>{CATEGORIES.length}</strong><span>service categories</span></div>
+            <div><strong>{PROVIDERS.length}</strong><span>companies listed</span></div>
+            <div><strong>0</strong><span>verified adapters</span></div>
           </div>
         </div>
         <CategoryMap active={active} setActive={setActive} />
@@ -75,26 +74,26 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
 
       <section className="eco-principle">
         <div>
-          <span>01 · BLUEBALLS CORE</span>
-          <strong>Customer experience, product rules, ledger, workflows and FX orchestration.</strong>
+          <span>01 · BLUEBALLS SOFTWARE</span>
+          <strong>Reference APIs, ledger, product flows and FX tooling.</strong>
         </div>
         <div className="highlight">
-          <span>02 · INTEGRATION SURFACES</span>
-          <strong>Replaceable adapters, webhooks and contracts that keep vendor choices outside the product core.</strong>
+          <span>02 · YOUR INTEGRATIONS</span>
+          <strong>Adapters your team builds and tests for the services it chooses.</strong>
         </div>
         <div>
-          <span>03 · PROVIDER LANDSCAPE</span>
-          <strong>Candidate banks, networks, custody, cards, data and liquidity providers to evaluate.</strong>
+          <span>03 · PROVIDER DIRECTORY</span>
+          <strong>Companies to assess for location, licences, product fit and access.</strong>
         </div>
       </section>
 
       <section className="eco-featured">
         <div className="eco-section-head">
           <div>
-            <span>EXAMPLE SHORTLIST</span>
-            <h2>Infrastructure teams commonly evaluate.</h2>
+            <span>STARTING POINTS</span>
+            <h2>A short list across the main categories.</h2>
           </div>
-          <p>Research leads, not Blueballs partners or endorsements. “Works with Blueballs” should be reserved for verified adapters.</p>
+          <p>These companies are listed for research. Blueballs does not currently include adapters for them.</p>
         </div>
         <div className="eco-featured-grid">
           {featured.map((provider) => <ProviderCard provider={provider} featured key={provider.id} />)}
@@ -106,9 +105,9 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
       <section id="eco-directory" className="eco-directory">
         <div className="eco-directory-head">
           <div>
-            <span>PROVIDER LANDSCAPE</span>
-            <h2>{selectedCategory ? selectedCategory.label : "Explore the regulated edge around Blueballs."}</h2>
-            <p>{selectedCategory ? selectedCategory.description : "Filter candidate infrastructure by capability and region. Inclusion means relevant to evaluate—not integrated, approved or endorsed."}</p>
+            <span>PROVIDER DIRECTORY</span>
+            <h2>{selectedCategory ? selectedCategory.label : "Browse provider candidates."}</h2>
+            <p>{selectedCategory ? selectedCategory.description : "Filter the directory by service or region. Open a company’s website to check whether it fits your product."}</p>
           </div>
           <label className="eco-search">
             <span>SEARCH</span>
@@ -134,14 +133,14 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
               <strong>{selectedCategory.description}</strong>
             </div>
             <div>
-              <span>CONNECTS TO BLUEBALLS</span>
+              <span>RELATED BLUEBALLS MODULES</span>
               <div>{selectedCategory.blueballs.map((module) => <b key={module}>{module}</b>)}</div>
             </div>
           </div>
         )}
 
         <div className="eco-results-line">
-          <span>{filtered.length} candidate {filtered.length === 1 ? "provider" : "providers"}</span>
+          <span>{filtered.length} {filtered.length === 1 ? "listing" : "listings"}</span>
           <span>Official links open in a new tab</span>
         </div>
 
@@ -157,19 +156,19 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
 
       <section className="eco-bottom">
         <div>
-          <span>BUILD THE SOFTWARE ON BLUEBALLS</span>
-          <h2>Verify an adapter before calling a provider part of the ecosystem.</h2>
-          <p>No single vendor needs to own the whole stack. The directory is the research layer; tested adapters and published compatibility evidence are what turn a candidate into something Blueballs genuinely works with.</p>
+          <span>BUILDING AN ADAPTER?</span>
+          <h2>Start with the API your product already uses.</h2>
+          <p>Match the provider to the relevant Blueballs request and response, then test the connection against the sandbox flow.</p>
         </div>
         <div className="eco-bottom-actions">
-          <button type="button" onClick={() => onNavigate("/developers")}>Open developer manual</button>
-          <button type="button" className="secondary" onClick={() => onNavigate("/fx")}>Inspect Stablecoin FX</button>
+          <button type="button" onClick={() => onNavigate("/developers")}>View API reference</button>
+          <button type="button" className="secondary" onClick={() => onNavigate("/fx")}>View FX adapter flow</button>
         </div>
       </section>
 
       <div className="eco-disclaimer">
-        <span style={{ fontFamily: MONO }}>DIRECTORY NOTE</span>
-        <p>Company names and logos belong to their respective owners. Listings are independent research leads, not partnerships, integrations or endorsements. Availability, licensing, geography, technical compatibility and approval must be verified with each provider.</p>
+        <span style={{ fontFamily: MONO }}>ABOUT THIS DIRECTORY</span>
+        <p>Listings are for research only. Check services, licences, availability, pricing and technical fit directly with each company.</p>
       </div>
     </div>
   );

@@ -110,8 +110,8 @@ export const meta: ScreenMeta = {
   id: "deposit-onchain",
   journey: "funding",
   title: "On-chain deposit",
-  blurb: "A wallet per customer, addressable per network — deposit USDX straight from a chain instead of a bank rail.",
+  blurb: "Illustrates a deposit-address screen for a sandbox wallet. No live chain transfer occurs.",
   endpoint: "POST /v2/wallets",
   code:
-    'await bb.wallets.create({\n  customer: "cus_41c",\n  currency: "USDX",\n  network: "base"\n});\n\n// → { address: "0x8f2c1a9b…e2cd40",\n//     network: "base", balance: { amount: "0.00" } }',
+    'fetch("/v2/wallets", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ customer: "cus_41c", currency: "USDX", network: "base" })\n});',
 };

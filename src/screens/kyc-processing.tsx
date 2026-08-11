@@ -15,7 +15,7 @@ type StepStatus = "completed" | "pending";
 
 const steps: { title: string; sub: string; status: StepStatus }[] = [
   { title: "Provisioning account", sub: "Customer record created", status: "completed" },
-  { title: "Compliance checks", sub: "Automated screening passed", status: "completed" },
+  { title: "Compliance state", sub: "Sandbox check recorded", status: "completed" },
   { title: "Identity verification", sub: "Document review in progress", status: "pending" },
 ];
 
@@ -50,7 +50,7 @@ export default function KycProcessingScreen() {
           <div style={{ height: 7, borderRadius: 999, background: "#2A2E3A", overflow: "hidden" }}>
             <div style={{ width: "66%", height: "100%", background: "#5A6DB8" }} />
           </div>
-          <div style={{ fontSize: 12, color: "#B9BFCC" }}>2 of 3 checks complete · usually a few minutes</div>
+          <div style={{ fontSize: 12, color: "#B9BFCC" }}>2 of 3 sandbox steps complete</div>
         </div>
       </div>
       <div style={{ flex: 1, background: "#FFFFFF", borderTop: "1px solid #E3E6EE", padding: "15px 20px 0", overflow: "hidden" }}>
@@ -78,14 +78,11 @@ export const meta: ScreenMeta = {
   id: "kyc-processing",
   journey: "onboarding",
   title: "KYC in progress",
-  blurb: "Submitted for verification — the status moves, the decision waits.",
+  blurb: "Shows a submitted application while its decision remains unset.",
   endpoint: "POST /v2/applications/:id/submit",
-  code: `await bb.applications.submit("app_7h2mres");
-
-// → {
-//   id: "app_7h2mres",
-//   status: "submitted",
-//   decision: null,
-//   submitted_at: "2026-08-07T09:14:02Z"
-// }`,
+  code: `fetch("/v2/applications/app_7h2mres/submit", {
+  method: "POST",
+  headers: { "content-type": "application/json", "x-api-key": key },
+  body: "{}"
+});`,
 };
