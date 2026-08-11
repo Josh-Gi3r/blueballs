@@ -38,10 +38,10 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
     <div className="eco-page">
       <section className="eco-hero">
         <div className="eco-hero-copy">
-          <div className="eco-eyebrow">THE BLUEBALLS ECOSYSTEM</div>
-          <h1>Build the bank. Connect the regulated pieces.</h1>
+          <div className="eco-eyebrow">THE INFRASTRUCTURE LANDSCAPE</div>
+          <h1>Own the core. Connect the regulated edge.</h1>
           <p>
-            Blueballs is the open-source product, ledger and orchestration layer. Use providers for the parts that need a bank licence, payment-network access, custody, cards, identity data or real liquidity.
+            Blueballs is the open-source product, ledger and orchestration layer. This map shows where adapters meet the licensed banks, networks, custody, cards, identity data and real liquidity a deployment may need.
           </p>
           <div className="eco-hero-actions">
             <button type="button" onClick={() => document.getElementById("eco-directory")?.scrollIntoView({ behavior: "smooth" })}>Browse providers</button>
@@ -49,8 +49,8 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
           </div>
           <div className="eco-hero-facts">
             <div><strong>{CATEGORIES.length}</strong><span>infrastructure layers</span></div>
-            <div><strong>{PROVIDERS.length}</strong><span>providers and alternatives</span></div>
-            <div><strong>Official</strong><span>sites and brand marks</span></div>
+            <div><strong>{PROVIDERS.length}</strong><span>candidates to evaluate</span></div>
+            <div><strong>None</strong><span>implied partnerships</span></div>
           </div>
         </div>
         <CategoryMap active={active} setActive={setActive} />
@@ -58,28 +58,26 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
 
       <section className="eco-principle">
         <div>
-          <span>YOU OWN</span>
-          <strong>The customer experience, product rules, ledger and workflows.</strong>
+          <span>01 · BLUEBALLS CORE</span>
+          <strong>Customer experience, product rules, ledger, workflows and FX orchestration.</strong>
         </div>
-        <div className="eco-principle-arrow">+</div>
-        <div>
-          <span>PROVIDERS SUPPLY</span>
-          <strong>Regulated access, networks, custody, cards, data and capital.</strong>
-        </div>
-        <div className="eco-principle-arrow">=</div>
         <div className="highlight">
-          <span>YOU CAN LAUNCH</span>
-          <strong>A bank shaped around your customers, not a vendor's template.</strong>
+          <span>02 · INTEGRATION SURFACES</span>
+          <strong>Replaceable adapters, webhooks and contracts that keep vendor choices outside the product core.</strong>
+        </div>
+        <div>
+          <span>03 · PROVIDER LANDSCAPE</span>
+          <strong>Candidate banks, networks, custody, cards, data and liquidity providers to evaluate.</strong>
         </div>
       </section>
 
       <section className="eco-featured">
         <div className="eco-section-head">
           <div>
-            <span>COMMON STARTING POINTS</span>
-            <h2>Providers founders usually evaluate first.</h2>
+            <span>EXAMPLE SHORTLIST</span>
+            <h2>Infrastructure teams commonly evaluate.</h2>
           </div>
-          <p>These are examples and alternatives, not formal Blueballs partnerships or endorsements.</p>
+          <p>Research leads, not Blueballs partners or endorsements. “Works with Blueballs” should be reserved for verified adapters.</p>
         </div>
         <div className="eco-featured-grid">
           {featured.map((provider) => <ProviderCard provider={provider} featured key={provider.id} />)}
@@ -89,9 +87,9 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
       <section id="eco-directory" className="eco-directory">
         <div className="eco-directory-head">
           <div>
-            <span>PROVIDER DIRECTORY</span>
-            <h2>{selectedCategory ? selectedCategory.label : "Every layer you need around Blueballs."}</h2>
-            <p>{selectedCategory ? selectedCategory.description : "Filter by the capability you need, compare credible options and open the provider's official site directly."}</p>
+            <span>PROVIDER LANDSCAPE</span>
+            <h2>{selectedCategory ? selectedCategory.label : "Explore the regulated edge around Blueballs."}</h2>
+            <p>{selectedCategory ? selectedCategory.description : "Filter candidate infrastructure by capability and region. Inclusion means relevant to evaluate—not integrated, approved or endorsed."}</p>
           </div>
           <label className="eco-search">
             <span>SEARCH</span>
@@ -124,7 +122,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
         )}
 
         <div className="eco-results-line">
-          <span>{filtered.length} {filtered.length === 1 ? "provider" : "providers"}</span>
+          <span>{filtered.length} candidate {filtered.length === 1 ? "provider" : "providers"}</span>
           <span>Official links open in a new tab</span>
         </div>
 
@@ -139,8 +137,8 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
       <section className="eco-bottom">
         <div>
           <span>BUILD THE SOFTWARE ON BLUEBALLS</span>
-          <h2>Then choose the regulated and network providers that fit your market.</h2>
-          <p>No single vendor needs to own the whole stack. Blueballs keeps the product contract consistent while providers remain replaceable behind adapters.</p>
+          <h2>Verify an adapter before calling a provider part of the ecosystem.</h2>
+          <p>No single vendor needs to own the whole stack. The directory is the research layer; tested adapters and published compatibility evidence are what turn a candidate into something Blueballs genuinely works with.</p>
         </div>
         <div className="eco-bottom-actions">
           <button type="button" onClick={() => onNavigate("/developers")}>Open developer manual</button>
@@ -150,7 +148,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
 
       <div className="eco-disclaimer">
         <span style={{ fontFamily: MONO }}>DIRECTORY NOTE</span>
-        <p>Company names and logos belong to their respective owners. Listings link to official company websites. Inclusion describes a possible infrastructure role only; availability, licensing, geography and approval depend on the provider and your programme.</p>
+        <p>Company names and logos belong to their respective owners. Listings are independent research leads, not partnerships, integrations or endorsements. Availability, licensing, geography, technical compatibility and approval must be verified with each provider.</p>
       </div>
     </div>
   );
