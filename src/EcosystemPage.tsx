@@ -12,15 +12,15 @@ type EcosystemPageProps = {
 
 const FILLER_COPY = [
   ["DIRECTORY", "Provider candidates."],
-  ["STATUS", "No verified integrations yet."],
-  ["SOURCES", "Official provider websites."],
+  ["OPEN SOURCE", "Free to fork and self-host."],
+  ["SOURCES", "Links to official websites."],
 ] as const;
 
-function EcosystemFillers({ count, columns, featured = false }: { count: number; columns: 2 | 3 | 4; featured?: boolean }) {
+function EcosystemFillers({ count, columns }: { count: number; columns: 2 | 3 | 4 }) {
   const missing = (columns - (count % columns)) % columns;
   return <>{Array.from({ length: missing }, (_, index) => {
     const [label, copy] = FILLER_COPY[index % FILLER_COPY.length];
-    return <div aria-hidden="true" className={`eco-provider-filler eco-fill-${columns} ${featured ? "eco-provider-featured" : ""}`} key={`${columns}-${index}`}>
+    return <div aria-hidden="true" className={`eco-provider-filler eco-fill-${columns}`} key={`${columns}-${index}`}>
       <span>{label}</span><strong>{copy}</strong><small>BLUEBALLS · OPEN SOURCE</small>
     </div>;
   })}</>;
@@ -49,7 +49,6 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
     });
   }, [active, query]);
 
-  const featured = PROVIDERS.filter((provider) => provider.featured);
   const selectedCategory = active === "all" ? null : CATEGORY_MAP[active];
 
   return (
@@ -74,25 +73,11 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
         <CategoryMap active={active} setActive={setActive} />
       </section>
 
-      <section className="eco-featured">
-        <div className="eco-section-head">
-          <div>
-            <span>STARTING POINTS</span>
-            <h2>A short list across the main categories.</h2>
-          </div>
-          <p>Start here, then compare access, coverage and product fit. None of these services is connected to Blueballs yet.</p>
-        </div>
-        <div className="eco-featured-grid">
-          {featured.map((provider) => <ProviderCard provider={provider} featured key={provider.id} />)}
-          <EcosystemFillers count={featured.length} columns={2} featured />
-        </div>
-      </section>
-
       <section id="eco-directory" className="eco-directory">
         <div className="eco-directory-head">
           <div>
             <span>PROVIDER DIRECTORY</span>
-            <h2>{selectedCategory ? selectedCategory.label : "Browse provider candidates."}</h2>
+            <h2>{selectedCategory ? selectedCategory.label : "Browse by service."}</h2>
             <p>{selectedCategory ? selectedCategory.description : "Filter the directory by service or region. Open a company’s website to check whether it fits your product."}</p>
           </div>
           <label className="eco-search">

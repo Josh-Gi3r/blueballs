@@ -6,20 +6,20 @@ function domainFor(url: string) {
   catch { return url; }
 }
 
-function ProviderLogo({ provider, large = false }: { provider: Provider; large?: boolean }) {
+function ProviderLogo({ provider }: { provider: Provider }) {
   const [failed, setFailed] = useState(false);
   const initials = provider.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 
-  return <span className={`eco-logo ${large ? "eco-logo-large" : ""}`} aria-hidden="true">
+  return <span className="eco-logo" aria-hidden="true">
     {failed ? <span>{initials}</span> : <img src={`/provider-logos/${provider.id}.png`} alt="" loading="lazy" onError={() => setFailed(true)} />}
   </span>;
 }
 
-export default function ProviderCard({ provider, featured = false }: { provider: Provider; featured?: boolean }) {
+export default function ProviderCard({ provider }: { provider: Provider }) {
   const primary = CATEGORY_MAP[provider.categories[0]];
-  return <article className={`eco-provider-card ${featured ? "eco-provider-featured" : ""}`}>
+  return <article className="eco-provider-card">
     <div className="eco-provider-top">
-      <a className="eco-provider-brand" href={provider.url} target="_blank" rel="noreferrer" aria-label={`${provider.name} official website`}><ProviderLogo provider={provider} large={featured} /><div><strong>{provider.name}</strong><span>{domainFor(provider.url)}</span></div></a>
+      <a className="eco-provider-brand" href={provider.url} target="_blank" rel="noreferrer" aria-label={`${provider.name} official website`}><ProviderLogo provider={provider} /><div><strong>{provider.name}</strong><span>{domainFor(provider.url)}</span></div></a>
       <span className="eco-provider-kind">{provider.kind}</span>
     </div>
     <p>{provider.provides}</p>

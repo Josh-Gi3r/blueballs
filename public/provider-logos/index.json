@@ -39,16 +39,6 @@
     "source": "https://increase.com/favicon.svg",
     "officialDomain": true
   },
-  "airwallex": {
-    "name": "Airwallex Embedded Finance",
-    "source": "https://grw-landing.airwallex.com/favicon.ico",
-    "officialDomain": true
-  },
-  "wise-platform": {
-    "name": "Wise Platform",
-    "source": "https://wise.com/public-resources/assets/icons/wise-personal/apple_touch_icon.png",
-    "officialDomain": true
-  },
   "currencycloud": {
     "name": "Currencycloud",
     "source": "https://www.currencycloud.com/favicon.ico?favicon.0yrid62x5fl.n.ico",
@@ -212,11 +202,6 @@
   "b2c2": {
     "name": "B2C2",
     "source": "https://cdn.prod.website-files.com/6140ac854c72f30bea35cc50/61532edabbe7a31ed2659cfb_250.png",
-    "officialDomain": true
-  },
-  "wintermute": {
-    "name": "Wintermute API Liquidity",
-    "source": "https://www.wintermute.com/images/apple-touch-icon.png",
     "officialDomain": true
   },
   "kaiko": {

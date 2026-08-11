@@ -25,5 +25,4 @@ export type Provider = {
   access: ProviderAccess;
   sandbox: ProviderSandbox;
   status: "Not connected";
-  featured?: boolean;
 };
