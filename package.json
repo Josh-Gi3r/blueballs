@@ -11,6 +11,12 @@
     "dev:fx": "node apps/fx-node/src/cli.js",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "preview:cloudflare": "wrangler dev -c wrangler.jsonc",
+    "deploy:api": "wrangler deploy -c wrangler.api.jsonc",
+    "deploy:fx": "wrangler deploy -c wrangler.fx.jsonc",
+    "deploy:site": "wrangler deploy -c wrangler.jsonc",
+    "deploy:cloudflare": "pnpm build && pnpm deploy:api && pnpm deploy:fx && pnpm deploy:site",
+    "preview:upload": "pnpm build && wrangler versions upload -c wrangler.jsonc",
     "test:fx": "node scripts/test-fx.mjs",
     "sbom": "node scripts/dependency-inventory.mjs",
     "sdk:pack": "npm --prefix packages/fx-sdk pack --dry-run"
@@ -22,8 +28,10 @@
   "devDependencies": {
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/node": "^24.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "wrangler": "^4.120.1"
   }
 }

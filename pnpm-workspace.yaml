@@ -1,3 +1,12 @@
 packages:
   - "apps/*"
   - "packages/*"
+allowBuilds:
+  esbuild: true
+  workerd: true
+minimumReleaseAgeExclude:
+  - miniflare@5.20260804.0-alpha
+  - wrangler@4.120.1
+onlyBuiltDependencies:
+  - esbuild
+  - workerd

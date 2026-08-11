@@ -8,12 +8,11 @@ import {
   ksuid, toMinor, fromMinor, ApiError, db, emit, post, balanceOf,
   RAILS, RATES, THIN, routes, route, isRegistered, match, need, paginate,
 } from "./kernel.js";
-import { readdir } from "node:fs/promises";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { ibanGenerate, abaGenerate } from "../../../packages/validation/src/index.js";
 
-const PORT = Number(process.env.PORT || 5281);
+export const API_PORT = Number(process.env.PORT || 5281);
 const VERSION = "2026-08-06";
 
 
@@ -80,7 +79,7 @@ async function idempotent(req, body, fn) {
 route("GET", "/v2", () => ({
   name: "Blueballs API",
   version: VERSION,
-  docs: "http://localhost:5280/developers",
+  docs: `${process.env.PUBLIC_SITE_URL || "http://localhost:5280"}/developers`,
   signup: "POST /v2/auth/signup — issues a sandbox key instantly, no approval",
 }), { public: true });
 
@@ -320,8 +319,13 @@ route("POST", "/v2/transfers", async ({ body }) => {
   emit("transfer.created", t);
   advance(t, "funds_received");
   // instant rails settle in-band; slower rails stay confirming until swept
-  setTimeout(() => advance(t, "submitted"), 20);
-  setTimeout(() => advance(t, rail.speed === "seconds" ? "settled" : "confirming"), 60);
+  if (process.env.CLOUDFLARE_WORKER === "true") {
+    advance(t, "submitted");
+    advance(t, rail.speed === "seconds" ? "settled" : "confirming");
+  } else {
+    setTimeout(() => advance(t, "submitted"), 20);
+    setTimeout(() => advance(t, rail.speed === "seconds" ? "settled" : "confirming"), 60);
+  }
   return t;
 });
 
@@ -331,6 +335,7 @@ function advance(t, status) {
   const previous = stored.status;
   stored.status = status;
   stored.legs[0].status = status;
+  db.transfers.set(stored.id, stored);
   emit("transfer.status_changed", { id: stored.id, previous_status: previous, current_status: status });
 }
 
@@ -371,14 +376,22 @@ route("GET", "/v2/currencies", () => ({
 /* ---------------- M2 fan-out: auto-load family route modules ----------------
  * Every file in ./routes/ is imported at boot. A family owns exactly one file
  * and never edits this one, so parallel work cannot collide. */
-const HERE = dirname(fileURLToPath(import.meta.url));
-try {
-  const files = (await readdir(join(HERE, "routes"))).filter((f) => f.endsWith(".js")).sort();
-  for (const f of files) await import(pathToFileURL(join(HERE, "routes", f)).href);
-  if (files.length) console.log(`  loaded ${files.length} family module(s): ${files.join(", ")}`);
-} catch (e) {
-  if (e.code !== "ENOENT") throw e; // no routes/ dir yet is fine
-}
+const HERE = process.env.CLOUDFLARE_WORKER === "true"
+  ? "."
+  : dirname(fileURLToPath(import.meta.url));
+const FAMILY_MODULES = [
+  ["business.js", () => import("./routes/business.js")],
+  ["cards.js", () => import("./routes/cards.js")],
+  ["fx-lp.js", () => import("./routes/fx-lp.js")],
+  ["fx-swap.js", () => import("./routes/fx-swap.js")],
+  ["fx.js", () => import("./routes/fx.js")],
+  ["identity.js", () => import("./routes/identity.js")],
+  ["payments.js", () => import("./routes/payments.js")],
+  ["platform.js", () => import("./routes/platform.js")],
+  ["products.js", () => import("./routes/products.js")],
+];
+for (const [, load] of FAMILY_MODULES) await load();
+console.log(`  loaded ${FAMILY_MODULES.length} family module(s): ${FAMILY_MODULES.map(([file]) => file).join(", ")}`);
 
 /* ---------------- deliberate 501s, derived from the catalogue ----------------
  * Anything in src/endpoints.ts without a real handler answers 501, not 404, so a
@@ -387,16 +400,22 @@ try {
 const CATALOGUE = join(HERE, "..", "..", "..", "src", "endpoints.ts");
 let stubbed = 0;
 let cataloguedCount = 0;
-try {
-  const src = await (await import("node:fs/promises")).readFile(CATALOGUE, "utf8");
-  for (const [, verb, path] of src.matchAll(/verb:\s*"(\w+)",\s*path:\s*"([^"]+)"/g)) {
-    cataloguedCount++;
+export function registerCatalogue(endpoints) {
+  let added = 0;
+  for (const { verb, path } of endpoints) {
     if (isRegistered(verb, path)) continue;
     route(verb, path, () => {
       throw new ApiError("not-implemented", 501, `${verb} ${path} is in the catalogue but not implemented yet.`);
     }, { public: true });
-    stubbed++;
+    added++;
   }
+  cataloguedCount = endpoints.length;
+  stubbed += added;
+}
+try {
+  const src = await (await import("node:fs/promises")).readFile(CATALOGUE, "utf8");
+  registerCatalogue([...src.matchAll(/verb:\s*"(\w+)",\s*path:\s*"([^"]+)"/g)]
+    .map(([, verb, path]) => ({ verb, path })));
 } catch (e) {
   console.warn("  could not read the endpoint catalogue:", e.message);
 }
@@ -405,16 +424,14 @@ try {
  * Not part of the 144-endpoint catalogue — this exists so the front end can show
  * genuine numbers (accounts open, endpoints live, etc.) instead of invented ones.
  * Public: these are aggregate counts, not any single customer's data. */
-const ENDPOINTS_IMPLEMENTED = cataloguedCount - stubbed;
-const ENDPOINTS_CATALOGUED = cataloguedCount;
 route("GET", "/v2/site/stats", () => ({
   accounts: db.accounts.size,
   customers: db.customers.size,
   transfers: db.transfers.size,
   currencies: Object.keys(RATES).length,
   rails: Object.keys(RAILS).length,
-  endpoints_implemented: ENDPOINTS_IMPLEMENTED,
-  endpoints_catalogued: ENDPOINTS_CATALOGUED,
+  endpoints_implemented: cataloguedCount - stubbed,
+  endpoints_catalogued: cataloguedCount,
 }), { public: true });
 
 /* ---------------- request pipeline ---------------- */
@@ -443,13 +460,13 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(API_PORT, () => {
   console.log(`  ${routes.length - stubbed} implemented · ${stubbed} deliberate 501s · ${routes.length} catalogued`);
   console.log(`
 ╔════════════════════════════════════════════════════════╗
 ║  Blueballs API                                         ║
 ╠════════════════════════════════════════════════════════╣
-║  http://localhost:${PORT}/v2                              ║
+║  http://localhost:${API_PORT}/v2                              ║
 ║  Get a key:  POST /v2/auth/signup {"email":"you@x.io"} ║
 ║  Docs:       http://localhost:5280/developers          ║
 ╚════════════════════════════════════════════════════════╝`);

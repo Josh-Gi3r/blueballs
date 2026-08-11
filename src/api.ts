@@ -2,8 +2,10 @@ import { demoFxCall, WEBSITE_FX_DEMO_LABEL } from "./fx/demoRuntime";
 
 /** Live client for the Blueballs API. The docs page runs real requests through this. */
 
+const IS_PRODUCTION_BUILD = Boolean((import.meta as any).env?.PROD);
+
 export const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE || "http://localhost:5290";
+  (import.meta as any).env?.VITE_API_BASE || (IS_PRODUCTION_BUILD ? "" : "http://localhost:5290");
 
 /**
  * When a standalone FX node is configured, the page uses it. A normal static
@@ -12,9 +14,11 @@ export const API_BASE =
  */
 export const FX_NODE_BASE = (import.meta as any).env?.VITE_FX_NODE_BASE || "";
 export const FX_NODE_KEY = (import.meta as any).env?.VITE_FX_NODE_KEY || "";
-const REMOTE_FX_CONFIGURED = Boolean(FX_NODE_BASE && FX_NODE_KEY);
+const REMOTE_FX_CONFIGURED = IS_PRODUCTION_BUILD || Boolean(FX_NODE_BASE);
 export const FX_RUNTIME_MODE: "node" | "demo" = REMOTE_FX_CONFIGURED ? "node" : "demo";
-export const FX_RUNTIME_LABEL = REMOTE_FX_CONFIGURED ? FX_NODE_BASE : WEBSITE_FX_DEMO_LABEL;
+export const FX_RUNTIME_LABEL = REMOTE_FX_CONFIGURED
+  ? (FX_NODE_BASE || "same-origin Cloudflare FX API")
+  : WEBSITE_FX_DEMO_LABEL;
 export const fxNodeConfigured = () => true;
 export const fxUsingWebsiteDemo = () => FX_RUNTIME_MODE === "demo";
 
@@ -83,7 +87,7 @@ export async function fxCall(
   const started = performance.now();
   try {
     const headers: Record<string, string> = { "content-type": "application/json" };
-    if (authenticated) headers.authorization = `Bearer ${FX_NODE_KEY}`;
+    if (authenticated && FX_NODE_KEY) headers.authorization = `Bearer ${FX_NODE_KEY}`;
     const res = await fetch(FX_NODE_BASE.replace(/\/$/, "") + path, {
       method,
       headers,
@@ -128,4 +132,34 @@ export type SiteStats = {
 export async function getStats(): Promise<SiteStats | null> {
   const r = await call("GET", "/v2/site/stats", undefined, false);
   return r.ok ? (r.body as SiteStats) : null;
+}
+
+
+/** Sensible example body per endpoint so "Try it" does something meaningful. */
+export function sampleBody(method: string, path: string): unknown | undefined {
+  if (method === "GET" || method === "DELETE") return undefined;
+  if (path === "/v2/auth/signup") return { email: "you@example.com" };
+  if (path === "/v2/customers") return { type: "individual", name: "Ada Lovelace" };
+  if (path === "/v2/accounts") return { customer: "cus_…", currency: "EUR" };
+  if (path === "/v2/quotes") return { from: "EUR", to: "SGD", amount: "5000.00" };
+  if (path === "/v2/transfers") return { from: "acc_…", amount: "2400.00", rail: "sepa_instant" };
+  if (path === "/v2/recipients") return { name: "Marta Ilves" };
+  if (path === "/v2/vaults") return { account: "acc_…", name: "House deposit", target: "20000.00" };
+  if (path === "/v2/cards") return { account: "acc_…", form: "virtual" };
+  if (path === "/v2/orgs") return { name: "Kessler Ltd" };
+  if (path === "/v2/webhooks") return { url: "https://example.com/hook", events: ["transfer.status_changed"] };
+  if (path === "/v2/qr/generate")
+    return { merchant: { name: "Coffee Corner", city: "Singapore", country: "SG" }, currency: "SGD", amount: "23.75" };
+  return {};
+}
+
+/** Silently provisions a sandbox key if the visitor doesn't have one yet, so the
+ *  hero FX widget and the quote-latency figure can hit the real API with zero
+ *  clicks — same self-serve signup a developer would use, just automatic. */
+export async function ensureKey(): Promise<string | null> {
+  const existing = getKey();
+  if (existing) return existing;
+  const email = `visitor-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}@blueballs.local`;
+  const r = await signup(email);
+  return (r.body as any)?.key ?? null;
 }

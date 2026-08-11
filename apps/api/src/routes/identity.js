@@ -15,7 +15,7 @@
  *  through the existing db.* collections instead.
  */
 
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "../../../../packages/sqlite-compat/src/index.js";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
@@ -28,7 +28,9 @@ import { ibanGenerate, abaGenerate } from "../../../../packages/validation/src/i
 // Same DB file lib.js opens (apps/api/blueballs.sqlite), same WAL mode — a
 // second connection from this process is safe and keeps both collections
 // durable across restarts, matching every other resource in the API.
-const DB_PATH = process.env.DB_PATH || join(dirname(fileURLToPath(import.meta.url)), "..", "..", "blueballs.sqlite");
+const DB_PATH = process.env.DB_PATH || (process.env.CLOUDFLARE_WORKER === "true"
+  ? ":memory:"
+  : join(dirname(fileURLToPath(import.meta.url)), "..", "..", "blueballs.sqlite"));
 const sqlite = new DatabaseSync(DB_PATH);
 sqlite.exec("PRAGMA journal_mode = WAL");
 

@@ -10,6 +10,8 @@ artifacts/
 *.sqlite-shm
 .DS_Store
 *.log
+.wrangler/
+.dev.vars*
 
 # Foundry / FX contracts
 packages/fx-contracts/lib/

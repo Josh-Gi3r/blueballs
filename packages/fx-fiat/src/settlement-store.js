@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../sqlite-compat/src/index.js';
 
 import { hashFiatIntent, normalizeFiatIntent } from './intent.js';
 

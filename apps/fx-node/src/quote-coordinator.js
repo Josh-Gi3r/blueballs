@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../../packages/sqlite-compat/src/index.js';
 
 function parse(value) { return JSON.parse(value); }
 

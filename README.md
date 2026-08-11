@@ -100,6 +100,27 @@ pnpm dev:api
 pnpm dev:fx
 ```
 
+### Cloudflare preview and deployment
+
+The hosted reference stack runs at `https://blueballs.tech`. Cloudflare serves
+the Vite site and routes the banking and FX APIs through same-origin service
+bindings, with Durable Object SQLite storage behind both services.
+
+```bash
+# Cloudflare-flavoured local preview
+pnpm preview:cloudflare
+
+# Upload a shareable preview version without changing production
+pnpm preview:upload
+
+# Build and deploy the site plus both APIs
+pnpm deploy:cloudflare
+```
+
+The deployment requires an authenticated Wrangler session. Production and
+preview settings live in `wrangler.jsonc`, `wrangler.api.jsonc`, and
+`wrangler.fx.jsonc`.
+
 ### Docker Compose
 
 ```bash

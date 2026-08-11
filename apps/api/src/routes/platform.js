@@ -83,13 +83,15 @@ function notify(type, data) {
 
 /** Background sweep so webhooks also fire for events raised by other families
  *  (transfers, customers, accounts, ...) that this file doesn't emit directly. */
-setInterval(() => {
-  for (const evt of db.events) {
-    if (dispatchedEventIds.has(evt.id)) continue;
-    dispatchedEventIds.add(evt.id);
-    if (webhooks.size) dispatchToWebhooks(evt);
-  }
-}, 300).unref?.();
+if (process.env.CLOUDFLARE_WORKER !== "true") {
+  setInterval(() => {
+    for (const evt of db.events) {
+      if (dispatchedEventIds.has(evt.id)) continue;
+      dispatchedEventIds.add(evt.id);
+      if (webhooks.size) dispatchToWebhooks(evt);
+    }
+  }, 300).unref?.();
+}
 
 route("POST", "/v2/webhooks", ({ body, key }) => {
   need(body, ["url"]);

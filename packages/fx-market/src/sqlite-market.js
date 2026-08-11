@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../sqlite-compat/src/index.js';
 
 import { availableSell, compareMakerPrice, minBigInt, normalizedPriceKey } from './math.js';
 import { normalizeAddress, validateAdmission } from './validation.js';
