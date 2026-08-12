@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Label, Pill } from "./Primitives";
+import { Label } from "./Primitives";
 import { FX_CAPABILITIES, capabilitySource, capabilityTest } from "./capabilities";
 
 const FLOWS = [
@@ -7,6 +7,8 @@ const FLOWS = [
   { from:"BRL", to:"EUR", pay:"R$500,000", receive:"€84,760" },
   { from:"USDT", to:"EURC", pay:"100,000 USDT", receive:"92,410 EURC" },
 ] as const;
+
+const statusLabel = (status: string) => status.replace(/_/g, " ");
 
 export function ProductPhone(){
   const [index,setIndex]=useState(0); const flow=FLOWS[index]; const [stage,setStage]=useState<"quote"|"review"|"done">("quote");
@@ -52,5 +54,5 @@ export function SettlementStates(){
 
 export function ImplementationExplorer(){
   const [selected,setSelected]=useState(FX_CAPABILITIES[0].id); const capability=FX_CAPABILITIES.find((item)=>item.id===selected)!;
-  return <section className="fxp-section fx-impl"><div className="fxp-section-head"><div><Label>DEVELOPERS</Label><h2>It is infrastructure. So here is the infrastructure.</h2><p>Every section below tells you whether the capability is built, reference-only, adapter-ready, or not connected yet — with the source beside it.</p></div></div><div className="fx-impl-layout"><div className="fx-impl-list">{FX_CAPABILITIES.map((item)=><button type="button" key={item.id} className={selected===item.id?"active":""} onClick={()=>setSelected(item.id)}><span className={`status ${item.status.toLowerCase()}`}>{item.status.replaceAll("_"," ")}</span><b>{item.title}</b></button>)}</div><div className="fx-impl-detail"><div className={`fx-status-big ${capability.status.toLowerCase()}`}>{capability.status.replaceAll("_"," ")}</div><h3>{capability.title}</h3><p>{capability.summary}</p>{capability.api&&<div className="fx-api-lines">{capability.api.map((line)=><code key={line}>{line}</code>)}</div>}<div className="fx-impl-links"><a href={capabilitySource(capability)} target="_blank" rel="noreferrer">Source ↗</a>{capabilityTest(capability)&&<a href={capabilityTest(capability)!} target="_blank" rel="noreferrer">Tests ↗</a>}</div></div></div></section>
+  return <section className="fxp-section fx-impl"><div className="fxp-section-head"><div><Label>DEVELOPERS</Label><h2>It is infrastructure. So here is the infrastructure.</h2><p>Every section below tells you whether the capability is built, reference-only, adapter-ready, or not connected yet — with the source beside it.</p></div></div><div className="fx-impl-layout"><div className="fx-impl-list">{FX_CAPABILITIES.map((item)=><button type="button" key={item.id} className={selected===item.id?"active":""} onClick={()=>setSelected(item.id)}><span className={`status ${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span><b>{item.title}</b></button>)}</div><div className="fx-impl-detail"><div className={`fx-status-big ${capability.status.toLowerCase()}`}>{statusLabel(capability.status)}</div><h3>{capability.title}</h3><p>{capability.summary}</p>{capability.api&&<div className="fx-api-lines">{capability.api.map((line)=><code key={line}>{line}</code>)}</div>}<div className="fx-impl-links"><a href={capabilitySource(capability)} target="_blank" rel="noreferrer">Source ↗</a>{capabilityTest(capability)&&<a href={capabilityTest(capability)!} target="_blank" rel="noreferrer">Tests ↗</a>}</div></div></div></section>
 }
