@@ -17,6 +17,7 @@ import CardDeclined, { meta as CardDeclinedMeta } from "./card-declined";
 import LinkExternal, { meta as LinkExternalMeta } from "./link-external";
 import PayoutReceipt, { meta as PayoutReceiptMeta } from "./payout-receipt";
 import MerchantQr, { meta as MerchantQrMeta } from "./merchant-qr";
+import WalletProduct, { meta as WalletProductMeta } from "./wallet-product";
 
 export type ScreenMeta = {
   id: string;
@@ -56,6 +57,7 @@ export const SCREENS: ScreenModule[] = [
   { meta: LinkExternalMeta, Component: LinkExternal },
   { meta: PayoutReceiptMeta, Component: PayoutReceipt },
   { meta: MerchantQrMeta, Component: MerchantQr },
+  { meta: WalletProductMeta, Component: WalletProduct },
 ];
 
 export const byJourney = (j: ScreenMeta["journey"]) => SCREENS.filter((s) => s.meta.journey === j);
