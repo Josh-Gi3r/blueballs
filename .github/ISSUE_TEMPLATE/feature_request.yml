@@ -1,0 +1,26 @@
+name: Feature proposal
+description: Propose a capability or developer-experience improvement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or integrator problem needs solving?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: Describe the externally observable behaviour, not just an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: API, state and security impact
+      description: Note contract changes, new states, permissions, financial invariants, migrations or compatibility concerns.
+    validations:
+      required: true
