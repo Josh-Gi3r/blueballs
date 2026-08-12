@@ -204,9 +204,27 @@ input, button, textarea, select { font: inherit; color: inherit; }
   gap: 14px;
   grid-template-columns: 1fr;
 }
-@media (min-width: 700px)  { .bb-product-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1040px) { .bb-product-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1360px) { .bb-product-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 700px)  { .bb-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1040px) { .bb-product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1360px) { .bb-product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.bb-grid-filler {
+  display: none;
+  min-height: 190px;
+  border-radius: 16px;
+  padding: 22px 20px;
+  background: #292C34;
+  color: #FFFFFF;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+}
+.bb-grid-filler > span { font: 10px 'IBM Plex Mono', monospace; letter-spacing: .16em; color: #AEB7CC; }
+.bb-grid-filler > strong { font-size: 18px; line-height: 1.2; letter-spacing: -.025em; max-width: 18ch; }
+.bb-grid-filler > small { font: 9px 'IBM Plex Mono', monospace; color: #7F899E; }
+@media (min-width: 700px) and (max-width: 1039px) { .bb-product-grid > .bb-fill-cols-2 { display: flex; } }
+@media (min-width: 1040px) and (max-width: 1359px) { .bb-product-grid > .bb-fill-cols-3 { display: flex; } }
+@media (min-width: 1360px) { .bb-product-grid > .bb-fill-cols-4 { display: flex; } }
 
 /* ---- endpoint rows: whole row is the affordance ---- */
 .bb-endpoint { cursor: pointer; }
@@ -218,8 +236,15 @@ input, button, textarea, select { font: inherit; color: inherit; }
   gap: 14px;
   grid-template-columns: 1fr;
 }
-@media (min-width: 760px)  { .bb-screen-grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1180px) { .bb-screen-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 760px)  { .bb-screen-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1180px) { .bb-screen-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 760px) and (max-width: 1179px) { .bb-screen-grid > .bb-fill-cols-2 { display: flex; } }
+@media (min-width: 1180px) { .bb-screen-grid > .bb-fill-cols-3 { display: flex; } }
+
+.bb-footer { grid-template-columns: minmax(0,1.4fr) repeat(3,minmax(0,1fr)); }
+.bb-footer > div { min-width: 0; border: 1px solid #343943; border-radius: 13px; padding: 18px; }
+@media (max-width: 980px) { .bb-footer { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 560px) { .bb-footer { grid-template-columns: 1fr; } }
 
 /* scale the full 328×682 device down to fit inside a product card.
    Height must fit the WHOLE device (682 * 0.6 ≈ 410) or it crops. */

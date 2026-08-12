@@ -53,68 +53,68 @@ const SCREENS: Screen[] = ["accounts", "cards", "transfers", "exchange", "vaults
 // Every product renders its own phone screen alongside the call behind it.
 
 const products = [
-  { glyph: "AC", screen: "accounts" as Screen, tag: "ACCOUNTS", endpoint: "POST /v2/accounts", title: "Accounts", short: "Multi-currency accounts with real IBANs and sortcodes.",
-    body: "Open personal, business or sub-accounts in seconds. Each carries its own IBAN, account number and balance across six currencies, all reconciled on one ledger.",
-    rows: [{ k: "CURRENCIES", v: "6" }, { k: "IDENTIFIERS", v: "IBAN · SORT · ROUTING" }, { k: "SUB-ACCOUNTS", v: "UNLIMITED" }, { k: "OPEN TIME", v: "INSTANT" }],
-    code: 'await bb.accounts.create({\n  holder: "usr_41c",\n  currency: "EUR",\n  type: "personal"\n});\n\n// → { iban: "DE89…", balance: 0 }' },
-  { glyph: "CD", screen: "cards" as Screen, tag: "CARDS", endpoint: "POST /v2/cards", title: "Cards", short: "Issue virtual and physical cards with per-card rules.",
-    body: "Issue a virtual card instantly or order physical plastic. Freeze, set spend limits, restrict merchant categories and stream authorisations as they happen.",
-    rows: [{ k: "TYPES", v: "VIRTUAL · PHYSICAL" }, { k: "CONTROLS", v: "LIMITS · MCC · FREEZE" }, { k: "WALLETS", v: "APPLE · GOOGLE" }, { k: "AUTH STREAM", v: "WEBHOOK" }],
-    code: 'await bb.cards.issue({\n  account: "acc_92f",\n  form: "virtual",\n  limits: { daily: 500_00 }\n});\n\n// → { last4: "4417", state: "active" }' },
-  { glyph: "TR", screen: "transfers" as Screen, tag: "TRANSFERS", endpoint: "POST /v2/transfers", title: "Transfers", short: "Local rails, SWIFT and on-chain from one call.",
-    body: "Send on SEPA Instant, Faster Payments, ACH, wire or stablecoin rails with a single payload. Blueballs picks the cheapest route that meets your deadline.",
-    rows: [{ k: "RAILS", v: "6" }, { k: "SETTLEMENT", v: "SECONDS ON INSTANT RAILS" }, { k: "CUT-OFFS", v: "QUERYABLE" }, { k: "LEGS", v: "PER-RAIL STATUS" }],
-    code: 'await bb.transfers.send({\n  from: "acc_92f",\n  to: { iban: "FR76…" },\n  amount: 2_400_00, rail: "sepa_instant"\n});' },
-  { glyph: "FX", screen: "exchange" as Screen, tag: "EXCHANGE", endpoint: "POST /v2/exchange", title: "Exchange", short: "FX and crypto conversion at interbank rates.",
-    body: "Convert between currencies and stablecoins at interbank mid plus four basis points. Quotes hold for thirty seconds and settle atomically against the balance.",
-    rows: [{ k: "PAIRS", v: "30" }, { k: "SPREAD", v: "4 BPS · 85 THIN" }, { k: "QUOTE HOLD", v: "30 SECONDS" }, { k: "EXPIRY", v: "ENFORCED · 409" }],
-    code: 'await bb.exchange.quote({\n  from: "USD", to: "EUR",\n  amount: 10_000_00\n});\n\n// → { rate: 0.9234, expires_in: 30 }' },
-  { glyph: "VT", screen: "vaults" as Screen, tag: "VAULTS", endpoint: "POST /v2/vaults", title: "Savings vaults", short: "Goal-based savings paying daily interest.",
-    body: "Ring-fence money into named vaults with round-ups, recurring deposits and daily accrual. Balances stay withdrawable on demand with no notice period.",
-    rows: [{ k: "RATE", v: "3% DEFAULT · SET PER VAULT" }, { k: "ACCRUAL", v: "DAILY" }, { k: "LEDGER", v: "DOUBLE-ENTRY" }, { k: "WITHDRAWAL", v: "ON DEMAND" }],
-    code: 'await bb.vaults.create({\n  account: "acc_92f",\n  name: "Deposit",\n  target: 20_000_00, roundups: true\n});' },
-  { glyph: "CR", screen: "credit" as Screen, tag: "CREDIT", endpoint: "POST /v2/credit", title: "Credit lines", short: "Overdrafts and collateralised borrowing.",
-    body: "Extend revolving credit against deposits or crypto collateral. Limits, pricing and liquidation thresholds are configured per programme, with margin calls delivered by webhook.",
-    rows: [{ k: "COLLATERAL", v: "PER LINE" }, { k: "MAX LTV", v: "80% DEFAULT" }, { k: "DRAW", v: "LTV-CAPPED" }, { k: "REPAY", v: "PARTIAL OK" }],
-    code: 'await bb.credit.open({\n  account: "acc_92f",\n  limit: 25_000_00,\n  collateral: { asset: "BTC", qty: 0.5 }\n});' },
-  { glyph: "BZ", screen: "business" as Screen, tag: "BUSINESS", endpoint: "POST /v2/orgs", title: "Business banking", short: "Teams, roles, approvals and expense rules.",
-    body: "Give organisations member roles, spend policies, multi-step approvals and per-team cards. Every action is written to an immutable audit log.",
-    rows: [{ k: "ROLES", v: "OWNER · ADMIN · MEMBER" }, { k: "APPROVALS", v: "MULTI-STEP" }, { k: "POLICIES", v: "PER TEAM" }, { k: "AUDIT LOG", v: "IMMUTABLE" }],
-    code: 'await bb.orgs.policy({\n  org: "org_7a2",\n  rule: { over: 1_000_00, approvals: 2 }\n});' },
-  { glyph: "LG", screen: "ledger" as Screen, tag: "LEDGER", endpoint: "GET /v2/ledger", title: "Statements", short: "Double-entry ledger with exports and webhooks.",
-    body: "Every movement lands in a double-entry ledger you can query, stream or export. Statements are produced as CSV, PDF or signed JSON for auditors.",
-    rows: [{ k: "MODEL", v: "DOUBLE-ENTRY" }, { k: "EXPORTS", v: "CSV · PDF · JSON" }, { k: "EVENTS", v: "SIGNED WEBHOOKS" }, { k: "RETENTION", v: "10 YEARS" }],
-    code: 'await bb.ledger.statement({\n  account: "acc_92f",\n  from: "2026-07-01", to: "2026-07-31"\n});' },
+  { glyph: "AC", screen: "accounts" as Screen, tag: "ACCOUNTS", endpoint: "POST /v2/accounts", title: "Accounts", short: "Create multi-currency sandbox accounts and receiving details.",
+    body: "Model personal and business accounts across six configured currencies. The sandbox generates sample identifiers and records every balance change on its ledger.",
+    rows: [{ k: "CURRENCIES", v: "6 CONFIGURED" }, { k: "DETAILS", v: "SAMPLE IBAN · SORT · ROUTING" }, { k: "BALANCES", v: "LEDGER-BACKED" }, { k: "MODE", v: "SANDBOX" }],
+    code: 'fetch("/v2/accounts", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ customer: "cus_41c", currency: "EUR" })\n});' },
+  { glyph: "CD", screen: "cards" as Screen, tag: "CARDS", endpoint: "POST /v2/cards", title: "Cards", short: "Create sandbox cards and test controls and decisions.",
+    body: "Create virtual or physical card records, freeze them, set limits, block merchant categories and test authorisation outcomes in the sandbox.",
+    rows: [{ k: "TYPES", v: "VIRTUAL · PHYSICAL RECORDS" }, { k: "CONTROLS", v: "LIMITS · MCC · FREEZE" }, { k: "AUTHORISATIONS", v: "SANDBOX" }, { k: "PROVIDER", v: "NOT INCLUDED" }],
+    code: 'fetch("/v2/cards", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ account: "acc_92f", form: "virtual" })\n});' },
+  { glyph: "TR", screen: "transfers" as Screen, tag: "TRANSFERS", endpoint: "POST /v2/transfers", title: "Transfers", short: "Model transfers across six configured payment rails.",
+    body: "Create sandbox transfers on SEPA Instant, Faster Payments, ACH, wire and other configured rails. Each leg keeps its own status so failures are visible.",
+    rows: [{ k: "RAILS", v: "6 REFERENCE" }, { k: "STATUS", v: "PER LEG" }, { k: "CUT-OFFS", v: "QUERYABLE" }, { k: "REAL MONEY", v: "NONE" }],
+    code: 'fetch("/v2/transfers", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ from: "acc_92f", amount: "2400.00", rail: "sepa_instant" })\n});' },
+  { glyph: "FX", screen: "exchange" as Screen, tag: "EXCHANGE", endpoint: "POST /v2/quotes", title: "Exchange", short: "Create expiring quotes for configured currency pairs.",
+    body: "Request a reference quote, inspect its rate and expiry, then test what happens when a client executes it before or after the hold ends.",
+    rows: [{ k: "PRICES", v: "REFERENCE DATA" }, { k: "QUOTE HOLD", v: "30 SECONDS" }, { k: "EXPIRY", v: "ENFORCED" }, { k: "LIVE MARKET", v: "NOT INCLUDED" }],
+    code: 'fetch("/v2/quotes", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ from: "USD", to: "EUR", amount: "10000.00" })\n});' },
+  { glyph: "VT", screen: "vaults" as Screen, tag: "VAULTS", endpoint: "POST /v2/vaults", title: "Savings vaults", short: "Model named balances, deposits, withdrawals and accrual.",
+    body: "Create a sandbox vault, move ledger balances in and out, and test round-up and accrual rules without presenting it as a live savings product.",
+    rows: [{ k: "RATE", v: "CONFIGURABLE" }, { k: "ACCRUAL", v: "REFERENCE LOGIC" }, { k: "LEDGER", v: "DOUBLE-ENTRY" }, { k: "MODE", v: "SANDBOX" }],
+    code: 'fetch("/v2/vaults", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ account: "acc_92f", name: "Deposit", target: "20000.00" })\n});' },
+  { glyph: "CR", screen: "credit" as Screen, tag: "CREDIT", endpoint: "POST /v2/credit", title: "Credit lines", short: "Test limits, draws, repayments and collateral checks.",
+    body: "Model a revolving credit line in the sandbox. Configure its limit and collateral, then test draws, repayments and loan-to-value checks.",
+    rows: [{ k: "COLLATERAL", v: "PER LINE" }, { k: "MAX LTV", v: "CONFIGURABLE" }, { k: "DRAW", v: "LIMIT-CHECKED" }, { k: "LENDER", v: "NOT INCLUDED" }],
+    code: 'fetch("/v2/credit", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ account: "acc_92f", limit: "25000.00" })\n});' },
+  { glyph: "BZ", screen: "business" as Screen, tag: "BUSINESS", endpoint: "POST /v2/orgs", title: "Business banking", short: "Model organisations, roles, policies and approvals.",
+    body: "Create organisations, add members and test role-based policies and approval chains. Actions appear in the reference event history.",
+    rows: [{ k: "ROLES", v: "OWNER · ADMIN · MEMBER" }, { k: "APPROVALS", v: "MULTI-STEP" }, { k: "POLICIES", v: "ATTACHABLE" }, { k: "HISTORY", v: "EVENT RECORDS" }],
+    code: 'fetch("/v2/orgs", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ name: "Kessler Ltd" })\n});' },
+  { glyph: "LG", screen: "ledger" as Screen, tag: "LEDGER", endpoint: "GET /v2/ledger", title: "Ledger & statements", short: "Query double-entry records and create sandbox statements.",
+    body: "Inspect ledger entries and point-in-time balances, then generate reference statement exports. The included PDF format is a development stand-in.",
+    rows: [{ k: "MODEL", v: "DOUBLE-ENTRY" }, { k: "EXPORTS", v: "REFERENCE FORMATS" }, { k: "EVENTS", v: "QUERYABLE" }, { k: "MODE", v: "SANDBOX" }],
+    code: 'fetch("/v2/ledger?account=acc_92f", {\n  headers: { "x-api-key": key }\n});' },
   // Products with no phone screen of their own — they show on the tiles and the
   // products page, and link into the docs rather than pinning a hero screen.
-  { glyph: "KY", screen: "signup" as Screen, tag: "ONBOARDING", endpoint: "POST /v2/applications", title: "Onboarding & KYC", short: "KYC and KYB with status kept separate from the decision.",
-    body: "Run individual and business onboarding: collect details, add associated individuals, upload documents, submit for verification and record enhanced due diligence. Lifecycle status never collapses into the outcome, so a review still running never looks like a rejection.",
-    rows: [{ k: "ENDPOINTS", v: "14" }, { k: "STATUS", v: "SEPARATE FROM DECISION" }, { k: "DOCUMENTS", v: "UPLOAD · FETCH" }, { k: "EDD", v: "SUPPORTED" }],
-    code: 'await bb.applications.create({\n  customer: "cus_41c",\n  type: "business"\n});\n\n// → { status: "pending", decision: null }' },
-  { glyph: "QR", screen: "deposit-onchain" as Screen, tag: "QR", endpoint: "POST /v2/qr/generate", title: "QR & payment links", short: "EMVCo QR both ways, plus shareable payment links.",
-    body: "Generate a real EMVCo merchant-presented payload with a CRC-16 checksum, decode one back into structured fields, and reject anything tampered with. Static and dynamic both supported, alongside single-use payment links.",
+  { glyph: "KY", screen: "signup" as Screen, tag: "ONBOARDING", endpoint: "POST /v2/applications", title: "Onboarding & KYC", short: "Model KYC and KYB application states and decisions.",
+    body: "Collect application data, documents, associated people and due-diligence records. Blueballs models the workflow; a production deployment supplies the verification provider.",
+    rows: [{ k: "ENDPOINTS", v: "14" }, { k: "STATUS", v: "SEPARATE FROM DECISION" }, { k: "DOCUMENTS", v: "UPLOAD · FETCH" }, { k: "EDD", v: "MODELLED" }],
+    code: 'fetch("/v2/applications", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ customer: "cus_41c", type: "business" })\n});' },
+  { glyph: "QR", screen: "deposit-onchain" as Screen, tag: "QR", endpoint: "POST /v2/qr/generate", title: "QR & payment links", short: "Generate and validate EMVCo QR payloads and link records.",
+    body: "Build merchant-presented QR payloads with CRC-16 checksums, decode them into fields, reject changed payloads and create sandbox payment-link records.",
     rows: [{ k: "STANDARD", v: "EMVCo MPM" }, { k: "CHECKSUM", v: "CRC-16/CCITT" }, { k: "TYPES", v: "STATIC · DYNAMIC" }, { k: "TAMPERING", v: "REJECTED" }],
-    code: 'await bb.qr.generate({\n  merchant: { name: "Coffee Corner" },\n  currency: "SGD", amount: "23.75"\n});' },
-  { glyph: "WL", screen: "deposit-onchain" as Screen, tag: "WALLETS", endpoint: "POST /v2/wallets", title: "Wallets", short: "On-chain balances with policies attached.",
-    body: "Create wallets under a customer, read balances per asset and network, and send with spend policies and approval chains enforced before anything moves.",
+    code: 'fetch("/v2/qr/generate", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ merchant: { name: "Coffee Corner", city: "Singapore", country: "SG" }, currency: "SGD", amount: "23.75" })\n});' },
+  { glyph: "WL", screen: "deposit-onchain" as Screen, tag: "WALLETS", endpoint: "POST /v2/wallets", title: "Wallets", short: "Track sandbox balances and test policy-gated sends.",
+    body: "Create wallet records, read balances by asset and network, and test policy and approval checks. No blockchain or custody provider is connected.",
     rows: [{ k: "ENDPOINTS", v: "6" }, { k: "POLICIES", v: "ATTACHABLE" }, { k: "APPROVALS", v: "THRESHOLD-GATED" }, { k: "LEDGER", v: "DOUBLE-ENTRY" }],
-    code: 'await bb.wallets.send({\n  wallet: "wal_7a2",\n  to: "0x8f2c…", amount: "250.00"\n});' },
-  { glyph: "WH", screen: "deposit-pending" as Screen, tag: "WEBHOOKS", endpoint: "POST /v2/webhooks", title: "Webhooks & events", short: "Signed delivery, a delivery log, and replay.",
-    body: "Register targets and receive HMAC-signed callbacks on every state change. Thirty days of delivery history, and a replay that carries an explicit header so a receiver can tell it from an original.",
-    rows: [{ k: "SIGNING", v: "HMAC-SHA256" }, { k: "HISTORY", v: "30 DAYS" }, { k: "REPLAY", v: "X-WEBHOOK-REPLAY" }, { k: "EVENTS", v: "FULL AUDIT STREAM" }],
-    code: 'await bb.webhooks.create({\n  url: "https://you.dev/hook",\n  events: ["transfer.status_changed"]\n});' },
-  { glyph: "SB", screen: "card-declined" as Screen, tag: "SANDBOX", endpoint: "GET /v2/sandbox/scenarios", title: "Sandbox & failure injection", short: "Force any failure on purpose, then step past it.",
-    body: "A discoverable scenario catalogue covering compliance holds, manual review and unconfirmed payments. Stateful simulations pause mid-flow and wait for an explicit advance, so you can build against failure instead of hoping.",
+    code: 'fetch("/v2/wallets/wal_7a2/send", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ to: "0x8f2c…", amount: "250.00" })\n});' },
+  { glyph: "WH", screen: "deposit-pending" as Screen, tag: "WEBHOOKS", endpoint: "POST /v2/webhooks", title: "Webhooks & events", short: "Send signed callbacks, inspect deliveries and replay them.",
+    body: "Register a target for reference events, inspect delivery records and replay a callback with a header that distinguishes it from the original.",
+    rows: [{ k: "SIGNING", v: "HMAC-SHA256" }, { k: "HISTORY", v: "30 DAYS" }, { k: "REPLAY", v: "X-WEBHOOK-REPLAY" }, { k: "EVENTS", v: "REFERENCE RECORDS" }],
+    code: 'fetch("/v2/webhooks", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ url: "https://you.dev/hook", events: ["transfer.status_changed"] })\n});' },
+  { glyph: "SB", screen: "card-declined" as Screen, tag: "SANDBOX", endpoint: "GET /v2/sandbox/scenarios", title: "Sandbox scenarios", short: "Trigger predefined failures and advance paused simulations.",
+    body: "Use the scenario catalogue to test compliance holds, manual review and unconfirmed payments. Paused simulations continue only when you advance them.",
     rows: [{ k: "SCENARIOS", v: "CATALOGUED" }, { k: "PAUSE", v: "AWAITING_ADVANCE" }, { k: "IDEMPOTENT", v: "ON SIMULATION ID" }, { k: "CALLBACKS", v: "TRACKED" }],
-    code: 'await bb.sandbox.onboarding({\n  scenario: "onboarding.compliance_hold"\n});\n\n// → { awaiting_advance: true }' },
-  { glyph: "BL", screen: "funded-home" as Screen, tag: "BILLS", endpoint: "POST /v2/mandates", title: "Bills & subscriptions", short: "Direct debit mandates and recurring payments.",
-    body: "Create a mandate, then schedule recurring payments against it. Mandate status is checked before a subscription can be created, so a dead mandate cannot quietly keep charging.",
+    code: 'fetch("/v2/sandbox/onboarding", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ scenario: "onboarding.compliance_hold" })\n});' },
+  { glyph: "BL", screen: "funded-home" as Screen, tag: "BILLS", endpoint: "POST /v2/mandates", title: "Bills & subscriptions", short: "Model mandates and recurring payment schedules.",
+    body: "Create mandate records and schedule recurring payments against active mandates. The sandbox does not collect a live direct debit.",
     rows: [{ k: "MANDATES", v: "SCHEME-AWARE" }, { k: "SCHEDULE", v: "INTERVAL + NEXT RUN" }, { k: "GUARD", v: "INACTIVE → 409" }, { k: "ENDPOINTS", v: "4" }],
-    code: 'await bb.subscriptions.create({\n  mandate: "mnd_9f4",\n  amount: "12.99", interval: "month"\n});' },
-  { glyph: "RL", screen: "deposit-rails" as Screen, tag: "RAILS", endpoint: "GET /v2/rails", title: "Rails registry", short: "Cut-offs and calendars as data, not a docs table.",
-    body: "Every rail's currency, speed, cut-off, weekend behaviour and limits are queryable at runtime. Stop hardcoding which rails are open when — ask the API.",
+    code: 'fetch("/v2/subscriptions", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ mandate: "mnd_9f4", amount: "12.99", interval: "month" })\n});' },
+  { glyph: "RL", screen: "deposit-rails" as Screen, tag: "RAILS", endpoint: "GET /v2/rails", title: "Rails registry", short: "Query six reference rails, limits, cut-offs and calendars.",
+    body: "Read the configured currency, speed, cut-off, weekend behaviour and limits for each reference rail from the API.",
     rows: [{ k: "RAILS", v: "6" }, { k: "CUT-OFFS", v: "QUERYABLE" }, { k: "CALENDAR", v: "PER RAIL" }, { k: "AUTH", v: "PUBLIC" }],
-    code: 'await bb.rails.get("ach");\n\n// → { cutoff: "17:00 ET",\n//     weekend: false }' },
+    code: 'fetch("/v2/rails/ach").then((response) => response.json());' },
 ];
 
 // Only rails the API actually implements — see RAILS in apps/api/src/kernel.js
@@ -122,35 +122,47 @@ const rails = ["SEPA Instant", "SEPA", "Faster Payments", "ACH", "Wire", "PayNow
 /* Ticker and platform totals are NOT hardcoded — see useState below, populated
  * from GET /v2/site/stats and GET /v2/rails on mount. This placeholder shows
  * while that load is in flight. */
-const TICKS_LOADING = ["CONNECTING TO THE LIVE API…"];
+const TICKS_LOADING = ["CONNECTING TO THE HOSTED SANDBOX…"];
 const guides = [
-  { kind: "GUIDE", title: "Idempotency", body: "Safe retries on every write endpoint, with a 24-hour replay window." },
-  { kind: "GUIDE", title: "Card authorisations", body: "Approve or decline in your own webhook within 800ms." },
-  { kind: "RUNBOOK", title: "Self-hosting", body: "Node stdlib + SQLite. No Docker, no external database. pnpm dev and you're running." },
+  { kind: "GUIDE", title: "Idempotency", body: "Retry write requests without creating the same sandbox object twice." },
+  { kind: "GUIDE", title: "Card authorisations", body: "Simulate an authorisation and record an approve or decline decision." },
+  { kind: "RUNBOOK", title: "Run it locally", body: "Install the packages and start the site, banking API and FX node with pnpm dev." },
 ];
 const posts = [
-  { date: "07 AUG 2026", title: "Every number on this site is now real or labelled", excerpt: "We audited our own marketing copy and found eleven invented figures — settled volume, uptime, a star count, an SDK that did not exist. All removed or wired to the live API.", tag: "NOTES" },
-  { date: "07 AUG 2026", title: "One command runs the whole stack", excerpt: "pnpm dev now starts the site and the API together, with no new dependencies. Self-hosting should not need a runbook.", tag: "RELEASE" },
-  { date: "06 AUG 2026", title: "All 144 endpoints implemented", excerpt: "Six resource-family modules built in parallel, each owning one file so they could not collide. Every catalogued endpoint now returns a real response.", tag: "RELEASE" },
-  { date: "06 AUG 2026", title: "Why unbuilt endpoints return 501, not 404", excerpt: "A 404 tells a caller they typed the URL wrong. A deliberate 501 tells them the truth: this is in the contract and not built yet.", tag: "ENGINEERING" },
-  { date: "06 AUG 2026", title: "Durable by default, on the standard library", excerpt: "Storage moved to SQLite through node:sqlite. Zero new dependencies, and your sandbox data survives a restart.", tag: "ENGINEERING" },
-  { date: "06 AUG 2026", title: "We were issuing the same routing number to everyone", excerpt: "Every USD account got one hardcoded ABA and every GBP account one sort code. Now generated per account, with real checksums.", tag: "INCIDENT" },
-];
-const fields = [
-  { label: "01 · NAME", placeholder: "Ada Lovelace" },
-  { label: "02 · EMAIL", placeholder: "ada@example.com" },
-  { label: "03 · ORGANISATION", placeholder: "Optional" },
+  { date: "07 AUG 2026", title: "Removing claims the code could not support", excerpt: "The site audit removed invented usage figures, package names and performance claims. Reference data is now labelled as reference data.", tag: "NOTES" },
+  { date: "07 AUG 2026", title: "One command starts the reference stack", excerpt: "pnpm dev starts the site, banking API and FX node for local development.", tag: "RELEASE" },
+  { date: "06 AUG 2026", title: "The full API catalogue now responds", excerpt: "All 144 catalogued routes now return an intentional reference response instead of falling through to an unknown route.", tag: "RELEASE" },
+  { date: "06 AUG 2026", title: "Making unfinished routes explicit", excerpt: "The route registry distinguishes an unknown URL from a catalogue entry that still needs an implementation.", tag: "ENGINEERING" },
+  { date: "06 AUG 2026", title: "Sandbox data now survives a restart", excerpt: "The local banking API stores reference state in SQLite through node:sqlite.", tag: "ENGINEERING" },
+  { date: "06 AUG 2026", title: "Generating separate sample receiving details", excerpt: "Sandbox accounts now receive distinct checksum-valid reference identifiers instead of sharing one fixture value.", tag: "FIX" },
 ];
 const counters = [
-  { title: "GitHub issues", body: "Not published yet — this repo hasn't shipped. Issues will be the fastest route to a maintainer once it has." },
-  { title: "Self-host it", body: "Clone this repo, run pnpm dev, and you have the whole stack — API and site — running locally." },
-  { title: "Security", body: "No public repo yet, so no disclosure address either. That gets set up before this ships." },
+  { title: "GitHub issues", body: "Report a bug or ask a project question in the public repository." },
+  { title: "Run it locally", body: "Clone the repository and run pnpm dev to start the site and reference APIs." },
+  { title: "Security", body: "Read the security policy before reporting a vulnerability or evaluating a deployment." },
 ];
 const footer = [
-  { head: "PRODUCT", links: ["Accounts", "Cards", "Transfers", "Exchange"] },
-  { head: "DEVELOPERS", links: ["Documentation", "API reference", "Status", "Changelog"] },
-  { head: "PROJECT", links: ["GitHub", "Licence", "Sponsors", "Security"] },
+  { head: "PRODUCT", links: [["Products", "/products"], ["Stablecoin FX", "/fx"], ["Providers", "/ecosystem"]] },
+  { head: "DEVELOPERS", links: [["Developer guide", "/developers"], ["API reference", "/developers"], ["Build notes", "/bulletin"]] },
+  { head: "PROJECT", links: [["GitHub", "https://github.com/Josh-Gi3r/blueballs"], ["Licence", "https://github.com/Josh-Gi3r/blueballs/blob/main/LICENSE"], ["Security", "https://github.com/Josh-Gi3r/blueballs/blob/main/SECURITY.md"]] },
 ];
+const GRID_FILLER_COPY = [
+  ["OPEN SOURCE", "MIT licensed."],
+  ["SELF-HOSTABLE", "Run it locally with pnpm dev."],
+  ["REFERENCE API", "144 catalogued endpoints."],
+] as const;
+
+function GridFillers({ count }: { count: number }) {
+  return <>{([2, 3, 4] as const).flatMap((columns) => {
+    const missing = (columns - (count % columns)) % columns;
+    return Array.from({ length: missing }, (_, index) => {
+      const [label, copy] = GRID_FILLER_COPY[index % GRID_FILLER_COPY.length];
+      return <div aria-hidden="true" className={`bb-grid-filler bb-fill-cols-${columns}`} key={`${columns}-${index}`}>
+        <span>{label}</span><strong>{copy}</strong><small>BLUEBALLS · MIT LICENCE</small>
+      </div>;
+    });
+  })}</>;
+}
 const quickstart = 'git clone <this repo>\ncd blueballs && pnpm install\npnpm dev            # site → :5280, api → :5290\n\ncurl -X POST http://localhost:5290/v2/auth/signup \\\n  -H "content-type: application/json" \\\n  -d \'{"email":"you@example.com"}\'\n\n// → { "key": "bb_sandbox_…", "scope": "sandbox", … }';
 const devInstall = "$ git clone <this repo>\n$ cd blueballs && pnpm install\n$ pnpm dev\n\n  site   http://localhost:5280\n  api    http://localhost:5290/v2";
 const devCall = 'curl -X POST http://localhost:5290/v2/auth/signup \\\n  -H "content-type: application/json" \\\n  -d \'{"email":"you@example.com"}\'\n\n// → { "key": "bb_sandbox_…", "scope": "sandbox",\n//     "note": "…only time the key is shown." }';
@@ -162,7 +174,6 @@ export default function App() {
 
   const [screen, setScreen] = useState<Screen>("accounts");
   const [pinned, setPinned] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [apiFilter, setApiFilter] = useState("");
 
   // Real platform counts — GET /v2/site/stats. No invented numbers on this page.
@@ -188,14 +199,14 @@ export default function App() {
           out.push(rail.cutoff ? `${label} CUT-OFF ${rail.cutoff}` : `${label} · ${rail.speed.toUpperCase()}`);
         }
       }
-      out.push("FX SPREAD 4 BPS · DEEP LIQUIDITY");
+      out.push("REFERENCE SANDBOX · NO REAL MONEY MOVES");
       if (stats) {
         out.push(`ACCOUNTS OPEN ${stats.accounts}`);
         out.push(`CUSTOMERS ${stats.customers}`);
         out.push(`TRANSFERS PROCESSED ${stats.transfers}`);
-        out.push(`ENDPOINTS LIVE ${stats.endpoints_implemented}/${stats.endpoints_catalogued}`);
+        out.push(`ENDPOINTS AVAILABLE ${stats.endpoints_implemented}/${stats.endpoints_catalogued}`);
       }
-      setTicks(out.length ? out : ["LIVE DATA UNAVAILABLE — IS THE API RUNNING?"]);
+      setTicks(out.length ? out : ["SANDBOX DATA UNAVAILABLE — IS THE API RUNNING?"]);
     })();
     return () => { alive = false; };
   }, [stats]);
@@ -251,11 +262,11 @@ export default function App() {
         { label: "Accounts open", value: String(stats.accounts) },
         { label: "Customers signed up", value: String(stats.customers) },
         { label: "Transfers processed", value: String(stats.transfers) },
-        { label: "Currencies supported", value: String(stats.currencies) },
+        { label: "Currencies configured", value: String(stats.currencies) },
       ]
     : statsErr
-    ? [{ label: "Live stats", value: "API offline" }]
-    : [{ label: "Live stats", value: "loading…" }];
+    ? [{ label: "Sandbox stats", value: "API offline" }]
+    : [{ label: "Sandbox stats", value: "loading…" }];
 
   const q = apiFilter.trim().toLowerCase();
   const shownFamilies = !q ? FAMILIES : FAMILIES
@@ -270,7 +281,7 @@ export default function App() {
   const ink: CSSProperties = { fontSize: 14, fontWeight: 500, padding: "14px 24px", cursor: "pointer", border: "1px solid #14161C", borderRadius: 10, background: "#14161C", color: "#FFFFFF" };
   const nav: { key: Page; label: string }[] = [
     { key: "home", label: "Home" }, { key: "products", label: "Products" }, { key: "fx", label: "Stablecoin FX" },
-    { key: "dev", label: "Developers" }, { key: "blog", label: "Bulletin" },
+    { key: "dev", label: "Developers" }, { key: "blog", label: "Build notes" },
   ];
 
   return (
@@ -292,9 +303,9 @@ export default function App() {
               hover={{ color: "#14161C" }}>{t.label}</H>
           ))}
         </div>
-        <H as="button" onClick={() => setPage("contact")}
+        <H as="button" onClick={() => setPage("dev")}
           style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #14161C", borderRadius: 10, background: "#14161C", color: "#FFFFFF" }}
-          hover={{ background: "#5A6DB8", borderColor: "#5A6DB8" }}>Get a key</H>
+          hover={{ background: "#5A6DB8", borderColor: "#5A6DB8" }}>Try the sandbox</H>
       </div>
 
       <div style={{ width: "100%", maxWidth: 1200, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -318,27 +329,27 @@ export default function App() {
               {/* hero + the call behind this screen */}
               <div data-pad style={{ ...card, padding: "56px 46px 44px", display: "flex", flexDirection: "column", gap: 24 }}>
                 <div style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 8, background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 999, padding: "6px 13px", fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.14em", color: "#4E5FA6" }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#5A6DB8" }} />MIT LICENCED · FREE FOREVER
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#5A6DB8" }} />FREE · MIT LICENSED · SELF-HOSTABLE
                 </div>
                 <h1 style={{ margin: 0, fontSize: "clamp(30px, 3.6vw, 50px)", lineHeight: 1.1, fontWeight: 600, letterSpacing: "-0.035em", textWrap: "balance" as CSSProperties["textWrap"] }}>
-                  The banking stack,<br />open sourced.<br /><span style={{ color: "#5A6DB8" }}>Accounts, cards, exchange.</span>
+                  Open-source software<br />for building a neobank.<br /><span style={{ color: "#5A6DB8" }}>Run it. Read it. Extend it.</span>
                 </h1>
                 <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "50ch", color: "#454B5C" }}>
-                  Blueballs gives any product the primitives a modern bank runs on — multi-currency accounts, issued cards, transfers, savings and exchange — behind one API. Hosted or self-hosted, with no licence to negotiate.
+                  Blueballs is free, MIT-licensed software for accounts, cards, transfers, onboarding, ledger and FX. Create a sandbox key yourself, run the code locally and connect the services your production deployment needs. The goal is to lower the cost of building financial products so more teams can serve people traditional banks overlook or exclude.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <H as="button" onClick={() => setPage("contact")} style={ink} hover={{ background: "#5A6DB8", borderColor: "#5A6DB8" }}>Request a key</H>
+                  <H as="button" onClick={() => setPage("dev")} style={ink} hover={{ background: "#5A6DB8", borderColor: "#5A6DB8" }}>Try the sandbox</H>
                   <H as="button" onClick={() => setPage("dev")} style={{ ...ink, border: "1px solid #D7DBE4", background: "#FFFFFF", color: "#14161C" }} hover={{ borderColor: "#14161C" }}>Read the docs</H>
                 </div>
                 <div style={{ display: "flex", gap: 32, flexWrap: "wrap", paddingTop: 22, borderTop: "1px solid #E7EAF0", fontFamily: MONO, fontSize: 11, letterSpacing: "0.08em", color: "#7A8296" }}>
                   <span>{stats ? stats.currencies : 6} CURRENCIES</span>
                   <span>{quoteMs !== null ? `${quoteMs}MS QUOTE ROUND-TRIP` : quoteErr ? "QUOTES OFFLINE" : "MEASURING QUOTE LATENCY…"}</span>
-                  <span>MIT · SELF-HOSTED</span>
+                  <span>MIT LICENSE · SELF-HOSTABLE</span>
                 </div>
 
                 <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
-                    <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>THE CALL BEHIND THIS SCREEN</div>
+                    <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>EXAMPLE REQUEST</div>
                     <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6", border: "1px solid #DADFF2", background: "#EEF1FA", borderRadius: 999, padding: "5px 12px" }}>{active.endpoint}</div>
                   </div>
                   <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 14, padding: "20px 22px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{active.code}</div>
@@ -393,6 +404,7 @@ export default function App() {
                   </H>
                 );
               })}
+              <GridFillers count={products.length} />
             </div>
 
             {/* quickstart + platform */}
@@ -404,7 +416,7 @@ export default function App() {
               <div data-pad style={{ ...card, padding: "30px 32px 26px", display: "flex", flexDirection: "column" }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
                   <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>PLATFORM</div>
-                  <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.1em", color: "#7A8296" }}>LIVE FROM THIS SANDBOX</div>
+                  <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.1em", color: "#7A8296" }}>CURRENT HOSTED SANDBOX</div>
                 </div>
                 {totals.map((t) => (
                   <div key={t.label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 14, padding: "14px 0", borderBottom: "1px solid #E7EAF0" }}>
@@ -418,10 +430,10 @@ export default function App() {
             {/* CTA */}
             <div data-pad style={{ background: "#5A6DB8", color: "#FFFFFF", borderRadius: 18, padding: "42px 44px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ fontSize: "clamp(24px, 2.6vw, 32px)", fontWeight: 600, letterSpacing: "-0.03em" }}>Open an account.</div>
-                <div style={{ fontSize: 15.5, lineHeight: 1.6, maxWidth: "48ch", opacity: 0.9 }}>Sandbox keys are issued instantly and cost nothing. Clone this repo and run pnpm dev if you would rather run it yourself.</div>
+                <div style={{ fontSize: "clamp(24px, 2.6vw, 32px)", fontWeight: 600, letterSpacing: "-0.03em" }}>Try the reference API.</div>
+                <div style={{ fontSize: 15.5, lineHeight: 1.6, maxWidth: "48ch", opacity: 0.9 }}>Create a sandbox key here, or clone the repository and run the full reference stack locally.</div>
               </div>
-              <H as="button" onClick={() => setPage("contact")} style={{ fontSize: 14, fontWeight: 500, padding: "15px 26px", cursor: "pointer", border: "1px solid #FFFFFF", borderRadius: 10, background: "#FFFFFF", color: "#14161C" }} hover={{ background: "transparent", color: "#FFFFFF" }}>Get your key</H>
+              <H as="button" onClick={() => setPage("dev")} style={{ fontSize: 14, fontWeight: 500, padding: "15px 26px", cursor: "pointer", border: "1px solid #FFFFFF", borderRadius: 10, background: "#FFFFFF", color: "#14161C" }} hover={{ background: "transparent", color: "#FFFFFF" }}>Get a sandbox key</H>
             </div>
           </div>
         )}
@@ -431,11 +443,11 @@ export default function App() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div data-pad style={{ ...card, padding: "46px 46px 40px" }}>
               <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>PRODUCTS</div>
-              <h1 style={{ margin: "14px 0 12px", fontSize: "clamp(28px, 3.2vw, 42px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Everything a bank ships.</h1>
-              <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "64ch", color: "#454B5C" }}>Eight products, one ledger. Open an account, issue a card, move money, hold balances in six currencies and reconcile it all from the same statement.</p>
+              <h1 style={{ margin: "14px 0 12px", fontSize: "clamp(28px, 3.2vw, 42px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Banking product models you can run and inspect.</h1>
+              <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "64ch", color: "#454B5C" }}>The repository models accounts, cards, transfers, onboarding, ledger, wallets and more behind one reference API. Use these flows as a starting point, then connect the services and controls required for production.</p>
             </div>
             <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296", margin: "6px 2px 0" }}>
-              {products.length} PRODUCTS · EACH WITH ITS SCREEN AND THE CALL BEHIND IT
+              {products.length} REFERENCE MODULES · EXAMPLE SCREEN + API REQUEST
             </div>
             <div className="bb-screen-grid">
               {products.map((p) => (
@@ -475,10 +487,11 @@ export default function App() {
                     <span style={{ fontFamily: MONO, fontSize: 10.5, color: "#7A8296" }}>{p.endpoint}</span>
                     <H as="button" onClick={() => setPage("dev")}
                       style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.08em", color: "#4E5FA6", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                      hover={{ color: "#14161C" }}>RUN IT →</H>
+                      hover={{ color: "#14161C" }}>VIEW ENDPOINT →</H>
                   </div>
                 </div>
               ))}
+              <GridFillers count={products.length} />
             </div>
 
             <H onClick={() => setPage("fx")}
@@ -486,13 +499,12 @@ export default function App() {
               hover={{ borderColor: "#5A6DB8" }}>
               <div>
                 <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>STABLECOIN FX</div>
-                <div style={{ fontSize: 21, fontWeight: 600, letterSpacing: "-0.025em", margin: "8px 0 6px" }}>One spread, not three.</div>
+                <div style={{ fontSize: 21, fontWeight: 600, letterSpacing: "-0.025em", margin: "8px 0 6px" }}>Inspect the canonical FX reference flow.</div>
                 <div style={{ fontSize: 14.5, lineHeight: 1.55, color: "#5B6376", maxWidth: "60ch" }}>
-                  Ramps are 1:1, only the corridor is priced, and the price derives itself from imbalance.
-                  Drag the thermostat, build a route, work out what providing liquidity pays.
+                  Follow one BRL-to-EUR request through policy checks, source selection, reservation and mixed-finality settlement.
                 </div>
               </div>
-              <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6", whiteSpace: "nowrap" }}>OPEN THE FX PAGE →</div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6", whiteSpace: "nowrap" }}>OPEN FX DEMO →</div>
             </H>
 
             <Journey />
@@ -508,11 +520,10 @@ export default function App() {
                 </div>
                 <H as="button" onClick={() => setPage("dev")}
                   style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #D7DBE4", borderRadius: 10, background: "#FFFFFF", color: "#14161C" }}
-                  hover={{ borderColor: "#14161C" }}>Run them in the docs →</H>
+                  hover={{ borderColor: "#14161C" }}>View the API reference →</H>
               </div>
               <p style={{ margin: "12px 0 20px", fontSize: 15.5, lineHeight: 1.6, maxWidth: "70ch", color: "#454B5C" }}>
-                The eight above are how people describe a bank. This is everything the API actually exposes —
-                every family below is implemented and callable today.
+                The API groups {TOTAL_ENDPOINTS} catalogued endpoints into {FAMILIES.length} resource families. Each one is available in the hosted reference sandbox.
               </p>
               <div className="bb-product-grid">
                 {FAMILIES.map((f) => (
@@ -526,11 +537,12 @@ export default function App() {
                     <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "#5B6376" }}>{f.blurb}</div>
                   </H>
                 ))}
+                <GridFillers count={FAMILIES.length} />
               </div>
             </div>
 
             <div data-pad style={{ ...card, padding: 32 }}>
-              <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296", marginBottom: 16 }}>RAILS AND NETWORKS</div>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296", marginBottom: 16 }}>REFERENCE RAILS</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {rails.map((c) => (
                   <H key={c} style={{ border: "1px solid #DDE1E8", borderRadius: 999, padding: "8px 16px", fontFamily: MONO, fontSize: 11.5, color: "#454B5C" }} hover={{ borderColor: "#5A6DB8", color: "#4E5FA6" }}>{c}</H>
@@ -563,14 +575,14 @@ export default function App() {
                   hover={{ color: "#4E5FA6", background: "#F0F2F7" }}>{item.label}</H>
               ))}
               <div style={{ padding: "16px 22px 0" }}>
-                <div style={{ borderTop: "1px solid #E7EAF0", paddingTop: 14, fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: "#5B6376" }}>MIT licence<br />Repository private while it stabilises</div>
+                <div style={{ borderTop: "1px solid #E7EAF0", paddingTop: 14, fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: "#5B6376" }}>MIT licence<br />Public reference repository</div>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div id="doc-overview" data-pad style={{ ...card, padding: "42px 40px 36px", scrollMarginTop: 90 }}>
-                <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>DEVELOPER MANUAL · REV 2.4</div>
-                <h1 style={{ margin: "14px 0 12px", fontSize: "clamp(26px, 3vw, 38px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Start moving money.</h1>
-                <p style={{ margin: 0, fontSize: 16.5, lineHeight: 1.62, maxWidth: "58ch", color: "#454B5C" }}>One base URL, one bearer token, JSON in and out. Sandbox keys are unmetered and every endpoint mirrors production semantics.</p>
+                <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>DEVELOPER GUIDE</div>
+                <h1 style={{ margin: "14px 0 12px", fontSize: "clamp(26px, 3vw, 38px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Use the reference API.</h1>
+                <p style={{ margin: 0, fontSize: 16.5, lineHeight: 1.62, maxWidth: "58ch", color: "#454B5C" }}>Create a sandbox key, send JSON requests with the x-api-key header and inspect the responses. This is reference behaviour, not a production banking service.</p>
               </div>
               <div data-col style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 18, padding: "24px 26px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{devInstall}</div>
@@ -587,7 +599,7 @@ export default function App() {
                 </div>
                 <div style={{ marginTop: 14 }}>
                   <div style={{ fontSize: 14, color: "#454B5C", marginBottom: 10, lineHeight: 1.55 }}>
-                    Every endpoint below runs for real against the API. Get a key and press Run — no approval, nothing simulated.
+                    These endpoints run against the hosted sandbox. They create reference data and never move real money or call production providers.
                   </div>
                   <KeyIssuer />
                 </div>
@@ -637,10 +649,10 @@ export default function App() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div data-pad style={{ ...card, padding: "42px 46px 36px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
               <div>
-                <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>BULLETIN · WEEKLY</div>
-                <h1 style={{ margin: "14px 0 0", fontSize: "clamp(28px, 3.2vw, 42px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Dispatches</h1>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>BUILD NOTES</div>
+                  <h1 style={{ margin: "14px 0 0", fontSize: "clamp(28px, 3.2vw, 42px)", fontWeight: 600, letterSpacing: "-0.035em" }}>What changed and why.</h1>
               </div>
-              <div style={{ fontFamily: MONO, fontSize: 11, color: "#7A8296", textAlign: "right", lineHeight: 1.7 }}>BUILD LOG<br />ENTRIES 001–006</div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "#7A8296", textAlign: "right", lineHeight: 1.7 }}>BUILD LOG<br />6 ENTRIES</div>
             </div>
             <div data-pad style={{ ...card, padding: "10px 32px 26px" }}>
               {posts.map((p, i) => (
@@ -661,33 +673,18 @@ export default function App() {
         {page === "contact" && (
           <div data-col style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 14, alignItems: "start" }}>
             <div data-pad style={{ ...card, padding: "42px 40px 38px" }}>
-              <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>APPLICATION · FORM AK-1</div>
-              <h1 style={{ margin: "14px 0 10px", fontSize: "clamp(26px, 3vw, 38px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Open an account.</h1>
-              <p style={{ margin: "0 0 26px", fontSize: 16, lineHeight: 1.62, maxWidth: "52ch", color: "#454B5C" }}>Sandbox keys are issued immediately, self-serve, no form required — hit the docs page. This form is for everything else: production access, self-hosting help, partnerships.</p>
-              <form onSubmit={(e) => { e.preventDefault(); setSubmitted(true); }} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {fields.map((f) => (
-                  <div key={f.label} style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                    <label style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296" }}>{f.label}</label>
-                    <H as="input" placeholder={f.placeholder} style={{ border: "1px solid #DDE1E8", borderRadius: 10, background: "#F7F8FB", padding: "13px 16px", fontSize: 15, outline: "none" }} focus={{ borderColor: "#5A6DB8", background: "#FFFFFF" }} />
-                  </div>
-                ))}
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  <label style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296" }}>04 · WHAT ARE YOU BUILDING</label>
-                  <H as="textarea" rows={4} placeholder="One or two lines is plenty" style={{ border: "1px solid #DDE1E8", borderRadius: 10, background: "#F7F8FB", padding: "13px 16px", fontSize: 15, outline: "none", resize: "vertical" }} focus={{ borderColor: "#5A6DB8", background: "#FFFFFF" }} />
-                </div>
-                <div style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 14, color: "#454B5C" }}>
-                  <input type="checkbox" style={{ width: 16, height: 16, marginTop: 3, accentColor: "#5A6DB8" }} />
-                  <span>Send me the weekly bulletin. Roughly 400 words, no marketing.</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
-                  <H as="button" type="submit" style={ink} hover={{ background: "#5A6DB8", borderColor: "#5A6DB8" }}>Submit application</H>
-                  <div style={{ fontSize: 13.5, color: "#4E5FA6", display: submitted ? "block" : "none" }}>Received — check your inbox.</div>
-                </div>
-              </form>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>PROJECT CONTACT</div>
+              <h1 style={{ margin: "14px 0 10px", fontSize: "clamp(26px, 3vw, 38px)", fontWeight: 600, letterSpacing: "-0.035em" }}>Talk to the project.</h1>
+              <p style={{ margin: "0 0 26px", fontSize: 16, lineHeight: 1.62, maxWidth: "52ch", color: "#454B5C" }}>Sandbox keys are available in the developer guide. For bugs, project questions or deployment discussions, use the public GitHub repository.</p>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <a href="https://github.com/Josh-Gi3r/blueballs/issues" target="_blank" rel="noreferrer" style={{ ...ink, display: "inline-block" }}>Open GitHub issues ↗</a>
+                <a href="https://github.com/Josh-Gi3r/blueballs" target="_blank" rel="noreferrer" style={{ ...ink, display: "inline-block", border: "1px solid #D7DBE4", background: "#FFFFFF", color: "#14161C" }}>View repository ↗</a>
+              </div>
+              <p style={{ margin: "22px 0 0", fontSize: 13.5, lineHeight: 1.6, color: "#7A8296" }}>There is no contact form or mailing list on this site yet.</p>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div style={{ ...card, padding: "26px 24px 22px" }}>
-                <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.18em", color: "#7A8296", marginBottom: 12 }}>OTHER COUNTERS</div>
+                <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.18em", color: "#7A8296", marginBottom: 12 }}>OTHER ROUTES</div>
                 {counters.map((c) => (
                   <div key={c.title} style={{ padding: "13px 0", borderTop: "1px solid #E7EAF0", display: "flex", flexDirection: "column", gap: 4 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.02em" }}>{c.title}</div>
@@ -695,22 +692,22 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 18, padding: "22px 24px", fontFamily: MONO, fontSize: 12, lineHeight: 1.85 }}>THIS REPO ISN'T PUBLISHED YET.<br />UNTIL IT IS, THIS FORM IS THE<br />ONLY WAY TO REACH A MAINTAINER.</div>
+              <a href="https://github.com/Josh-Gi3r/blueballs/blob/main/SECURITY.md" target="_blank" rel="noreferrer" style={{ display: "block", background: "#14161C", color: "#E4E7EE", borderRadius: 18, padding: "22px 24px", fontFamily: MONO, fontSize: 12, lineHeight: 1.85 }}>REPORT A SECURITY ISSUE<br />READ THE SECURITY POLICY ↗</a>
             </div>
           </div>
         )}
 
         {/* FOOTER */}
-        <div data-col data-pad style={{ ...card, padding: "32px 38px 28px", display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 1fr", gap: 26 }}>
+        <div data-pad className="bb-footer" style={{ padding: "26px", display: "grid", gap: 12, background: "#14161C", color: "#FFFFFF", borderRadius: 18 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>Blueballs</div>
-            <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "#5B6376", maxWidth: "34ch" }}>An open-source banking stack. Free to use, free to fork, no accounts sold.</div>
-            <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", color: "#7A8296", marginTop: 6 }}>© 2026 · MIT LICENCE</div>
+            <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "#C5CAD7", maxWidth: "34ch" }}>MIT-licensed reference software for building neobank products.</div>
+            <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", color: "#8F98AC", marginTop: 6 }}>© 2026 · MIT LICENCE</div>
           </div>
           {footer.map((col) => (
             <div key={col.head} style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296" }}>{col.head}</div>
-              {col.links.map((l) => (<a key={l} href="#" style={{ fontSize: 13.5, color: "#454B5C" }}>{l}</a>))}
+              <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8F98AC" }}>{col.head}</div>
+              {col.links.map(([label, href]) => (<a key={label} href={href} style={{ fontSize: 13.5, color: "#E4E7EE" }}>{label}</a>))}
             </div>
           ))}
         </div>

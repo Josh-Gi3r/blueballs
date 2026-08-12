@@ -43,7 +43,7 @@ export default function AccountOpenScreen() {
           </div>
         </div>
         <div style={{ marginTop: 10, fontSize: 11.5, color: "#7A8296", lineHeight: 1.5 }}>
-          Real identifiers, issued the moment the account opened — not placeholders swapped in later.
+          Sample identifiers generated with this sandbox account. They cannot receive real payments.
         </div>
       </div>
     </div>
@@ -54,17 +54,11 @@ export const meta: ScreenMeta = {
   id: "account-open",
   journey: "onboarding",
   title: "Account open",
-  blurb: "A real IBAN and BIC, issued in the same call that opens the account.",
+  blurb: "Shows sample receiving details returned with a new sandbox account.",
   endpoint: "POST /v2/accounts",
-  code: `await bb.accounts.create({
-  customer: "cus_9f2k3ah7",
-  currency: "EUR"
-});
-
-// → {
-//   id: "acc_2p9dxq1m",
-//   status: "open",
-//   details: { type: "iban", iban: "DE89 3704 0044 0532 0130 00", bic: "BLBLDEB2" },
-//   balance: { amount: "0.00", currency: "EUR" }
-// }`,
+  code: `fetch("/v2/accounts", {
+  method: "POST",
+  headers: { "content-type": "application/json", "x-api-key": key },
+  body: JSON.stringify({ customer: "cus_9f2k3ah7", currency: "EUR" })
+});`,
 };

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../../packages/sqlite-compat/src/index.js';
 
 import { planExactOutput } from '../../../packages/fx-liquidity/src/index.js';
 

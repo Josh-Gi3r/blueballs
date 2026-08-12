@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "blueballs-fx",
+  "main": "./workers/fx/index.js",
+  "compatibility_date": "2026-08-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "vars": {
+    "CLOUDFLARE_WORKER": "true",
+    "FX_API_KEY": "bb_test_public_fx"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "FX_API", "class_name": "BlueballsFxApi" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["BlueballsFxApi"] }
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 }
+  }
+}

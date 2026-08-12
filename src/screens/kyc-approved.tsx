@@ -29,9 +29,9 @@ export default function KycApprovedScreen() {
         }}>
           ✓
         </div>
-        <div style={{ fontSize: 21, fontWeight: 600, letterSpacing: "-0.03em" }}>Welcome, Ada</div>
+        <div style={{ fontSize: 21, fontWeight: 600, letterSpacing: "-0.03em" }}>Sandbox approval recorded</div>
         <div style={{ fontSize: 14, color: "#5B6376", lineHeight: 1.5 }}>
-          Your account is now active. Every rail is unlocked and ready to use.
+          The application is complete and its sample decision is approved.
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap", justifyContent: "center" }}>
           <Badge text="STATUS · COMPLETED" />
@@ -40,7 +40,7 @@ export default function KycApprovedScreen() {
       </div>
       <div style={{ padding: "14px 20px 22px" }}>
         <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
-          Continue
+          View configured capabilities
         </div>
       </div>
     </div>
@@ -51,13 +51,9 @@ export const meta: ScreenMeta = {
   id: "kyc-approved",
   journey: "onboarding",
   title: "Approved",
-  blurb: "Status and decision are separate fields — a running review never reads as a rejection.",
+  blurb: "Shows an application after the sandbox records an approved decision.",
   endpoint: "GET /v2/applications/:id",
-  code: `await bb.applications.retrieve("app_7h2mres");
-
-// → {
-//   id: "app_7h2mres",
-//   status: "completed",
-//   decision: "approved"
-// }`,
+  code: `fetch("/v2/applications/app_7h2mres", {
+  headers: { "x-api-key": key }
+}).then((response) => response.json());`,
 };

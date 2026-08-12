@@ -17,7 +17,7 @@ export function LiveBadge({ connected, loading, mode }: {
   const copy = loading
     ? mode === "demo" ? "loading website demo" : "contacting FX node"
     : connected
-      ? mode === "demo" ? "interactive website demo" : "live local FX node"
+      ? mode === "demo" ? "interactive website demo" : "reference FX node connected"
       : "FX runtime offline";
   return <div className={`fxp-live ${connected ? "on" : "off"} ${mode}`}><span />{copy}</div>;
 }

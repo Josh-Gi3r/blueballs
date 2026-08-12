@@ -148,9 +148,9 @@ export default function FxPage() {
   return <div className="fxp">
     <section className="fxp-hero">
       <div className="fxp-hero-copy">
-        <div className="fxp-hero-top"><Label>FX FOR THE BANK YOU'RE BUILDING</Label><LiveBadge connected={runtimeReachable} loading={loading} mode={FX_RUNTIME_MODE} /></div>
-        <h1>Give customers FX. Keep control of the market underneath.</h1>
-        <p>The customer sees one exchange. Your institution decides which liquidity can price it, how much balance-sheet risk to take and which rails settle it.</p>
+        <div className="fxp-hero-top"><Label>BRL → EUR REFERENCE FLOW</Label><LiveBadge connected={runtimeReachable} loading={loading} mode={FX_RUNTIME_MODE} /></div>
+        <h1>Inspect how a BRL-to-EUR quote is priced and reserved.</h1>
+        <p>The reference node checks policy, compares seeded liquidity, reserves capacity and records each settlement leg. It does not connect to live providers or execute production payments.</p>
         <div className="fxp-hero-tabs">{(["customer", "bank", "api"] as HeroView[]).map((view) => <button type="button" key={view} className={heroView === view ? "active" : ""} onClick={() => setHeroView(view)}>{view}</button>)}</div>
         {heroView === "customer" && <CustomerView trade={trade} />}
         {heroView === "bank" && <BankView trade={trade} selected={selectedSource} onSelect={setSelectedSource} />}
@@ -160,31 +160,31 @@ export default function FxPage() {
     </section>
 
     <section className="fxp-section fxp-live-market">
-      <div className="fxp-section-head"><div><Label>THE SAME TRADE · OPENED UP</Label><h2>See exactly where the quote came from.</h2><p>Change the amount or remove a source. The same demo reroutes the trade immediately.</p></div><a href="#fx-developer"><Pill>See the call ↓</Pill></a></div>
+      <div className="fxp-section-head"><div><Label>SOURCE ALLOCATION</Label><h2>Inspect the sources used for this quote.</h2><p>Change the amount or choose a market scenario to see the reference node rebuild the route.</p></div><a href="#fx-developer"><Pill>See the request ↓</Pill></a></div>
       <div className="fxp-market-scenarios">{scenarios.map((item) => { const copy = SCENARIO_COPY[item.id] ?? { title: item.label, short: "" }; return <button type="button" key={item.id} className={activeScenario === item.id ? "active" : ""} onClick={() => void changeScenario(item.id)} disabled={busy}><b>{copy.title}</b><span>{copy.short}</span></button>; })}</div>
       <div className="fxp-market-note"><span className={currentMarket?.reference.available ? "ok" : "bad"} /><b>{selectedScenario.title}</b><span>{selectedScenario.short}</span></div>
       <AllocationMap trade={trade} selected={selectedSource} onSelect={setSelectedSource} />
     </section>
 
-    <ArtworkSection image={liquidityArtwork} label="LIQUIDITY" title="Use the market your institution already has." copy="Customer flow, issuers, institutions, treasury and principal can compete inside one policy-controlled market. The customer still sees a single quote.">
+    <ArtworkSection image={liquidityArtwork} label="LIQUIDITY" title="Combine approved liquidity sources in one route." copy="The reference market compares seeded customer, issuer, institutional, treasury and principal liquidity after policy checks. All sources use deterministic local data.">
       <div className="fxp-art-facts"><div><b>{trade?.sources.length ?? 0}</b><span>sources used now</span></div><div><b>{trade?.sourceStatus.filter((item) => item.eligible).length ?? 0}</b><span>eligible now</span></div></div>
     </ArtworkSection>
 
-    <ArtworkSection reverse image={policyArtwork} label="POLICY BEFORE PRICE" title="A better rate does not outrank your rules." copy="Identity, credentials, corridor permissions and ticket limits decide who enters the market. Only then can price compete.">
-      <button type="button" className="fxp-inline-action" onClick={() => void changeScenario(activeScenario === "issuer_policy_blocked" ? "balanced" : "issuer_policy_blocked")} disabled={busy}>{activeScenario === "issuer_policy_blocked" ? "Restore issuer" : "Revoke issuer authorisation"}</button>
+    <ArtworkSection reverse image={policyArtwork} label="POLICY BEFORE PRICE" title="Check policy eligibility before comparing prices." copy="Participant status, credentials, corridor rules and ticket limits determine which seeded sources may quote.">
+      <button type="button" className="fxp-inline-action" onClick={() => void changeScenario(activeScenario === "issuer_policy_blocked" ? "balanced" : "issuer_policy_blocked")} disabled={busy}>{activeScenario === "issuer_policy_blocked" ? "Restore issuer" : "Disable issuer in this scenario"}</button>
     </ArtworkSection>
 
-    <ArtworkSection image={treasuryArtwork} label="TREASURY AND PRINCIPAL" title="Your balance sheet can quote. It cannot cross the limit you set." copy="The demo reserves risk with the quote. When capacity is gone, principal disappears from the route instead of pretending the trade can still be filled.">
-      <div className="fxp-inline-buttons"><button type="button" onClick={() => void changeScenario("treasury_near_limit")} disabled={busy}>Use most treasury inventory</button><button type="button" onClick={() => void changeScenario("principal_limit")} disabled={busy}>Hit the principal limit</button></div>
+    <ArtworkSection image={treasuryArtwork} label="TREASURY AND PRINCIPAL" title="Set hard limits on treasury and principal liquidity." copy="The reference node reserves risk capacity with the quote. A source leaves the route when its configured limit is reached.">
+      <div className="fxp-inline-buttons"><button type="button" onClick={() => void changeScenario("treasury_near_limit")} disabled={busy}>Reduce treasury capacity</button><button type="button" onClick={() => void changeScenario("principal_limit")} disabled={busy}>Exhaust principal capacity</button></div>
     </ArtworkSection>
 
-    <ArtworkSection reverse image={routeArtwork} label="FIAT OUTSIDE · TOKEN FX INSIDE" title="The customer asks for euros. The route can use PIX and stablecoins underneath." copy="Each leg keeps its own settlement state. The token exchange can complete together while the payment in and payout out remain separate steps.">
+    <ArtworkSection reverse image={routeArtwork} label="MIXED-FINALITY ROUTE" title="Track fiat and token settlement as separate legs." copy="The sample route uses an attested BRL payment, an atomic BRLX/EURC token swap and asynchronous EURC redemption. Only the token swap is atomic.">
       <SettlementRoute trade={trade} />
     </ArtworkSection>
 
     <SimulatorLab />
     <DeveloperInspector trade={trade} amount={amount} />
     <Packages />
-    <div className="fxp-runtime-note">Demo runtime: <code>{FX_RUNTIME_LABEL}</code></div>
+    <div className="fxp-runtime-note">FX runtime: <code>{FX_RUNTIME_LABEL}</code></div>
   </div>;
 }

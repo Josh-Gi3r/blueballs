@@ -17,7 +17,7 @@ export function ApiStatus() {
     return () => { alive = false; clearInterval(t); };
   }, []);
   const tone = up === null ? "#7A8296" : up ? "#2E7D53" : "#B4453C";
-  const label = up === null ? "CHECKING" : up ? "API LIVE" : "API OFFLINE";
+  const label = up === null ? "CHECKING" : up ? "SANDBOX ONLINE" : "SANDBOX OFFLINE";
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 10,
@@ -53,7 +53,7 @@ export function KeyIssuer() {
     return (
       <div style={{ background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 12, padding: "13px 15px" }}>
         <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#4E5FA6", marginBottom: 7 }}>
-          YOUR SANDBOX KEY · UNMETERED · NEVER EXPIRES
+          SANDBOX KEY · STORED IN THIS BROWSER
         </div>
         <div style={{ fontFamily: MONO, fontSize: 12.5, wordBreak: "break-all", color: "#14161C" }}>{key}</div>
         <div style={{ display: "flex", gap: 14, marginTop: 10, alignItems: "center" }}>
@@ -63,9 +63,9 @@ export function KeyIssuer() {
           </button>
           <button onClick={() => { clearKey(); setKeyState(null); }}
             style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", color: "#7A8296", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-            FORGET
+            REMOVE FROM BROWSER
           </button>
-          <span style={{ fontSize: 12, color: "#5B6376" }}>Every “Run” below now uses it.</span>
+          <span style={{ fontSize: 12, color: "#5B6376" }}>The requests below now use this key.</span>
         </div>
       </div>
     );
@@ -124,7 +124,7 @@ export function TryIt({ verb, path }: { verb: string; path: string }) {
   return (
     <>
       <button onClick={() => setOpen(!open)} style={btn} aria-expanded={open}
-        title={open ? "Hide the console" : "Run this endpoint against the live API"}>
+        title={open ? "Hide the console" : "Run this endpoint against the hosted sandbox"}>
         <span style={{ fontSize: 8, transform: open ? "rotate(90deg)" : "none", transition: "transform .12s ease", display: "inline-block" }}>▶</span>
         {open ? "HIDE" : "TRY"}
       </button>

@@ -35,6 +35,7 @@ export default function Device({
     <div style={{ width: 348, height: 682, flex: "none", display: "flex", justifyContent: "center" }}>
       <div style={{ width: 328, height: 682, border: "1px solid #C9CEDA", borderRadius: 44, background: "#14161C", padding: 10, boxShadow: "0 18px 40px rgba(20,22,28,0.16)", boxSizing: "border-box" }}>
         <div style={{ background: "#F4F5F8", borderRadius: 35, overflow: "hidden", height: "100%", display: "flex", flexDirection: "column", position: "relative" }}>
+          <div style={{ position: "absolute", top: 14, right: 14, zIndex: 2, fontFamily: MONO, fontSize: 9, letterSpacing: "0.12em", padding: "3px 8px", borderRadius: 999, background: "#F0F1F5", color: "#7A8296", border: "1px solid #DDE1E8" }}>ILLUSTRATIVE · SAMPLE</div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 24px 4px", fontSize: 12, fontWeight: 600, letterSpacing: "-0.01em" }}>
             <span>9:41</span>
             <div style={{ display: "flex", gap: 5, alignItems: "center", fontFamily: MONO, fontSize: 10 }}>

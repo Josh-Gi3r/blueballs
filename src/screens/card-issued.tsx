@@ -50,8 +50,8 @@ export default function CardIssued() {
         <div style={{ ...white, borderRadius: 14, padding: "13px 15px", display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 30, height: 30, borderRadius: 8, background: "#14161C" }} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 500 }}>Add to Apple Wallet</div>
-            <div style={{ fontSize: 11.5, color: "#7A8296" }}>Tap to pay wherever contactless is accepted</div>
+            <div style={{ fontSize: 13.5, fontWeight: 500 }}>Wallet provisioning not connected</div>
+            <div style={{ fontSize: 11.5, color: "#7A8296" }}>Illustrative action for a future card-provider adapter</div>
           </div>
           <span style={{ color: "#7A8296" }}>›</span>
         </div>
@@ -74,7 +74,7 @@ export const meta: ScreenMeta = {
   id: "card-issued",
   journey: "spending",
   title: "Card issued",
-  blurb: "A virtual card, ready to spend the instant it's created — no plastic to wait on.",
+  blurb: "Shows a sandbox virtual-card record. It is not connected to a card network.",
   endpoint: "POST /v2/cards",
-  code: 'await bb.cards.issue({\n  customer: "cus_9f2k",\n  account: "acc_92f8",\n  type: "virtual"\n});\n\n// → { id: "crd_2mFq8Xp…", last4: "4417",\n//     status: "active", spend_limits: {…} }',
+  code: 'fetch("/v2/cards", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ customer: "cus_9f2k", account: "acc_92f8", form: "virtual" })\n});',
 };

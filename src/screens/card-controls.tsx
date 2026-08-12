@@ -75,7 +75,7 @@ export const meta: ScreenMeta = {
   id: "card-controls",
   journey: "spending",
   title: "Spend controls",
-  blurb: "Per-transaction and monthly limits, plus merchant-category blocks — enforced on the authorisation, not after the fact.",
+  blurb: "Shows limits and merchant-category blocks checked by the sandbox authorisation handler.",
   endpoint: "PATCH /v2/cards/:id/controls",
-  code: 'await bb.cards.controls("crd_2mFq8Xp…", {\n  spend_limits: {\n    per_authorization: { amount: "150.00", currency: "EUR" },\n    monthly: { amount: "3000.00", currency: "EUR" }\n  },\n  merchant_categories: { blocked: ["7995"] }\n});\n\n// → { spend_limits: {…}, merchant_categories: {…} }',
+  code: 'fetch("/v2/cards/crd_2mFq8Xp…/controls", {\n  method: "PATCH",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ spend_limits: { monthly: { amount: "3000.00", currency: "EUR" } }, merchant_categories: { blocked: ["7995"] } })\n});',
 };

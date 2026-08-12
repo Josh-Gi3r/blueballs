@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../sqlite-compat/src/index.js';
 
 const PARTICIPANT_TYPES = new Set([
   'CUSTOMER', 'INDIVIDUAL_LP', 'INSTITUTIONAL_LP', 'ISSUER',

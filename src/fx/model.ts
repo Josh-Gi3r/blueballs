@@ -109,7 +109,7 @@ export const SCENARIO_COPY: Record<string, { title: string; short: string }> = {
   lp_offline: { title: "LP offline", short: "The route rebuilds without the institutional LP." },
   issuer_policy_blocked: { title: "Issuer revoked", short: "The issuer is removed before price comparison." },
   treasury_near_limit: { title: "Treasury nearly used", short: "Only a small amount of treasury inventory remains." },
-  principal_limit: { title: "Balance sheet at limit", short: "Principal cannot warehouse more exposure." },
+  principal_limit: { title: "Balance sheet at limit", short: "The configured principal limit has been reached." },
   reference_outage: { title: "Reference price unavailable", short: "The bank stops quoting its own balance sheet." },
 };
 

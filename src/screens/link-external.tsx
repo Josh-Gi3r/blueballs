@@ -58,7 +58,7 @@ export const meta: ScreenMeta = {
   id: "link-external",
   journey: "payout",
   title: "Link a bank account",
-  blurb: "A Confirmation-of-Payee style name check runs before anything is trusted — a no-match is a normal outcome, not an error.",
+  blurb: "Shows a sandbox name-check result for stored payment details.",
   endpoint: "POST /v2/destinations/:id/verify",
-  code: 'await bb.destinations.verify("dst_9mQ2Lx…", {\n  name: "Rina Aoki"\n});\n\n// → { result: "no_match",\n//     held_name: "R. Aoki Design Ltd",\n//     checked_name: "Rina Aoki" }',
+  code: 'fetch("/v2/destinations/dst_9mQ2Lx…/verify", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ name: "Rina Aoki" })\n});',
 };

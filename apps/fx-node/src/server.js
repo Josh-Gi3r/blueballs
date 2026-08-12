@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
 
-const OPENAPI_YAML = readFileSync(new URL('../openapi.yaml', import.meta.url), 'utf8');
+const OPENAPI_YAML = process.env.CLOUDFLARE_WORKER === 'true'
+  ? 'openapi: 3.1.0\ninfo:\n  title: Blueballs FX API\n  version: 0.1.0\npaths: {}\n'
+  : readFileSync(new URL('../openapi.yaml', import.meta.url), 'utf8');
 
 function apiError(code, status, message, details = undefined) {
   const error = new Error(message);

@@ -50,8 +50,8 @@ export default function CardDeclined() {
 export const meta: ScreenMeta = {
   id: "card-declined",
   journey: "spending",
-  title: "Declined, honestly",
-  blurb: "A frozen or over-limit card declines in the open, with the real reason shown — not swallowed into a generic failure.",
+  title: "Card declined",
+  blurb: "Shows a sandbox decline with an explicit reason code.",
   endpoint: "POST /v2/authorisations/:id/decline",
-  code: 'await bb.authorisations.decline("aut_7kD4Nq…", {\n  reason: "card_frozen"\n});\n\n// → { status: "declined", decline_reason: "card_frozen",\n//     network_response_code: "05", declined_at: "…" }',
+  code: 'fetch("/v2/authorisations/aut_7kD4Nq…/decline", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: JSON.stringify({ reason: "card_frozen" })\n});',
 };

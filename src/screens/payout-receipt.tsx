@@ -49,7 +49,7 @@ export const meta: ScreenMeta = {
   id: "payout-receipt",
   journey: "payout",
   title: "Payout receipt",
-  blurb: "Status derived from the transfer's own legs, not guessed — the receipt is just this object rendered.",
+  blurb: "Renders a settled sandbox transfer and its leg statuses.",
   endpoint: "GET /v2/transfers/:id",
-  code: 'await bb.transfers.get("trf_6dW1XpQm9Kf");\n\n// → { status: "settled", rail: "sepa_instant",\n//     amount: { amount: "1250.00", currency: "EUR" },\n//     legs: [{ status: "settled", rail: "sepa_instant" }] }',
+  code: 'fetch("/v2/transfers/trf_6dW1XpQm9Kf", {\n  headers: { "x-api-key": key }\n}).then((response) => response.json());',
 };

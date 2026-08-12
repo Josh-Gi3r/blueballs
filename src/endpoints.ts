@@ -6,7 +6,7 @@ export type Family = { name: string; blurb: string; endpoints: Endpoint[] };
 
 export const FAMILIES: Family[] = [
   {
-    name: "Auth & API keys", blurb: "Self-serve. Sign up and your sandbox key is issued instantly — unmetered, no approval step.",
+    name: "Auth & API keys", blurb: "Create and manage sandbox API keys.",
     endpoints: [
       { verb: "POST", path: "/v2/auth/signup", does: "Create an account and issue a sandbox key", auth: "PUBLIC" },
       { verb: "POST", path: "/v2/keys", does: "Issue a new API key", auth: "KEY" },
@@ -17,7 +17,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Customers", blurb: "The person or business. Capabilities tell you which rails they can use and what's still outstanding.",
+    name: "Customers", blurb: "Create customer records and inspect their configured capabilities.",
     endpoints: [
       { verb: "POST", path: "/v2/customers", does: "Create a customer", auth: "KEY" },
       { verb: "GET", path: "/v2/customers/:id", does: "Retrieve a customer", auth: "KEY" },
@@ -29,7 +29,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Onboarding applications", blurb: "KYC and KYB. Lifecycle status is separate from the decision, so a running review never looks like a rejection.",
+    name: "Onboarding applications", blurb: "Model application states, documents, attestations and due-diligence records.",
     endpoints: [
       { verb: "POST", path: "/v2/applications", does: "Start an application", auth: "KEY" },
       { verb: "GET", path: "/v2/applications/:id", does: "Application with status and decision", auth: "KEY" },
@@ -48,9 +48,9 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Accounts", blurb: "Multi-currency balances on one ledger. Typed by what the account does, not just what it holds.",
+    name: "Accounts", blurb: "Create multi-currency sandbox accounts and query their balances.",
     endpoints: [
-      { verb: "POST", path: "/v2/accounts", does: "Open an account", auth: "KEY" },
+      { verb: "POST", path: "/v2/accounts", does: "Create a sandbox account", auth: "KEY" },
       { verb: "GET", path: "/v2/accounts/:id", does: "Balance and identifiers", auth: "KEY" },
       { verb: "GET", path: "/v2/accounts", does: "List accounts", auth: "KEY" },
       { verb: "PATCH", path: "/v2/accounts/:id", does: "Update an account", auth: "KEY" },
@@ -59,7 +59,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Receiving details", blurb: "The issued instrument. One account can carry several — an IBAN, a sort code, a PayNow alias.",
+    name: "Receiving details", blurb: "Generate reference receiving details for a sandbox account.",
     endpoints: [
       { verb: "POST", path: "/v2/accounts/:id/details", does: "Issue receiving details for a rail", auth: "KEY" },
       { verb: "GET", path: "/v2/accounts/:id/details", does: "List receiving details", auth: "KEY" },
@@ -67,7 +67,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Wallets", blurb: "On-chain balances per asset and network, with policies attached.",
+    name: "Wallets", blurb: "Create sandbox wallet records, balances and policy-gated sends.",
     endpoints: [
       { verb: "POST", path: "/v2/wallets", does: "Create a wallet", auth: "KEY" },
       { verb: "GET", path: "/v2/wallets/:id", does: "Retrieve a wallet", auth: "KEY" },
@@ -78,7 +78,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Recipients", blurb: "A person is not an account number. One recipient holds many destinations.",
+    name: "Recipients", blurb: "Store recipients separately from their payment destinations.",
     endpoints: [
       { verb: "POST", path: "/v2/recipients", does: "Create a recipient", auth: "KEY" },
       { verb: "GET", path: "/v2/recipients/:id", does: "Retrieve a recipient", auth: "KEY" },
@@ -88,7 +88,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Destinations", blurb: "Where money actually lands, typed by rail. Includes name checking before you send.",
+    name: "Destinations", blurb: "Store rail-specific details and run sandbox name checks.",
     endpoints: [
       { verb: "POST", path: "/v2/recipients/:id/destinations", does: "Add a destination", auth: "KEY" },
       { verb: "GET", path: "/v2/destinations/:id", does: "Retrieve a destination", auth: "KEY" },
@@ -98,26 +98,26 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Quotes & exchange", blurb: "A quote is an object with an id and an expiry, so the price you showed is the price you can audit.",
+    name: "Quotes & exchange", blurb: "Create expiring reference quotes and inspect indicative rates.",
     endpoints: [
       { verb: "POST", path: "/v2/quotes", does: "Create a quote, held for 30 seconds", auth: "KEY" },
       { verb: "GET", path: "/v2/quotes/:id", does: "Retrieve a quote and its expiry", auth: "KEY" },
       { verb: "POST", path: "/v2/quotes/:id/execute", does: "Execute a held quote", auth: "KEY" },
       { verb: "GET", path: "/v2/rates", does: "Indicative rate, not lockable", auth: "PUBLIC" },
-      { verb: "GET", path: "/v2/pairs", does: "Supported pairs and depth", auth: "PUBLIC" },
+      { verb: "GET", path: "/v2/pairs", does: "Configured pairs and reference depth", auth: "PUBLIC" },
     ],
   },
   {
-    name: "Stablecoin FX", blurb: "Three legs, priced honestly. The ramps are 1:1 — only the corridor between them carries a spread.",
+    name: "Stablecoin FX", blurb: "Legacy compatibility endpoints. Use the canonical FX node for new FX work.",
     endpoints: [
-      { verb: "GET", path: "/v2/assets", does: "Every fiat and stablecoin, and what each redeems against", auth: "PUBLIC" },
+      { verb: "GET", path: "/v2/assets", does: "Configured fiat and stablecoin assets and their reference pegs", auth: "PUBLIC" },
       { verb: "GET", path: "/v2/corridors", does: "Corridor depth, spread and settlement per pair", auth: "PUBLIC" },
       { verb: "POST", path: "/v2/fx/quote", does: "Price one leg — on-ramp, corridor or off-ramp", auth: "KEY" },
       { verb: "POST", path: "/v2/fx/route", does: "The full cross-border route, leg by leg", auth: "KEY" },
-      { verb: "POST", path: "/v2/ramps/on", does: "Fiat in, stablecoin minted 1:1", auth: "KEY" },
-      { verb: "POST", path: "/v2/ramps/off", does: "Stablecoin redeemed 1:1 back to fiat", auth: "KEY" },
+      { verb: "POST", path: "/v2/ramps/on", does: "Model a reference fiat-to-stablecoin ramp", auth: "KEY" },
+      { verb: "POST", path: "/v2/ramps/off", does: "Model a reference stablecoin-to-fiat ramp", auth: "KEY" },
       { verb: "GET", path: "/v2/ramps", does: "Ramp history", auth: "KEY" },
-      { verb: "GET", path: "/v2/fx/depth", does: "Aggregate resting depth — never maker identity", auth: "PUBLIC" },
+      { verb: "GET", path: "/v2/fx/depth", does: "Aggregate reference depth without maker identities", auth: "PUBLIC" },
       { verb: "GET", path: "/v2/fx/price", does: "Imbalance-derived price for a corridor", auth: "PUBLIC" },
       { verb: "GET", path: "/v2/fx/pricing-model", does: "The constants and formula, so any quote can be rechecked", auth: "PUBLIC" },
       { verb: "POST", path: "/v2/fx/rfq", does: "A firm price for your own size, binding for a window — the integrator tier", auth: "KEY" },
@@ -141,9 +141,9 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Transfers", blurb: "One transfer, an ordered list of legs. Status is derived from the legs, never guessed.",
+    name: "Transfers", blurb: "Create sandbox transfers with rail-specific legs and statuses.",
     endpoints: [
-      { verb: "POST", path: "/v2/transfers", does: "Send on any rail", auth: "KEY" },
+      { verb: "POST", path: "/v2/transfers", does: "Create a transfer on a configured reference rail", auth: "KEY" },
       { verb: "GET", path: "/v2/transfers/:id", does: "Transfer with legs and status", auth: "KEY" },
       { verb: "GET", path: "/v2/transfers", does: "List transfers", auth: "KEY" },
       { verb: "POST", path: "/v2/transfers/:id/cancel", does: "Cancel before funding", auth: "KEY" },
@@ -151,32 +151,32 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Cards", blurb: "Issue, control and reveal. Freeze is scoped to whoever set it.",
+    name: "Cards", blurb: "Create sandbox card records and test controls and authorisation flows.",
     endpoints: [
-      { verb: "POST", path: "/v2/cards", does: "Issue a virtual or physical card", auth: "KEY" },
+      { verb: "POST", path: "/v2/cards", does: "Create a virtual or physical sandbox card", auth: "KEY" },
       { verb: "GET", path: "/v2/cards/:id", does: "Card with status and reason", auth: "KEY" },
       { verb: "GET", path: "/v2/cards", does: "List cards", auth: "KEY" },
       { verb: "POST", path: "/v2/cards/:id/freeze", does: "Freeze a card", auth: "KEY" },
       { verb: "POST", path: "/v2/cards/:id/unfreeze", does: "Unfreeze a card", auth: "KEY" },
-      { verb: "POST", path: "/v2/cards/:id/pin", does: "Get a secure PIN update link", auth: "KEY" },
-      { verb: "POST", path: "/v2/cards/:id/reveal", does: "Ephemeral key for PCI-safe reveal", auth: "KEY" },
+      { verb: "POST", path: "/v2/cards/:id/pin", does: "Request a temporary PIN update link", auth: "KEY" },
+      { verb: "POST", path: "/v2/cards/:id/reveal", does: "Create a temporary card-reveal token", auth: "KEY" },
       { verb: "PATCH", path: "/v2/cards/:id/controls", does: "Limits and merchant categories", auth: "KEY" },
       { verb: "GET", path: "/v2/cards/:id/transactions", does: "Card transactions", auth: "KEY" },
       { verb: "GET", path: "/v2/cards/:id/statements", does: "Card statements", auth: "KEY" },
     ],
   },
   {
-    name: "Authorisations", blurb: "Approve or decline in your own webhook, inside 800ms.",
+    name: "Authorisations", blurb: "Simulate card authorisations and record approve or decline decisions.",
     endpoints: [
       { verb: "GET", path: "/v2/authorisations/:id", does: "Retrieve an authorisation", auth: "KEY" },
       { verb: "GET", path: "/v2/authorisations", does: "List pending and cleared", auth: "KEY" },
-      { verb: "POST", path: "/v2/authorisations/:id/approve", does: "Approve in real time", auth: "KEY" },
-      { verb: "POST", path: "/v2/authorisations/:id/decline", does: "Decline in real time", auth: "KEY" },
+      { verb: "POST", path: "/v2/authorisations/:id/approve", does: "Record an approval decision", auth: "KEY" },
+      { verb: "POST", path: "/v2/authorisations/:id/decline", does: "Record a decline decision", auth: "KEY" },
       { verb: "POST", path: "/v2/cards/:id/authorisations", does: "Simulate an authorisation against a card", auth: "KEY" },
     ],
   },
   {
-    name: "Disputes", blurb: "Chargebacks with network reason codes and the timers regulators expect.",
+    name: "Disputes", blurb: "Model disputes, reason codes, deadlines and evidence.",
     endpoints: [
       { verb: "POST", path: "/v2/disputes", does: "Raise a dispute", auth: "KEY" },
       { verb: "GET", path: "/v2/disputes/:id", does: "Dispute with reason code and deadline", auth: "KEY" },
@@ -185,7 +185,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Savings vaults", blurb: "Ring-fenced balances with daily accrual and round-ups.",
+    name: "Savings vaults", blurb: "Create sandbox vaults and test deposits, withdrawals and accrual.",
     endpoints: [
       { verb: "POST", path: "/v2/vaults", does: "Create a vault", auth: "KEY" },
       { verb: "GET", path: "/v2/vaults/:id", does: "Vault and accrued interest", auth: "KEY" },
@@ -196,7 +196,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Credit lines", blurb: "Revolving credit against deposits or collateral, with margin calls by webhook.",
+    name: "Credit lines", blurb: "Model credit lines, draws, repayments and collateral checks.",
     endpoints: [
       { verb: "POST", path: "/v2/credit", does: "Open a credit line", auth: "KEY" },
       { verb: "GET", path: "/v2/credit/:id", does: "Limit, drawn balance and LTV", auth: "KEY" },
@@ -207,7 +207,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Policies", blurb: "Rules attached to accounts, wallets and cards. The spend-control engine.",
+    name: "Policies", blurb: "Create rules and attach them to accounts, wallets or cards.",
     endpoints: [
       { verb: "POST", path: "/v2/policies", does: "Create a policy", auth: "KEY" },
       { verb: "GET", path: "/v2/policies/:id", does: "Retrieve a policy", auth: "KEY" },
@@ -221,7 +221,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Approval chains", blurb: "Procedural approvals with thresholds — distinct from cryptographic signing.",
+    name: "Approval chains", blurb: "Create threshold-based approval workflows.",
     endpoints: [
       { verb: "POST", path: "/v2/approval-chains", does: "Create a chain", auth: "KEY" },
       { verb: "GET", path: "/v2/approval-chains/:id", does: "Retrieve a chain", auth: "KEY" },
@@ -231,7 +231,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Organisations", blurb: "Teams, roles and a real permission matrix.",
+    name: "Organisations", blurb: "Create organisations, members and roles.",
     endpoints: [
       { verb: "POST", path: "/v2/orgs", does: "Create an organisation", auth: "KEY" },
       { verb: "GET", path: "/v2/orgs/:id", does: "Retrieve an organisation", auth: "KEY" },
@@ -242,23 +242,23 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Ledger & statements", blurb: "Double-entry. Query it, stream it, hand it to an auditor.",
+    name: "Ledger & statements", blurb: "Query reference ledger entries and balances, and create sandbox statements.",
     endpoints: [
       { verb: "GET", path: "/v2/ledger", does: "Double-entry entries", auth: "KEY" },
       { verb: "GET", path: "/v2/ledger/balances", does: "Balances at a point in time", auth: "KEY" },
       { verb: "POST", path: "/v2/statements", does: "Generate a statement", auth: "KEY" },
-      { verb: "GET", path: "/v2/statements/:id", does: "CSV, PDF or signed JSON", auth: "KEY" },
+      { verb: "GET", path: "/v2/statements/:id", does: "Retrieve a reference statement export", auth: "KEY" },
     ],
   },
   {
-    name: "Fees", blurb: "Configured once, disclosed on every transaction it touches.",
+    name: "Fees", blurb: "Read and update sandbox fee configuration.",
     endpoints: [
       { verb: "GET", path: "/v2/fees/config", does: "Current fee configuration", auth: "KEY" },
       { verb: "PUT", path: "/v2/fees/config", does: "Set the fee payout destination", auth: "KEY" },
     ],
   },
   {
-    name: "Rails registry", blurb: "Cut-offs, holidays and field schemas as data you can query — not a table in the docs.",
+    name: "Rails registry", blurb: "Query six configured rails, limits, cut-offs and calendars.",
     endpoints: [
       { verb: "GET", path: "/v2/rails", does: "Rail availability and cut-offs", auth: "PUBLIC" },
       { verb: "GET", path: "/v2/rails/:id", does: "Field schema and limits for a rail", auth: "PUBLIC" },
@@ -266,7 +266,7 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "QR & payment links", blurb: "EMVCo QR in both directions, plus shareable payment links.",
+    name: "QR & payment links", blurb: "Generate and decode EMVCo payloads and create payment-link records.",
     endpoints: [
       { verb: "POST", path: "/v2/qr/decode", does: "Decode a merchant or consumer QR", auth: "KEY" },
       { verb: "POST", path: "/v2/qr/generate", does: "Generate an EMVCo QR payload", auth: "KEY" },
@@ -275,16 +275,16 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Bills & subscriptions", blurb: "Direct debit mandates and recurring payments.",
+    name: "Bills & subscriptions", blurb: "Create mandate records and recurring payment schedules in the sandbox.",
     endpoints: [
-      { verb: "POST", path: "/v2/mandates", does: "Create a direct debit mandate", auth: "KEY" },
+      { verb: "POST", path: "/v2/mandates", does: "Create a sandbox mandate record", auth: "KEY" },
       { verb: "GET", path: "/v2/mandates/:id", does: "Mandate status", auth: "KEY" },
       { verb: "POST", path: "/v2/subscriptions", does: "Create a recurring payment", auth: "KEY" },
       { verb: "GET", path: "/v2/subscriptions", does: "List subscriptions", auth: "KEY" },
     ],
   },
   {
-    name: "Webhooks", blurb: "Signed, replayable, with 30 days of delivery history.",
+    name: "Webhooks", blurb: "Create targets, inspect deliveries and replay signed callbacks.",
     endpoints: [
       { verb: "POST", path: "/v2/webhooks", does: "Create a target", auth: "KEY" },
       { verb: "GET", path: "/v2/webhooks/:id", does: "Retrieve a target", auth: "KEY" },
@@ -296,14 +296,14 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Events", blurb: "The audit stream behind everything above.",
+    name: "Events", blurb: "Query API event records.",
     endpoints: [
       { verb: "GET", path: "/v2/events", does: "Paginated event stream", auth: "KEY" },
       { verb: "GET", path: "/v2/events/:id", does: "Retrieve one event", auth: "KEY" },
     ],
   },
   {
-    name: "Sandbox", blurb: "Drive failures on purpose. Pause at a state, then advance past it.",
+    name: "Sandbox", blurb: "Trigger predefined scenarios and advance paused simulations.",
     endpoints: [
       { verb: "GET", path: "/v2/sandbox/scenarios", does: "Scenario catalogue", auth: "KEY" },
       { verb: "POST", path: "/v2/sandbox/payments", does: "Simulate an inbound payment", auth: "KEY" },
@@ -313,11 +313,11 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Reference data", blurb: "Countries, currencies and networks, so you don't hardcode them.",
+    name: "Reference data", blurb: "Query countries, currencies and networks configured in this reference API.",
     endpoints: [
-      { verb: "GET", path: "/v2/countries", does: "Supported countries", auth: "PUBLIC" },
-      { verb: "GET", path: "/v2/currencies", does: "Supported currencies", auth: "PUBLIC" },
-      { verb: "GET", path: "/v2/networks", does: "Supported blockchain networks", auth: "PUBLIC" },
+      { verb: "GET", path: "/v2/countries", does: "Configured countries", auth: "PUBLIC" },
+      { verb: "GET", path: "/v2/currencies", does: "Configured currencies", auth: "PUBLIC" },
+      { verb: "GET", path: "/v2/networks", does: "Configured blockchain networks", auth: "PUBLIC" },
     ],
   },
 ];

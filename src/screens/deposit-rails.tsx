@@ -36,7 +36,7 @@ export default function DepositRails() {
       </div>
 
       <div style={{ padding: "2px 20px 10px", fontSize: 12.5, lineHeight: 1.5, color: "#7A8296" }}>
-        Every rail's speed, cut-off and weekend availability, queried live.
+        The six rails configured in the reference registry.
       </div>
 
       <div style={{ flex: 1, padding: "0 20px 4px", display: "flex", flexDirection: "column", gap: 8, overflow: "auto" }}>
@@ -79,8 +79,8 @@ export const meta: ScreenMeta = {
   id: "deposit-rails",
   journey: "funding",
   title: "Deposit rails",
-  blurb: "The six real rails, each with its own speed, cut-off and weekend behaviour — queried, not hardcoded.",
+  blurb: "Shows the six rails configured in the reference registry.",
   endpoint: "GET /v2/rails",
   code:
-    'await bb.rails.list();\n\n// → [\n//     { id: "sepa_instant", currency: "EUR",\n//       speed: "seconds", cutoff: null, weekend: true },\n//     { id: "ach", currency: "USD",\n//       speed: "1-2 business days", cutoff: "17:00 ET",\n//       weekend: false },\n//     …\n//   ]',
+    'fetch("/v2/rails").then((response) => response.json());',
 };

@@ -58,10 +58,10 @@ export function Phone({ amount, trade, mode, runtimeMode, busy, error, onAmount,
 
   return <div className="fxp-phone"><div className="fxp-phone-inner">
     <div className="fxp-phone-status"><span>9:41</span><span>▮▮▮ ᯤ ▰</span></div>
-    <div className="fxp-phone-title-row"><div className="fxp-phone-title">Exchange</div><span>{runtimeMode === "demo" ? "DEMO" : "REFERENCE"}</span></div>
-    <div className="fxp-phone-box"><div className="fxp-phone-box-label"><span>You pay</span><span>Balance R$82,400</span></div><div className="fxp-phone-amount"><input inputMode="decimal" value={amount} onChange={(event) => onAmount(event.target.value)} /><b>BRL ▾</b></div></div>
+    <div className="fxp-phone-title-row"><div className="fxp-phone-title">Exchange</div><span>REFERENCE · NO REAL MONEY</span></div>
+    <div className="fxp-phone-box"><div className="fxp-phone-box-label"><span>You pay</span><span>Sample balance R$82,400</span></div><div className="fxp-phone-amount"><input inputMode="decimal" value={amount} onChange={(event) => onAmount(event.target.value)} /><b>BRL ▾</b></div></div>
     <div className="fxp-phone-swap">⇅</div>
-    <div className="fxp-phone-box"><div className="fxp-phone-box-label"><span>You receive</span><span>{trade?.evidence.reserved ? "Reserved" : runtimeMode === "demo" ? "Demo preview" : "Live preview"}</span></div><div className="fxp-phone-amount"><strong>{receive ? Number(receive).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><b>EUR ▾</b></div></div>
+    <div className="fxp-phone-box"><div className="fxp-phone-box-label"><span>You receive</span><span>{trade?.evidence.reserved ? "Reserved" : runtimeMode === "demo" ? "Demo preview" : "Reference preview"}</span></div><div className="fxp-phone-amount"><strong>{receive ? Number(receive).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}</strong><b>EUR ▾</b></div></div>
     <div className="fxp-phone-summary"><div><span>Rate</span><b>{trade ? `1 EUR = ${trade.rate} BRL` : "Calculating…"}</b></div><div><span>Charged</span><b>{formatCurrency(charged, "BRL")}</b></div><div><span>Liquidity</span><b>{trade ? `${trade.sources.length} sources` : "—"}</b></div><div><span>Settlement</span><b>{trade?.settlement.guarantee.class ?? "—"}</b></div></div>
     {error && <div className="fxp-phone-error">{error}</div>}
     <button className="fxp-phone-primary" type="button" disabled={busy || !trade || trade.state !== "PREVIEW"} onClick={onReview}>{busy ? "Calculating…" : trade ? "Review exchange" : "No full route available"}</button>

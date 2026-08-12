@@ -68,8 +68,8 @@ export const meta: ScreenMeta = {
   id: "funded-home",
   journey: "funding",
   title: "Funded",
-  blurb: "Same account, moments later — balance updated and the deposit sitting at the top of activity with its rail attached.",
+  blurb: "Shows an illustrative account balance after sandbox funding.",
   endpoint: "GET /v2/accounts/:id",
   code:
-    'await bb.accounts.retrieve("acc_92f");\n\n// → { balance: { amount: "23402.10",\n//       currency: "EUR" } }',
+    'fetch("/v2/accounts/acc_92f", {\n  headers: { "x-api-key": key }\n}).then((response) => response.json());',
 };

@@ -35,7 +35,7 @@ export default function CardTap() {
         }}>
           <div>
             <div style={{ fontSize: 13.5, fontWeight: 600, color: "#2E7D53" }}>Approved</div>
-            <div style={{ fontSize: 11.5, color: "#4C8468" }}>Decision returned in 214ms</div>
+            <div style={{ fontSize: 11.5, color: "#4C8468" }}>Sample authorisation approved</div>
           </div>
           <div style={{ fontFamily: MONO, fontSize: 10, color: "#2E7D53" }}>00</div>
         </div>
@@ -48,7 +48,7 @@ export const meta: ScreenMeta = {
   id: "card-tap",
   journey: "spending",
   title: "Paying in person",
-  blurb: "Every tap is a live authorisation — your webhook decides approve or decline, and the network holds for it inside 800ms.",
+  blurb: "Illustrates a sandbox card-authorisation decision. No card network is connected.",
   endpoint: "POST /v2/authorisations/:id/approve",
-  code: '// Your webhook receives the authorisation and must answer inside 800ms\napp.post("/webhooks/authorisation", async (req, res) => {\n  const aut = req.body.data;\n  await bb.authorisations.approve(aut.id);\n  res.sendStatus(200);\n});\n\n// → { status: "settled", approved_at: "…",\n//     network_response_code: "00" }',
+  code: 'fetch("/v2/authorisations/aut_7kD4Nq…/approve", {\n  method: "POST",\n  headers: { "content-type": "application/json", "x-api-key": key },\n  body: "{}"\n});',
 };

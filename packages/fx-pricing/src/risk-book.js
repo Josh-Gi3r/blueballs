@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from '../../sqlite-compat/src/index.js';
 
 function abs(value) {
   return value < 0n ? -value : value;

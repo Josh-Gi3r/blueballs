@@ -55,19 +55,11 @@ export const meta: ScreenMeta = {
   id: "signup",
   journey: "onboarding",
   title: "Sign up",
-  blurb: "Create the customer record everything else in the journey hangs off.",
+  blurb: "Create the customer record used by the later sandbox requests.",
   endpoint: "POST /v2/customers",
-  code: `await bb.customers.create({
-  type: "individual",
-  name: "Ada Lovelace",
-  email: "ada@lovelace.dev"
-});
-
-// → {
-//   id: "cus_9f2k3ah7",
-//   type: "individual",
-//   status: "pending",
-//   decision: null,
-//   tier: 1
-// }`,
+  code: `fetch("/v2/customers", {
+  method: "POST",
+  headers: { "content-type": "application/json", "x-api-key": key },
+  body: JSON.stringify({ type: "individual", name: "Ada Lovelace", email: "ada@lovelace.dev" })
+});`,
 };

@@ -67,11 +67,11 @@ export type FxQuote = {
 const fmt = (v: string | number) =>
   Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** The FROM amount every live quote below is priced against — kept in sync with
+/** The FROM amount every reference quote below is priced against — kept in sync with
  *  the POST /v2/quotes call App.tsx fires for this same amount. */
 const FX_SAMPLE_EUR = 10000;
 
-/** Live exchange screen: a real quote from POST /v2/quotes, not a rate table. */
+/** Reference exchange screen driven by POST /v2/quotes. */
 function ExchangeScreen({ fxQuote, fxErr }: { fxQuote?: FxQuote | null; fxErr?: boolean }) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   useEffect(() => {
@@ -120,13 +120,13 @@ function ExchangeScreen({ fxQuote, fxErr }: { fxQuote?: FxQuote | null; fxErr?: 
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>Quote expires</span><span style={{ color: expired ? "#B4453C" : "#14161C" }}>{expired ? "expired" : `${secondsLeft}s`}</span></div>
           </>
         ) : fxErr ? (
-          <div style={{ fontSize: 12.5, color: "#B4453C" }}>Could not reach the API for a live quote. Is it running on :5290?</div>
+          <div style={{ fontSize: 12.5, color: "#B4453C" }}>Could not reach the reference API. Is it running on :5290?</div>
         ) : (
-          <div style={{ fontSize: 12.5, color: "#7A8296" }}>Fetching a real quote from POST /v2/quotes…</div>
+          <div style={{ fontSize: 12.5, color: "#7A8296" }}>Fetching a reference quote from POST /v2/quotes…</div>
         )}
       </div>
       <div style={{ margin: "10px 20px 0", ...white, borderRadius: 16, padding: "13px 16px", fontSize: 11.5, lineHeight: 1.55, color: "#5B6376" }}>
-        This card is the literal response of <span style={{ fontFamily: MONO }}>POST /v2/quotes</span> for €{fmt(FX_SAMPLE_EUR)} → GBP, called live when this page loaded.
+        This card uses the hosted sandbox response from <span style={{ fontFamily: MONO }}>POST /v2/quotes</span> for €{fmt(FX_SAMPLE_EUR)} → GBP.
       </div>
       <div style={{ marginTop: "auto", padding: "14px 20px 22px" }}>
         <div style={{ background: expired ? "#DDE1E8" : "#5A6DB8", color: expired ? "#7A8296" : "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
@@ -153,7 +153,7 @@ export default function PhoneScreen({ screen = "accounts", fxQuote, fxErr }: {
             fontFamily: MONO, fontSize: 9, letterSpacing: "0.12em", padding: "3px 8px", borderRadius: 999,
             background: isLive ? "#E7F3EC" : "#F0F1F5", color: isLive ? "#2E7D53" : "#7A8296",
             border: `1px solid ${isLive ? "#BEE3CE" : "#DDE1E8"}`,
-          }}>{isLive ? "LIVE QUOTE" : "ILLUSTRATIVE"}</div>
+          }}>{isLive ? "REFERENCE QUOTE" : "ILLUSTRATIVE · SAMPLE"}</div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 24px 4px", fontSize: 12, fontWeight: 600, letterSpacing: "-0.01em" }}>
             <span>9:41</span>
@@ -274,7 +274,7 @@ export default function PhoneScreen({ screen = "accounts", fxQuote, fxErr }: {
                 ))}
               </div>
               <div style={{ marginTop: "auto", padding: "14px 20px 22px", background: "#FFFFFF", borderTop: "1px solid #E3E6EE" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296", marginBottom: 12 }}><span>Arrives</span><span style={{ color: "#14161C" }}>In about 4 seconds</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296", marginBottom: 12 }}><span>Reference rail</span><span style={{ color: "#14161C" }}>SEPA Instant</span></div>
                 <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Slide to send €2,400.00</div>
               </div>
             </div>
@@ -294,10 +294,10 @@ export default function PhoneScreen({ screen = "accounts", fxQuote, fxErr }: {
               </div>
               <div style={{ padding: "0 20px 14px" }}>
                 <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 18, padding: "22px 20px", display: "flex", flexDirection: "column", gap: 13 }}>
-                  <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8B93A6" }}>VAULT BALANCE · 4.82% AER</div>
+                  <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8B93A6" }}>SAMPLE VAULT BALANCE</div>
                   <div style={{ fontSize: 33, fontWeight: 600, letterSpacing: "-0.04em" }}>€12,480<span style={{ color: "#8B93A6" }}>.00</span></div>
                   <div style={{ height: 7, borderRadius: 999, background: "#2A2E3A", overflow: "hidden" }}><div style={{ width: "62%", height: "100%", background: "#5A6DB8" }} /></div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#B9BFCC" }}><span>62% of €20,000</span><span>Paid daily</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#B9BFCC" }}><span>62% of €20,000</span><span>Daily accrual rule</span></div>
                 </div>
               </div>
               <div style={{ padding: "0 20px 14px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
