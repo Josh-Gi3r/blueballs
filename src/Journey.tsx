@@ -1,11 +1,8 @@
 import { useState, type CSSProperties } from "react";
-import { JOURNEYS, byJourney, SCREENS } from "./screens/registry";
+import { JOURNEYS, byJourney } from "./screens/registry";
 
 const MONO = "'IBM Plex Mono', monospace";
 
-/** The journey walkthrough: pick a journey, step through its screens, and see the
- *  exact API call behind each one. This is the thing the site is actually selling —
- *  a screen on its own proves nothing. */
 export default function Journey() {
   const [journey, setJourney] = useState(JOURNEYS[0].id);
   const [step, setStep] = useState(0);
@@ -27,20 +24,19 @@ export default function Journey() {
     <div data-pad style={{ background: "#FFFFFF", border: "1px solid #D7DBE4", borderRadius: 18, padding: "34px 34px 30px" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>EXAMPLE PRODUCT FLOWS</div>
+          <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.18em", color: "#7A8296" }}>SEE IT IN A PRODUCT</div>
           <h2 style={{ margin: "10px 0 0", fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em" }}>
-            {SCREENS.length} screens paired with API requests.
+            From API call to customer experience.
           </h2>
         </div>
         <div style={{ fontFamily: MONO, fontSize: 11, color: "#7A8296" }}>
-          {JOURNEYS.length} JOURNEYS
+          {JOURNEYS.length} FLOWS
         </div>
       </div>
       <p style={{ margin: "12px 0 18px", fontSize: 15.5, lineHeight: 1.6, maxWidth: "72ch", color: "#454B5C" }}>
-        Each screen illustrates how a sandbox response could appear in a product. The request beside it shows the matching reference API call.
+        Walk through onboarding, funding, spending and payouts to see how Blueballs can sit behind a financial product. Each step pairs the customer experience with the API call behind it.
       </p>
 
-      {/* journey picker */}
       <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 8 }}>
         {JOURNEYS.filter((j) => byJourney(j.id).length > 0).map((j) => (
           <button key={j.id} onClick={() => pick(j.id)} style={chip(j.id === journey)}>
@@ -55,7 +51,6 @@ export default function Journey() {
         {JOURNEYS.find((j) => j.id === journey)?.blurb}
       </div>
 
-      {/* step rail */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
         {screens.map((s, i) => {
           const on = i === step;
@@ -75,10 +70,8 @@ export default function Journey() {
         })}
       </div>
 
-      {/* screen + the call behind it */}
       {meta && Body && (
         <div data-col style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 20, alignItems: "start" }}>
-          {/* phone */}
           <div style={{ background: "#EDEFF4", border: "1px solid #D7DBE4", borderRadius: 18, padding: "22px 20px", display: "flex", justifyContent: "center" }}>
             <div style={{ width: 328, border: "1px solid #C9CEDA", borderRadius: 44, background: "#07144F", padding: 10, boxShadow: "0 18px 40px rgba(20,22,28,0.16)" }}>
               <div style={{ background: "#F4F5F8", borderRadius: 35, overflow: "hidden", height: 660, display: "flex", flexDirection: "column", position: "relative" }}>
@@ -91,20 +84,19 @@ export default function Journey() {
             </div>
           </div>
 
-          {/* the call */}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h3 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: "-0.025em" }}>{meta.title}</h3>
                 <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.1em", color: meta.live ? "#2E7D53" : "#7A8296", background: meta.live ? "#E3F1E9" : "#ECEEF2", border: `1px solid ${meta.live ? "#BFE0CD" : "#D7DBE4"}`, borderRadius: 999, padding: "3px 9px" }}>
-                  {meta.live ? "LIVE SANDBOX DATA" : "ILLUSTRATIVE · SAMPLE DATA"}
+                  {meta.live ? "SANDBOX RESPONSE" : "EXAMPLE UI"}
                 </span>
               </div>
               <p style={{ margin: "8px 0 0", fontSize: 14.5, lineHeight: 1.6, color: "#454B5C", maxWidth: "60ch" }}>{meta.blurb}</p>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>MATCHING API REQUEST</div>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>API REQUEST</div>
               <div style={{ fontFamily: MONO, fontSize: 11, color: "#0647E8", border: "1px solid #CCE6FF", background: "#EAF4FF", borderRadius: 999, padding: "5px 12px" }}>{meta.endpoint}</div>
             </div>
             <div style={{ background: "#07144F", color: "#E4E7EE", borderRadius: 14, padding: "20px 22px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre-wrap", overflowX: "auto", maxHeight: 420 }}>{meta.code}</div>
