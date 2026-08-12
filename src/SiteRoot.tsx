@@ -12,6 +12,64 @@ function navigate(path: string) {
   window.scrollTo(0, 0);
 }
 
+/**
+ * App.tsx is still a large legacy single-file surface. Keep the public copy honest
+ * while that file is being split into proper page components. These replacements
+ * only touch exact legacy strings and can be deleted as the source sections move.
+ */
+function LegacyCopyBridge() {
+  useEffect(() => {
+    const replacements = new Map<string, string>([
+      [
+        "Blueballs is free, MIT-licensed software for accounts, cards, transfers, onboarding, ledger and FX. Create a sandbox key yourself, run the code locally and connect the services your production deployment needs. The goal is to lower the cost of building financial products so more teams can serve people traditional banks overlook or exclude.",
+        "Blueballs gives you the software to build accounts, cards, transfers, onboarding, wallets, FX and other financial products. It is open source and MIT licensed, so you can run it yourself, change it and connect the banks, payment networks and other providers you want to use.",
+      ],
+      ["Banking product models you can run and inspect.", "Build the financial products your bank needs."],
+      [
+        "The repository models accounts, cards, transfers, onboarding, ledger, wallets and more behind one reference API. Use these flows as a starting point, then connect the services and controls required for production.",
+        "Start with accounts, cards, transfers, onboarding, wallets, FX, business banking and more. Use the pieces you need, change them for your product and connect the providers your production deployment requires.",
+      ],
+      ["Inspect the canonical FX reference flow.", "Build FX into your financial product."],
+      [
+        "Follow one BRL-to-EUR request through policy checks, source selection, reservation and mixed-finality settlement.",
+        "See how pricing, liquidity routing, treasury controls and settlement can sit behind a customer currency exchange.",
+      ],
+      [
+        "The API groups 173 catalogued endpoints into 28 resource families. Each one is available in the hosted reference sandbox.",
+        "Explore the Blueballs API across accounts, cards, transfers, onboarding, wallets, FX, ledger and more.",
+      ],
+      ["144 catalogued endpoints.", "API surface included."],
+      ["MIT-licensed reference software for building neobank products.", "MIT-licensed open-source software for building neobanks and financial products."],
+    ]);
+
+    const apply = () => {
+      document.querySelectorAll("button").forEach((button) => {
+        if (button.textContent?.trim() === "Build notes") button.style.display = "none";
+      });
+
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let node: Node | null;
+      while ((node = walker.nextNode())) {
+        const text = node.textContent?.trim() ?? "";
+        const exact = replacements.get(text);
+        if (exact) {
+          node.textContent = exact;
+          continue;
+        }
+        if (text.endsWith("REFERENCE MODULES · EXAMPLE SCREEN + API REQUEST")) {
+          node.textContent = text.replace("REFERENCE MODULES · EXAMPLE SCREEN + API REQUEST", "PRODUCTS · EXAMPLE UI + API REQUEST");
+        }
+      }
+    };
+
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, []);
+  return null;
+}
+
 function EcosystemNavBridge() {
   const [mount, setMount] = useState<HTMLElement | null>(null);
 
@@ -63,7 +121,6 @@ function EcosystemShell() {
     ["Stablecoin FX", "/fx"],
     ["Providers", "/ecosystem"],
     ["Developers", "/developers"],
-    ["Build notes", "/bulletin"],
   ] as const;
   const ticker = ["PROVIDER DIRECTORY", "ACCOUNTS", "IDENTITY AND COMPLIANCE", "PAYMENT RAILS", "STABLECOINS", "WALLETS AND CUSTODY", "CARD ISSUING", "FX AND LIQUIDITY", "OPEN BANKING", "OPERATIONS"];
 
@@ -90,7 +147,7 @@ function EcosystemShell() {
         </div>
         <EcosystemPage onNavigate={navigate} />
         <div data-pad className="eco-shell-footer" style={{ background: "#07144F", color: "#FFFFFF", borderRadius: 18, padding: "26px", display: "grid", gap: 12 }}>
-          <div><BrandLockup compact inverse /><p style={{ fontSize: 13.5, lineHeight: 1.6, color: "#C5CAD7", maxWidth: "36ch" }}>MIT-licensed reference software for building neobank products.</p><div style={{ fontFamily: MONO, fontSize: 10.5, color: "#8F98AC" }}>© 2026 · MIT LICENCE</div></div>
+          <div><BrandLockup compact inverse /><p style={{ fontSize: 13.5, lineHeight: 1.6, color: "#C5CAD7", maxWidth: "36ch" }}>MIT-licensed open-source software for building neobanks and financial products.</p><div style={{ fontFamily: MONO, fontSize: 10.5, color: "#8F98AC" }}>© 2026 · MIT LICENCE</div></div>
           <div><div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8F98AC", marginBottom: 10 }}>PRODUCT</div><button type="button" onClick={() => navigate("/products")} className="eco-shell-link">Products</button><button type="button" onClick={() => navigate("/fx")} className="eco-shell-link">Stablecoin FX</button><button type="button" onClick={() => navigate("/ecosystem")} className="eco-shell-link">Providers</button></div>
           <div><div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8F98AC", marginBottom: 10 }}>DEVELOPERS</div><button type="button" onClick={() => navigate("/developers")} className="eco-shell-link">Documentation</button><a href="https://github.com/Josh-Gi3r/blueballs" target="_blank" rel="noreferrer" className="eco-shell-link">GitHub ↗</a></div>
         </div>
@@ -107,6 +164,10 @@ export default function SiteRoot() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  if (path === "/ecosystem") return <EcosystemShell />;
-  return <><App /><EcosystemNavBridge /></>;
+  useEffect(() => {
+    if (path === "/bulletin") navigate("/developers");
+  }, [path]);
+
+  if (path === "/ecosystem") return <><EcosystemShell /><LegacyCopyBridge /></>;
+  return <><App /><EcosystemNavBridge /><LegacyCopyBridge /></>;
 }
