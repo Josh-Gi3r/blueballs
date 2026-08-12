@@ -20,8 +20,10 @@ export default function Device({
   useEffect(() => {
     if (id !== "deposit-onchain") { setResolvedId(id); return; }
     const productCard = host.current?.closest(".bb-screen-grid > div");
-    const isQrCard = productCard?.textContent?.includes("QR & payment links") ?? false;
-    setResolvedId(isQrCard ? "merchant-qr" : id);
+    const cardText = productCard?.textContent ?? "";
+    if (cardText.includes("QR & payment links")) { setResolvedId("merchant-qr"); return; }
+    if (cardText.includes("Wallets") && cardText.includes("/v2/wallets")) { setResolvedId("wallet-product"); return; }
+    setResolvedId(id);
   }, [id]);
 
   if (LEGACY.has(resolvedId)) {
