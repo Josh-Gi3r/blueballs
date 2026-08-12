@@ -1,0 +1,82 @@
+import { useMemo, useState, type ChangeEvent } from "react";
+import { CARD_PROGRAMS, type CardProgram, type CardStatus, type CustodyModel } from "./cards/data";
+import "./CardsPage.css";
+
+type CardsPageProps = { onNavigate: (path: string) => void };
+type Filter = "all" | CustodyModel | "Visa" | "Mastercard" | "Consumer" | "Business" | "legacy";
+
+const FILTERS: { id: Filter; label: string }[] = [
+  {id:"all",label:"All programs"},{id:"Self-custodial",label:"Self-custody"},{id:"Custodial",label:"Custodial"},{id:"Hybrid",label:"Hybrid"},{id:"Visa",label:"Visa"},{id:"Mastercard",label:"Mastercard"},{id:"Consumer",label:"Consumer"},{id:"Business",label:"Business"},{id:"legacy",label:"Legacy"},
+];
+
+function matchesFilter(card: CardProgram, filter: Filter) {
+  if (filter === "all") return card.status !== "legacy";
+  if (filter === "legacy") return card.status === "legacy";
+  if (filter === "Visa" || filter === "Mastercard") return card.network.includes(filter) && card.status !== "legacy";
+  if (filter === "Consumer" || filter === "Business") return (card.customer === filter || card.customer === "Both") && card.status !== "legacy";
+  return card.custody === filter && card.status !== "legacy";
+}
+
+function statusLabel(status: CardStatus) { return status === "launching" ? "LAUNCHING" : status === "legacy" ? "LEGACY" : "ACTIVE"; }
+
+function CardTile({ card, selected, onSelect, onOpen }: { card: CardProgram; selected: boolean; onSelect: () => void; onOpen: () => void }) {
+  return <article className={`cards-tile ${selected ? "selected" : ""} ${card.status === "legacy" ? "legacy" : ""}`}>
+    <div className="cards-tile-top"><div><span>{statusLabel(card.status)}</span><h3>{card.name}</h3><small>{card.company}</small></div><button className="cards-compare-check" type="button" onClick={onSelect} aria-pressed={selected}>{selected ? "✓" : "+"}</button></div>
+    <div className="cards-model-line"><b>{card.network}</b><span>{card.type}</span><span>{card.custody}</span></div>
+    <p>{card.note}</p>
+    <div className="cards-token-row">{card.funding.slice(0,4).map((item)=><span key={item}>{item}</span>)}{card.funding.length>4&&<span>+{card.funding.length-4}</span>}</div>
+    <div className="cards-market-grid"><div><small>SPEND MODEL</small><b>{card.spendModel}</b></div><div><small>MARKET OFFER</small><b>{card.rewards}</b></div></div>
+    <div className="cards-stack"><small>KNOWN STACK</small><div>{card.partners.length ? card.partners.slice(0,4).map((partner,index)=><span key={partner}>{index>0&&<i>→</i>}{partner}</span>) : <span>Not publicly disclosed</span>}</div></div>
+    <div className="cards-tile-foot"><span>{card.geography}</span><button type="button" onClick={onOpen}>View model <b>→</b></button></div>
+  </article>;
+}
+
+function DetailPanel({ card, onClose, onCompare, selected }: { card: CardProgram; onClose:()=>void; onCompare:()=>void; selected:boolean }) {
+  return <div className="cards-detail-backdrop" onMouseDown={onClose}><aside className="cards-detail" onMouseDown={(event)=>event.stopPropagation()}>
+    <div className="cards-detail-head"><div><span>CARD MODEL</span><h2>{card.name}</h2><p>{card.company} · {card.network} · {card.type}</p></div><button type="button" onClick={onClose}>×</button></div>
+    <div className="cards-detail-summary"><div><small>CUSTODY</small><b>{card.custody}</b></div><div><small>CUSTOMER</small><b>{card.customer}</b></div><div><small>FORM</small><b>{[card.virtual&&"Virtual",card.physical&&"Physical"].filter(Boolean).join(" + ")||"Not disclosed"}</b></div></div>
+    <section><span>HOW THE MODEL WORKS</span><h3>{card.model}</h3><p>{card.note}</p><div className="cards-flow"><b>{card.wallets}</b><i>→</i><b>{card.spendModel}</b><i>→</i><b>{card.network}</b><i>→</i><b>Merchant</b></div></section>
+    <section><span>MONEY</span><div className="cards-detail-list"><div><small>STABLECOINS / FUNDING</small><b>{card.funding.join(" · ")}</b></div><div><small>CHAINS</small><b>{card.chains.join(" · ")}</b></div><div><small>FEES / FX</small><b>{card.fees}</b></div><div><small>REWARDS / PERKS</small><b>{card.rewards}</b></div></div></section>
+    <section><span>KNOWN INFRASTRUCTURE</span><div className="cards-partner-chain">{card.partners.map((partner,index)=><span key={partner}>{index>0&&<i>→</i>}<b>{partner}</b></span>)}</div><p className="cards-disclosure">Only relationships supported by the research are shown. Missing issuer, processor, settlement or compliance relationships remain not publicly disclosed.</p></section>
+    <section><span>AVAILABILITY</span><p>{card.geography}</p></section>
+    <div className="cards-detail-actions"><button type="button" onClick={onCompare}>{selected?"Remove from comparison":"Add to comparison"}</button><button type="button" className="secondary" onClick={onClose}>Back to directory</button></div>
+  </aside></div>;
+}
+
+function CompareTray({ cards, onRemove, onClear }: { cards: CardProgram[]; onRemove:(id:string)=>void; onClear:()=>void }) {
+  const [open,setOpen]=useState(false);
+  if (!cards.length) return null;
+  return <div className={`cards-compare-tray ${open?"open":""}`}><div className="cards-compare-bar"><div><span>COMPARE ARCHITECTURES</span><strong>{cards.map(card=>card.name).join(" · ")}</strong></div><div><button type="button" className="secondary" onClick={onClear}>Clear</button><button type="button" onClick={()=>setOpen(!open)}>{open?"Close comparison":`Compare ${cards.length}`}</button></div></div>{open&&<div className="cards-compare-table-wrap"><table><thead><tr><th>BUILD DECISION</th>{cards.map(card=><th key={card.id}>{card.name}<button onClick={()=>onRemove(card.id)}>×</button></th>)}</tr></thead><tbody>{[
+    ["Model",(c:CardProgram)=>c.model],["Card type",c=>`${c.network} · ${c.type}`],["Custody",c=>c.custody],["Funding",c=>c.funding.join(" · ")],["Chains",c=>c.chains.join(" · ")],["Spend model",c=>c.spendModel],["Known stack",c=>c.partners.join(" → ")||"Not publicly disclosed"],["Market offer",c=>c.rewards],["Fees / FX",c=>c.fees],["Geography",c=>c.geography],["Customer",c=>c.customer]
+  ].map(([label,getter])=><tr key={label as string}><td>{label as string}</td>{cards.map(card=><td key={card.id}>{(getter as (c:CardProgram)=>string)(card)}</td>)}</tr>)}</tbody></table></div>}</div>;
+}
+
+function ModelBuilder({ onApply }: { onApply:(custody:CustodyModel|string, network:string, proposition:string)=>void }) {
+  const [custody,setCustody]=useState("Self-custodial"); const [network,setNetwork]=useState("Any network"); const [proposition,setProposition]=useState("Stablecoin spend");
+  return <div className="cards-builder"><div className="cards-builder-head"><span>EXPLORE A CARD MODEL</span><strong>Start with the decisions you are making.</strong><small>See how existing programs made similar choices.</small></div><div className="cards-builder-steps">
+    <label><span>01 · CUSTODY</span><select value={custody} onChange={e=>setCustody(e.target.value)}><option>Self-custodial</option><option>Custodial</option><option>Hybrid</option><option>Any custody</option></select></label>
+    <label><span>02 · NETWORK</span><select value={network} onChange={e=>setNetwork(e.target.value)}><option>Any network</option><option>Visa</option><option>Mastercard</option></select></label>
+    <label><span>03 · PRODUCT</span><select value={proposition} onChange={e=>setProposition(e.target.value)}><option>Stablecoin spend</option><option>Cashback / rewards</option><option>Yield while spendable</option><option>Collateral / credit</option><option>Neobank account</option></select></label>
+  </div><button type="button" onClick={()=>onApply(custody,network,proposition)}>Find comparable models <span>→</span></button></div>;
+}
+
+export default function CardsPage({ onNavigate }: CardsPageProps) {
+  const [filter,setFilter]=useState<Filter>("all"); const [query,setQuery]=useState(""); const [selected,setSelected]=useState<string[]>([]); const [detail,setDetail]=useState<CardProgram|null>(null); const [builderHint,setBuilderHint]=useState("");
+  const filtered=useMemo(()=>{const q=query.trim().toLowerCase();return CARD_PROGRAMS.filter(card=>matchesFilter(card,filter)).filter(card=>!q||[card.name,card.company,card.network,card.type,card.custody,card.model,card.spendModel,card.rewards,card.geography,...card.funding,...card.chains,...card.partners].join(" ").toLowerCase().includes(q));},[filter,query]);
+  const compared=selected.map(id=>CARD_PROGRAMS.find(card=>card.id===id)).filter(Boolean) as CardProgram[];
+  const toggle=(id:string)=>setSelected(current=>current.includes(id)?current.filter(item=>item!==id):current.length<4?[...current,id]:current);
+  const applyBuilder=(custody:string,network:string,proposition:string)=>{setFilter(custody==="Any custody"?(network==="Visa"||network==="Mastercard"?network as Filter:"all"):custody as Filter); const terms=[network==="Any network"?"":network, proposition==="Cashback / rewards"?"cashback":proposition==="Yield while spendable"?"yield":proposition==="Collateral / credit"?"credit collateral":proposition==="Neobank account"?"neobank":""].filter(Boolean).join(" ");setQuery(terms);setBuilderHint(`${custody} · ${network} · ${proposition}`);setTimeout(()=>document.getElementById("cards-directory")?.scrollIntoView({behavior:"smooth"}),0);};
+  return <div className="cards-page">
+    <section className="cards-hero"><div className="cards-hero-copy"><div className="cards-eyebrow">CARD MODELS</div><h1><span>See how card products</span><span>are being built.</span></h1><p>Explore stablecoin and crypto-enabled card programs by funding model, custody, network, geography, fees, rewards and the providers behind them. Built for teams designing neobanks and financial products.</p><div className="cards-hero-actions"><button onClick={()=>document.getElementById("cards-directory")?.scrollIntoView({behavior:"smooth"})}>Explore card models</button><button className="secondary" onClick={()=>onNavigate("/ecosystem")}>Find infrastructure</button></div><div className="cards-hero-proof"><div><span>41</span><b>public programs researched</b></div><div><span>38</span><b>active or launching</b></div><div><span>3</span><b>legacy models retained</b></div></div></div><ModelBuilder onApply={applyBuilder}/></section>
+    <section id="cards-directory" className="cards-directory"><div className="cards-directory-head"><div><span>CARD MODEL DIRECTORY</span><h2>Study the market before you design the stack.</h2><p>Compare what users are being offered and how the card appears to work underneath. This is not a ranking.</p></div><label className="cards-search"><span>SEARCH</span><input value={query} onChange={(event:ChangeEvent<HTMLInputElement>)=>setQuery(event.target.value)} placeholder="Card, stablecoin, partner, model or region…"/></label></div>
+      <div className="cards-filter-row">{FILTERS.map(item=><button type="button" className={filter===item.id?"active":""} key={item.id} onClick={()=>{setFilter(item.id);setBuilderHint("")}}><b>{item.label}</b><span>{CARD_PROGRAMS.filter(card=>matchesFilter(card,item.id)).length}</span></button>)}</div>
+      {builderHint&&<div className="cards-builder-result"><span>MODEL SEARCH</span><b>{builderHint}</b><button type="button" onClick={()=>{setFilter("all");setQuery("");setBuilderHint("")}}>Reset</button></div>}
+      <div className="cards-results-line"><span>{filtered.length} {filtered.length===1?"program":"programs"}</span><span>Research snapshot · 12 Aug 2026 · Unknown fields are left undisclosed</span></div>
+      <div className="cards-grid">{filtered.map(card=><CardTile key={card.id} card={card} selected={selected.includes(card.id)} onSelect={()=>toggle(card.id)} onOpen={()=>setDetail(card)}/>)}</div>{filtered.length===0&&<div className="cards-empty">No card programs match this model search.</div>}
+    </section>
+    <section className="cards-market-note"><div><span>READ THE STACK, NOT JUST THE CARD</span><h2>The same customer proposition can sit on very different infrastructure.</h2><p>A card brand may use a self-custodial wallet, a program manager, a separate BIN sponsor, another processor and a network such as Visa or Mastercard. Blueballs keeps those relationships separate so builders can see the actual model where it is publicly known.</p></div><div className="cards-market-stack"><span>BRAND</span><i>→</i><span>WALLET / ACCOUNT</span><i>→</i><span>PROGRAM / ISSUER</span><i>→</i><span>NETWORK</span><i>→</i><span>MERCHANT</span></div></section>
+    <section className="cards-bottom"><div><span>FROM MARKET MODEL TO YOUR STACK</span><h2>Found a model you want to understand?</h2><p>Use the Providers directory to explore issuing, banking, custody, compliance, FX, stablecoin and payment infrastructure that could sit behind your own product.</p></div><div><button onClick={()=>onNavigate("/ecosystem")}>Browse providers</button><button className="secondary" onClick={()=>onNavigate("/developers")}>See Blueballs APIs</button></div></section>
+    <div className="cards-disclaimer"><span>ABOUT THIS DIRECTORY</span><p>Card programs, fees, rewards, eligibility and provider relationships change. The directory keeps unknown relationships as not publicly disclosed rather than inferring them. Research snapshot: 12 Aug 2026.</p></div>
+    {detail&&<DetailPanel card={detail} onClose={()=>setDetail(null)} onCompare={()=>toggle(detail.id)} selected={selected.includes(detail.id)}/>}<CompareTray cards={compared} onRemove={toggle} onClear={()=>setSelected([])}/>
+  </div>;
+}
