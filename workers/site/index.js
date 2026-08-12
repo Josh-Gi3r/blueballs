@@ -1,3 +1,11 @@
+import {
+  crawlerDocument,
+  llmsText,
+  pageMetadata,
+  robotsText,
+  sitemapXml,
+} from "./crawler-pages.js";
+
 function internalRequest(request, headers) {
   const next = new Headers(request.headers);
   next.delete("origin");
@@ -12,6 +20,24 @@ export default {
     if (url.hostname === "www.blueballs.tech") {
       url.hostname = "blueballs.tech";
       return Response.redirect(url.toString(), 301);
+    }
+
+    if (url.pathname === "/robots.txt") {
+      return new Response(robotsText(), {
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" },
+      });
+    }
+
+    if (url.pathname === "/sitemap.xml") {
+      return new Response(sitemapXml(), {
+        headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" },
+      });
+    }
+
+    if (url.pathname === "/llms.txt" || url.pathname === "/llms-full.txt") {
+      return new Response(llmsText(url.pathname === "/llms-full.txt"), {
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "public, max-age=3600" },
+      });
     }
 
     if (url.pathname.startsWith("/v2/fx/") || url.pathname === "/fx-health") {
@@ -48,6 +74,22 @@ export default {
       }, { status: bank.ok && fx.ok ? 200 : 503 });
     }
 
-    return env.ASSETS.fetch(request);
+    const assetResponse = await env.ASSETS.fetch(request);
+    const contentType = assetResponse.headers.get("content-type") ?? "";
+    if (!contentType.includes("text/html") || request.method === "HEAD") return assetResponse;
+
+    const metadata = pageMetadata(url.pathname);
+    let html = await assetResponse.text();
+    html = html
+      .replace(/<title>.*?<\/title>/s, `<title>${metadata.title}</title>`)
+      .replace("<div id=\"root\"></div>", crawlerDocument(url.pathname))
+      .replace("</head>", `<meta name="description" content="${metadata.description}"><link rel="canonical" href="https://blueballs.tech${url.pathname === "/" ? "" : url.pathname}"><link rel="alternate" type="text/plain" href="/llms.txt" title="LLM overview"></head>`);
+
+    const headers = new Headers(assetResponse.headers);
+    headers.delete("content-encoding");
+    headers.delete("content-length");
+    headers.delete("etag");
+    headers.set("content-type", "text/html; charset=utf-8");
+    return new Response(html, { status: assetResponse.status, headers });
   },
 };
