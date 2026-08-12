@@ -22,6 +22,11 @@ export default function FxPage() {
       <ProductExchangeVisual/>
     </section>
 
+    <section className="fxp-section fxn-products">
+      <div className="fxp-section-head"><div><Label>WHAT YOU CAN BUILD</Label><h2>Put currency exchange where your product needs it.</h2><p>The same FX layer can sit behind a simple exchange screen, a transfer, a business payment or a stablecoin balance.</p></div></div>
+      <div className="fxn-product-grid"><article><span>EXCHANGE</span><b>Convert balances in the app.</b><p>Quote, review, exchange and show the result without sending the customer to another product.</p></article><article><span>TRANSFER</span><b>Convert while money moves.</b><p>Take one currency, deliver another, and keep the FX leg inside the transfer flow.</p></article><article><span>BALANCES</span><b>Move between tokenised currencies.</b><p>Use the same market for stablecoin-to-stablecoin exchange without a fiat leg.</p></article><article><span>BUSINESS</span><b>Give companies the same FX layer.</b><p>Use it for supplier payments, treasury conversion and multi-currency operations.</p></article></div>
+    </section>
+
     <section className="fxp-section fxn-intro">
       <div className="fxp-section-head"><div><Label>WHAT CHANGES</Label><h2>You do not have to buy every FX trade from one outside provider.</h2><p>Your own customers, businesses, market makers, issuers and treasury can participate in the market. Connected firms and outside venues can add capacity when you need them.</p></div></div>
       <div className="fxn-intro-grid"><article><span>01</span><b>Operate a private market.</b><p>Keep orders and customer activity off the public chain.</p></article><article><span>02</span><b>Let more people provide FX.</b><p>Customers, businesses and institutions can place or quote liquidity.</p></article><article><span>03</span><b>Settle the token exchange on-chain.</b><p>The selected token fills can settle together instead of becoming separate promises.</p></article></div>
