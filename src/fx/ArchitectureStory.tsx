@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Label } from "./Primitives";
 
-const money = (value: string) => <strong>{value}</strong>;
-
 export function MasterArchitecture() {
   return <section className="fxp-section fx-visual-section">
     <div className="fxp-section-head"><div><Label>ONE CUSTOMER EXCHANGE</Label><h2>The product stays simple. The infrastructure can be much bigger.</h2><p>A USD → EUR exchange can use your own market, connected institutions, external venues and fiat edges without changing the customer-facing integration.</p></div></div>
