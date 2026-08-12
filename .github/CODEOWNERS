@@ -1,0 +1,14 @@
+# Default ownership. Replace/add teams as the maintainer group grows.
+* @Josh-Gi3r
+
+# Financially and security sensitive surfaces
+/apps/api/ @Josh-Gi3r
+/apps/fx-node/ @Josh-Gi3r
+/packages/fx-contracts/ @Josh-Gi3r
+/packages/fx-liquidity/ @Josh-Gi3r
+/packages/fx-market/ @Josh-Gi3r
+/packages/fx-policy/ @Josh-Gi3r
+/packages/fx-pricing/ @Josh-Gi3r
+/spec/ @Josh-Gi3r
+/.github/workflows/ @Josh-Gi3r
+/SECURITY.md @Josh-Gi3r
