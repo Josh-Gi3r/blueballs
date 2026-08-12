@@ -1,79 +1,142 @@
 import { useState } from "react";
 import { Label } from "./Primitives";
 
-function ArrowDefs(){return <defs><marker id="fx-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6078cb"/></marker><marker id="fx-arrow-soft" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#a9b5da"/></marker><filter id="fx-shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="12" floodColor="#1f315f" floodOpacity=".12"/></filter></defs>}
+const money = (value: string) => <strong>{value}</strong>;
 
-export function MasterArchitecture(){
-  return <section className="fxp-section fx-visual-section"><div className="fxp-section-head"><div><Label>ONE CUSTOMER EXCHANGE</Label><h2>The product stays simple. The infrastructure can be much bigger.</h2><p>A USD → EUR exchange can move through your own market, connected institutions, external venues and fiat edges without changing the customer-facing integration.</p></div></div><div className="fx-canvas fx-master-canvas"><svg viewBox="0 0 1440 760" role="img" aria-label="End-to-end FX infrastructure flow"><ArrowDefs/>
-    <path className="fx-route-main" d="M170 380 C270 380 280 380 360 380 S470 380 530 380" markerEnd="url(#fx-arrow)"/>
-    <path className="fx-route-main" d="M900 380 C980 380 1010 380 1085 380 S1190 380 1265 380" markerEnd="url(#fx-arrow)"/>
-    <path className="fx-route-soft" d="M705 300 C705 240 705 215 705 170" markerEnd="url(#fx-arrow-soft)"/>
-    <path className="fx-route-soft" d="M655 455 C590 520 515 555 420 590" markerEnd="url(#fx-arrow-soft)"/>
-    <path className="fx-route-soft" d="M755 455 C830 520 905 555 1010 590" markerEnd="url(#fx-arrow-soft)"/>
-    <g className="fx-node phone-node" transform="translate(55 270)"><rect width="190" height="220" rx="34"/><text x="95" y="38" textAnchor="middle" className="eyebrow">YOUR PRODUCT</text><text x="95" y="90" textAnchor="middle" className="big">$100,000</text><text x="95" y="122" textAnchor="middle" className="mid">USD → EUR</text><rect x="28" y="160" width="134" height="34" rx="17" className="button"/><text x="95" y="182" textAnchor="middle" className="buttonText">REVIEW EXCHANGE</text></g>
-    <g transform="translate(335 310)"><circle cx="70" cy="70" r="67" className="checkpoint"/><text x="70" y="55" textAnchor="middle" className="eyebrow">REQUEST</text><text x="70" y="82" textAnchor="middle" className="nodeTitle">Policy</text><text x="70" y="103" textAnchor="middle" className="tiny">assets · limits · access</text></g>
-    <g className="fx-core-node" transform="translate(530 250)" filter="url(#fx-shadow)"><rect width="370" height="260" rx="34"/><text x="185" y="46" textAnchor="middle" className="eyebrow light">YOUR FX STACK</text><text x="185" y="91" textAnchor="middle" className="heroText">Build the route</text><g className="coreItems"><text x="58" y="142">MARKET</text><text x="154" y="142">PRICE</text><text x="245" y="142">RESERVE</text><text x="58" y="188">EXECUTE</text><text x="154" y="188">SETTLE</text><text x="245" y="188">RECONCILE</text></g><text x="185" y="229" textAnchor="middle" className="tiny light">one interface · different market structures</text></g>
-    <g transform="translate(585 52)"><circle cx="120" cy="70" r="64" className="sourceHalo"/><text x="120" y="50" textAnchor="middle" className="eyebrow">YOUR MARKET</text><text x="120" y="76" textAnchor="middle" className="nodeTitle">Own flow</text><text x="120" y="98" textAnchor="middle" className="tiny">customers · makers · treasury</text></g>
-    <g transform="translate(250 560)"><circle cx="160" cy="55" r="52" className="sourceHalo"/><text x="160" y="44" textAnchor="middle" className="eyebrow">CONNECTED</text><text x="160" y="67" textAnchor="middle" className="nodeTitle">Institutions</text><text x="160" y="88" textAnchor="middle" className="tiny">issuer · bank · LP · JIT</text></g>
-    <g transform="translate(875 560)"><circle cx="135" cy="55" r="52" className="sourceHalo"/><text x="135" y="44" textAnchor="middle" className="eyebrow">OPTIONAL</text><text x="135" y="67" textAnchor="middle" className="nodeTitle">External routes</text><text x="135" y="88" textAnchor="middle" className="tiny">venue · aggregator · bridge</text></g>
-    <g transform="translate(1070 310)"><circle cx="70" cy="70" r="67" className="checkpoint"/><text x="70" y="55" textAnchor="middle" className="eyebrow">FINALITY</text><text x="70" y="82" textAnchor="middle" className="nodeTitle">Settle</text><text x="70" y="103" textAnchor="middle" className="tiny">token + external evidence</text></g>
-    <g className="fx-node result-node" transform="translate(1260 300)"><rect width="130" height="170" rx="26"/><circle cx="65" cy="48" r="22" className="ok"/><path d="M55 48l7 7 14-17" className="check"/><text x="65" y="91" textAnchor="middle" className="eyebrow">CUSTOMER</text><text x="65" y="118" textAnchor="middle" className="nodeTitle">EUR</text><text x="65" y="141" textAnchor="middle" className="tiny">received</text></g>
-    <text x="720" y="710" textAnchor="middle" className="caption">THE MARKET, PROVIDERS AND RAILS CAN CHANGE. THE PRODUCT INTEGRATION DOES NOT HAVE TO.</text>
-  </svg></div></section>
+export function MasterArchitecture() {
+  return <section className="fxp-section fx-visual-section">
+    <div className="fxp-section-head"><div><Label>ONE CUSTOMER EXCHANGE</Label><h2>The product stays simple. The infrastructure can be much bigger.</h2><p>A USD → EUR exchange can use your own market, connected institutions, external venues and fiat edges without changing the customer-facing integration.</p></div></div>
+    <div className="fx-stage fx-master-stage">
+      <div className="fx-master-product">
+        <div className="fx-mini-phone">
+          <div className="fx-mini-status"><span>9:41</span><span>● ● ●</span></div>
+          <div className="fx-mini-title">Exchange</div>
+          <div className="fx-mini-amount"><span>You pay</span><b>$100,000.00</b><em>USD</em></div>
+          <div className="fx-mini-arrow">↓</div>
+          <div className="fx-mini-amount receive"><span>You receive</span><b>€92,340.00</b><em>EUR</em></div>
+          <button type="button">Review exchange</button>
+        </div>
+      </div>
+
+      <div className="fx-master-rail"><span className="fx-rail-dot"/><span className="fx-rail-label">FX REQUEST</span></div>
+
+      <div className="fx-master-engine">
+        <div className="fx-engine-header"><span>YOUR FX STACK</span><b>USD → EUR</b><em>route assembling</em></div>
+        <div className="fx-engine-grid">
+          <div className="fx-engine-market"><div className="fx-panel-head"><span>PRIVATE MARKET</span><b>USDC / EURC</b></div><div className="fx-depth"><div><small>BIDS</small><p><span>0.9237</span><b>85k</b></p><p><span>0.9235</span><b>120k</b></p><p><span>0.9232</span><b>240k</b></p></div><div><small>OFFERS</small><p><span>0.9239</span><b>100k</b></p><p><span>0.9241</span><b>220k</b></p><p><span>0.9244</span><b>460k</b></p></div></div></div>
+          <div className="fx-engine-route"><div className="fx-panel-head"><span>SELECTED ROUTE</span><b>$100,000</b></div><ul><li><i className="own"/><span>Own market</span><b>$55k</b></li><li><i className="firm"/><span>Institutional JIT</span><b>$25k</b></li><li><i className="venue"/><span>External venue</span><b>$20k</b></li></ul><div className="fx-reserve"><span>ALL LEGS RESERVED</span><b>6.2s</b></div></div>
+        </div>
+        <div className="fx-engine-steps"><span>POLICY</span><span>PRICE</span><span>ROUTE</span><span>RESERVE</span><span>EXECUTE</span><span>RECONCILE</span></div>
+      </div>
+
+      <div className="fx-master-rail right"><span className="fx-rail-dot"/><span className="fx-rail-label">SETTLEMENT</span></div>
+
+      <div className="fx-master-result"><div className="fx-result-check">✓</div><span>CUSTOMER</span><b>€92,340</b><small>EUR received</small></div>
+
+      <div className="fx-master-sources">
+        <div className="fx-source-panel own"><span>YOUR MARKET</span><b>Customers · businesses · makers · treasury</b><small>Private signed flow already inside the institution.</small></div>
+        <div className="fx-source-panel firm"><span>CONNECTED FIRMS</span><b>Issuer · bank · LP · JIT</b><small>Orders, inventory or short-lived firm quotes.</small></div>
+        <div className="fx-source-panel venue"><span>EXTERNAL ROUTES</span><b>Venue · aggregator · bridge</b><small>Used only when they improve the executable path.</small></div>
+      </div>
+      <div className="fx-master-caption">THE MARKET, PROVIDERS AND RAILS CAN CHANGE. THE PRODUCT INTEGRATION DOES NOT HAVE TO.</div>
+    </div>
+  </section>;
 }
 
-export function OwnMarketGraphic(){
-  return <section className="fxp-section fx-visual-section"><div className="fxp-section-head"><div><Label>YOUR MARKET</Label><h2>Run the market behind the exchange.</h2><p>Opposing customer flow, customer and business orders, professional makers, issuers and treasury can all meet inside the same private market.</p></div></div><div className="fx-canvas"><svg viewBox="0 0 1440 780" role="img" aria-label="Private FX market with participant orders and one customer trade"><ArrowDefs/>
-    <path className="fx-route-main" d="M720 90L720 205" markerEnd="url(#fx-arrow)"/><path className="fx-route-main" d="M720 540L720 680" markerEnd="url(#fx-arrow)"/>
-    <path className="fx-route-soft" d="M235 205 C330 205 350 260 470 292" markerEnd="url(#fx-arrow-soft)"/><path className="fx-route-soft" d="M235 355 C330 355 360 350 470 350" markerEnd="url(#fx-arrow-soft)"/><path className="fx-route-soft" d="M235 505 C335 505 365 430 470 405" markerEnd="url(#fx-arrow-soft)"/>
-    <path className="fx-route-soft" d="M1205 205 C1110 205 1090 260 970 292" markerEnd="url(#fx-arrow-soft)"/><path className="fx-route-soft" d="M1205 355 C1110 355 1080 350 970 350" markerEnd="url(#fx-arrow-soft)"/><path className="fx-route-soft" d="M1205 505 C1105 505 1075 430 970 405" markerEnd="url(#fx-arrow-soft)"/>
-    <g transform="translate(600 35)"><rect width="240" height="72" rx="36" className="requestPill"/><text x="120" y="29" textAnchor="middle" className="eyebrow light">INCOMING EXCHANGE</text><text x="120" y="53" textAnchor="middle" className="nodeTitle light">$250k USD → EUR</text></g>
-    {[[70,160,"CUSTOMER","$40k","limit order"],[70,310,"BUSINESS","$75k","private order"],[70,460,"MARKET MAKER","$300k","resting quote"],[1130,160,"ISSUER","$150k","inventory"],[1130,310,"TREASURY","$90k","risk-limited"],[1130,460,"INSTITUTION","$500k","signed order"]].map(([x,y,k,a,s])=><g key={String(k)} transform={`translate(${x} ${y})`}><circle cx="85" cy="55" r="48" className="participant"/><text x="85" y="44" textAnchor="middle" className="eyebrow">{k}</text><text x="85" y="67" textAnchor="middle" className="nodeTitle">{a}</text><text x="85" y="88" textAnchor="middle" className="tiny">{s}</text></g>)}
-    <g className="marketPool" transform="translate(470 205)" filter="url(#fx-shadow)"><path d="M85 0H415c48 0 85 38 85 85v165c0 48-37 85-85 85H85C37 335 0 298 0 250V85C0 38 37 0 85 0Z"/><text x="250" y="50" textAnchor="middle" className="eyebrow light">PRIVATE FX MARKET</text><text x="250" y="88" textAnchor="middle" className="heroText">USDC / EURC</text><line x1="250" y1="115" x2="250" y2="275" className="marketDivider"/><text x="120" y="142" textAnchor="middle" className="eyebrow light">BIDS</text><text x="380" y="142" textAnchor="middle" className="eyebrow light">OFFERS</text><text x="120" y="190" textAnchor="middle" className="marketNumber">$118k</text><text x="380" y="190" textAnchor="middle" className="marketNumber">$265k</text><text x="250" y="235" textAnchor="middle" className="tiny light">price-time matching · partial fills · cancellation</text><rect x="125" y="260" width="250" height="42" rx="21" className="selectedFill"/><text x="250" y="286" textAnchor="middle" className="buttonText">SELECTED INTERNAL FILL · $165k</text></g>
-    <g transform="translate(530 665)"><rect width="380" height="70" rx="20" className="darkNote"/><text x="22" y="28" className="eyebrow light">WHAT LEAVES THE MARKET</text><text x="22" y="51" className="nodeTitle light">Aggregate depth, not maker identity</text></g>
-  </svg></div></section>
+export function OwnMarketGraphic() {
+  const participants = [
+    ["Customer flow", "$40k", "opposing flow"],
+    ["Businesses", "$75k", "private orders"],
+    ["Market makers", "$300k", "resting quotes"],
+    ["Issuer", "$150k", "inventory"],
+    ["Treasury", "$90k", "risk-limited"],
+    ["Institution", "$500k", "signed orders"],
+  ];
+  return <section className="fxp-section fx-visual-section">
+    <div className="fxp-section-head"><div><Label>YOUR MARKET</Label><h2>Run the market behind the exchange.</h2><p>Opposing customer flow, customer and business orders, professional makers, issuers and treasury can all meet inside the same private market.</p></div></div>
+    <div className="fx-stage fx-market-stage">
+      <div className="fx-participant-column"><span className="fx-stage-kicker">WHO CAN MAKE THE MARKET</span>{participants.map(([name, amount, detail], index)=><div className="fx-participant-row" key={name}><i className={`p${index}`}/><div><b>{name}</b><small>{detail}</small></div><strong>{amount}</strong></div>)}</div>
+      <div className="fx-market-terminal">
+        <div className="fx-terminal-top"><div><span>PRIVATE FX MARKET</span><b>USDC / EURC</b></div><div className="fx-terminal-state">OPEN · PRIVATE</div></div>
+        <div className="fx-terminal-book"><div className="bid"><small>BIDS</small><div className="book-head"><span>AMOUNT</span><span>PRICE</span></div><p><b>250k</b><em>0.9237</em><i style={{width:"88%"}}/></p><p><b>120k</b><em>0.9235</em><i style={{width:"62%"}}/></p><p><b>85k</b><em>0.9234</em><i style={{width:"42%"}}/></p><p><b>60k</b><em>0.9232</em><i style={{width:"30%"}}/></p></div><div className="ask"><small>OFFERS</small><div className="book-head"><span>PRICE</span><span>AMOUNT</span></div><p><em>0.9239</em><b>100k</b><i style={{width:"34%"}}/></p><p><em>0.9241</em><b>220k</b><i style={{width:"58%"}}/></p><p><em>0.9243</em><b>300k</b><i style={{width:"72%"}}/></p><p><em>0.9246</em><b>500k</b><i style={{width:"94%"}}/></p></div></div>
+        <div className="fx-terminal-foot"><span>Signed orders</span><span>Price-time matching</span><span>Partial fills</span><span>Reservations</span></div>
+      </div>
+      <div className="fx-market-outcome"><div className="fx-incoming-trade"><span>INCOMING EXCHANGE</span><b>$250,000</b><small>USD → EUR</small></div><div className="fx-flow-arrow">↓</div><div className="fx-best-fill"><span>BEST INTERNAL FILL</span><b>$165,000</b><small>matched in-market</small></div><div className="fx-residual"><span>REMAINING</span><b>$85,000</b><small>JIT / external if needed</small></div></div>
+      <div className="fx-market-caption">MAKER IDENTITIES STAY PRIVATE. AGGREGATE DEPTH CAN STILL BE EXPOSED.</div>
+    </div>
+  </section>;
 }
 
-export function ProviderParticipation(){
+export function ProviderParticipation() {
   const [mode,setMode]=useState<"resting"|"inventory"|"jit">("jit");
-  const modes={resting:{label:"RESTING ORDERS",caption:"Issuer, bank or LP leaves signed executable orders in the market.",left:"SIGNED ORDERS",mid:"PRIVATE MARKET",right:"SELECTED FILL"},inventory:{label:"AVAILABLE INVENTORY",caption:"A connected institution exposes current price and capacity without joining the public book.",left:"PRICE + CAPACITY",mid:"NORMALISE",right:"EXECUTABLE SLICE"},jit:{label:"JUST-IN-TIME RFQ",caption:"Ask for a short-lived firm price only when incoming flow needs more capacity.",left:"$4m REQUEST",mid:"FAN OUT",right:"FIRM QUOTES"}}[mode];
-  return <section className="fxp-section fx-visual-section"><div className="fxp-section-head"><div><Label>CONNECTED FIRMS</Label><h2>They do not all have to provide liquidity the same way.</h2><p>Banks, issuers, LPs and intermediaries can place orders, expose inventory, or answer when flow arrives.</p></div></div><div className="fx-diagram-tabs"><button className={mode==="resting"?"active":""} onClick={()=>setMode("resting")}>Resting orders</button><button className={mode==="inventory"?"active":""} onClick={()=>setMode("inventory")}>Available inventory</button><button className={mode==="jit"?"active":""} onClick={()=>setMode("jit")}>JIT / RFQ</button></div><div className="fx-canvas"><svg viewBox="0 0 1440 660" role="img" aria-label="Institutional participation modes"><ArrowDefs/>
-    <text x="720" y="58" textAnchor="middle" className="diagramTitle">{modes.label}</text><text x="720" y="88" textAnchor="middle" className="diagramSub">{modes.caption}</text>
-    <path className="fx-route-main" d="M245 315 C360 315 390 315 505 315" markerEnd="url(#fx-arrow)"/><path className="fx-route-main" d="M935 315 C1050 315 1080 315 1195 315" markerEnd="url(#fx-arrow)"/>
-    {[[70,170,"ISSUER","mint / redeem + inventory"],[70,310,"BANK","treasury / principal"],[70,450,"MARKET MAKER","professional liquidity"]].map(([x,y,k,s])=><g key={String(k)} transform={`translate(${x} ${y})`}><circle cx="88" cy="55" r="48" className="participant"/><text x="88" y="46" textAnchor="middle" className="eyebrow">{k}</text><text x="88" y="70" textAnchor="middle" className="tiny">{s}</text></g>)}
-    <g transform="translate(505 205)" filter="url(#fx-shadow)"><circle cx="215" cy="110" r="108" className="coreCircle"/><text x="215" y="80" textAnchor="middle" className="eyebrow light">{modes.mid}</text><text x="215" y="118" textAnchor="middle" className="heroText">Provider API</text><text x="215" y="150" textAnchor="middle" className="tiny light">quote · capacity · expiry · reserve</text></g>
-    <g transform="translate(1120 180)"><path d="M80 0h165c44 0 80 36 80 80v155c0 44-36 80-80 80H80c-44 0-80-36-80-80V80C0 36 36 0 80 0Z" className="quotePanel"/><text x="162" y="42" textAnchor="middle" className="eyebrow">{modes.right}</text>{mode==="jit"?<><text x="38" y="102" className="tiny">Issuer</text><text x="285" y="102" textAnchor="end" className="nodeTitle">$2m · 6s</text><text x="38" y="155" className="tiny">Bank</text><text x="285" y="155" textAnchor="end" className="nodeTitle">$5m · 8s</text><text x="38" y="208" className="tiny">LP</text><text x="285" y="208" textAnchor="end" className="nodeTitle">$3m · 4s</text></>:<><text x="162" y="125" textAnchor="middle" className="heroText dark">{mode==="resting"?"$2.5m":"$5.0m"}</text><text x="162" y="160" textAnchor="middle" className="tiny">price + capacity</text><text x="162" y="205" textAnchor="middle" className="nodeTitle">firm before use</text></>}</g>
-    <g transform="translate(510 505)"><rect width="420" height="72" rx="22" className="darkNote"/><text x="210" y="28" textAnchor="middle" className="eyebrow light">SAME ROUTER</text><text x="210" y="52" textAnchor="middle" className="nodeTitle light">Normalise → compare → reserve only what is selected</text></g>
-  </svg></div></section>
+  const data = mode === "jit" ? [
+    ["Issuer A","0.9235","$2.0m","6s","selected"],
+    ["Bank B","0.9236","$5.0m","8s","selected"],
+    ["LP C","0.9238","$3.0m","4s",""],
+  ] : mode === "inventory" ? [
+    ["Issuer A","0.9234","$4.0m","live","selected"],
+    ["Bank B","0.9237","$6.5m","live",""],
+    ["LP C","0.9236","$2.5m","live","selected"],
+  ] : [
+    ["Issuer A","0.9233","$1.5m","GTC","selected"],
+    ["Bank B","0.9236","$2.0m","GTC",""],
+    ["LP C","0.9234","$3.5m","GTC","selected"],
+  ];
+  const title = mode === "jit" ? "Ask only when flow arrives." : mode === "inventory" ? "Read executable capacity without a resting order." : "Let institutions leave signed orders in the market.";
+  return <section className="fxp-section fx-visual-section">
+    <div className="fxp-section-head"><div><Label>CONNECTED FIRMS</Label><h2>Providers can connect on their terms.</h2><p>Banks, issuers, LPs and intermediaries can place orders, expose inventory, or answer a short-lived request when customer flow arrives.</p></div></div>
+    <div className="fx-diagram-tabs"><button className={mode==="resting"?"active":""} onClick={()=>setMode("resting")}>Resting orders</button><button className={mode==="inventory"?"active":""} onClick={()=>setMode("inventory")}>Available inventory</button><button className={mode==="jit"?"active":""} onClick={()=>setMode("jit")}>JIT / RFQ</button></div>
+    <div className="fx-stage fx-provider-stage">
+      <div className="fx-provider-request"><span>{mode === "jit" ? "RFQ" : mode === "inventory" ? "DISCOVERY" : "ORDER BOOK"}</span><b>{mode === "jit" ? "$4,000,000" : "USDC / EURC"}</b><small>{mode === "jit" ? "USDC → EURC" : title}</small><div className="fx-request-clock">{mode === "jit" ? "00:08" : "LIVE"}</div></div>
+      <div className="fx-provider-terminal">
+        <div className="fx-terminal-top"><div><span>{mode === "jit" ? "FIRM QUOTES" : mode === "inventory" ? "AVAILABLE CAPACITY" : "RESTING INSTITUTIONAL ORDERS"}</span><b>{title}</b></div><div className="fx-terminal-state">NORMALISED</div></div>
+        <div className="fx-provider-table"><div className="head"><span>PROVIDER</span><span>PRICE</span><span>CAPACITY</span><span>{mode === "jit" ? "EXPIRES" : "STATE"}</span></div>{data.map(([provider,price,capacity,state,selected])=><div className={selected?"quote-row selected":"quote-row"} key={provider}><span><i/>{provider}</span><b>{price}</b><strong>{capacity}</strong><em>{state}</em></div>)}</div>
+        <div className="fx-provider-summary"><div><span>SELECTED</span><b>{mode === "jit" ? "Issuer A + Bank B" : "Issuer A + LP C"}</b></div><div><span>RESERVED CAPACITY</span><b>{mode === "jit" ? "$4.0m" : "$3.5m"}</b></div></div>
+      </div>
+      <div className="fx-provider-caption">SAME ROUTER · DIFFERENT PROVIDER LIFECYCLES · RESERVE ONLY WHAT IS SELECTED</div>
+    </div>
+  </section>;
 }
 
-export function FiatEdgeGraphic(){
+export function FiatEdgeGraphic() {
   const [mode,setMode]=useState<"managed"|"peer"|"issuer">("peer");
-  const label=mode==="managed"?"MANAGED PROVIDER":mode==="peer"?"VERIFIED P2P":"DIRECT ISSUER";
-  const step=mode==="managed"?"bank / payment instructions → provider confirmation":mode==="peer"?"buyer pays seller → proof verified → escrow releases":"issuer receives fiat → mint / release";
-  return <section className="fxp-section fx-visual-section"><div className="fxp-section-head"><div><Label>FIAT AT THE EDGES</Label><h2>You can change the way money gets on-chain without changing the FX market.</h2><p>Managed ramps, direct issuers and verified P2P rails are different ways to create the fiat edge. Stablecoin-to-stablecoin FX skips those edges entirely.</p></div></div><div className="fx-diagram-tabs"><button className={mode==="managed"?"active":""} onClick={()=>setMode("managed")}>Managed provider</button><button className={mode==="peer"?"active":""} onClick={()=>setMode("peer")}>Verified P2P</button><button className={mode==="issuer"?"active":""} onClick={()=>setMode("issuer")}>Direct issuer</button></div><div className="fx-canvas"><svg viewBox="0 0 1440 650" role="img" aria-label="Fiat edge routes into stablecoin FX"><ArrowDefs/>
-    <path className="fx-route-main" d="M180 325H390" markerEnd="url(#fx-arrow)"/><path className="fx-route-main" d="M620 325H785" markerEnd="url(#fx-arrow)"/><path className="fx-route-main" d="M985 325H1120" markerEnd="url(#fx-arrow)"/><path className="fx-route-main" d="M1280 325H1370" markerEnd="url(#fx-arrow)"/>
-    <g transform="translate(55 245)"><circle cx="80" cy="80" r="74" className="fiatCircle"/><text x="80" y="68" textAnchor="middle" className="heroText dark">BRL</text><text x="80" y="96" textAnchor="middle" className="tiny">customer fiat</text></g>
-    <g transform="translate(390 205)" filter="url(#fx-shadow)"><path d="M52 0h180c29 0 52 23 52 52v136c0 29-23 52-52 52H52c-29 0-52-23-52-52V52C0 23 23 0 52 0Z" className="edgePanel"/><text x="142" y="55" textAnchor="middle" className="eyebrow">{label}</text><text x="142" y="92" textAnchor="middle" className="nodeTitle">Fiat → token</text><foreignObject x="30" y="115" width="224" height="92"><div className="svg-wrap">{step}</div></foreignObject></g>
-    <g transform="translate(755 245)"><circle cx="80" cy="80" r="74" className="tokenCircle"/><text x="80" y="68" textAnchor="middle" className="heroText light">USDC</text><text x="80" y="96" textAnchor="middle" className="tiny light">stablecoin</text></g>
-    <g className="fxCoreRoute" transform="translate(970 205)" filter="url(#fx-shadow)"><rect width="220" height="240" rx="40"/><text x="110" y="55" textAnchor="middle" className="eyebrow light">YOUR FX MARKET</text><text x="110" y="102" textAnchor="middle" className="heroText">USDC</text><path d="M62 126H158" markerEnd="url(#fx-arrow)" className="innerArrow"/><text x="110" y="172" textAnchor="middle" className="heroText">EURC</text><text x="110" y="209" textAnchor="middle" className="tiny light">own market + connected routes</text></g>
-    <g transform="translate(1190 245)"><circle cx="80" cy="80" r="74" className="tokenCircle soft"/><text x="80" y="68" textAnchor="middle" className="heroText light">EURC</text><text x="80" y="96" textAnchor="middle" className="tiny light">stablecoin</text></g>
-    <g transform="translate(1325 252)"><text x="42" y="48" textAnchor="middle" className="eyebrow">REDEEM</text><text x="42" y="78" textAnchor="middle" className="nodeTitle">EUR</text></g>
-    <g transform="translate(415 510)"><rect width="610" height="72" rx="22" className="darkNote"/><text x="305" y="28" textAnchor="middle" className="eyebrow light">NO FIAT EDGE REQUIRED</text><text x="305" y="52" textAnchor="middle" className="nodeTitle light">USDT → EURC can enter the FX market directly</text></g>
-  </svg></div></section>
+  return <section className="fxp-section fx-visual-section">
+    <div className="fxp-section-head"><div><Label>FIAT AT THE EDGES</Label><h2>Change the way money gets on-chain without changing the FX market.</h2><p>Managed ramps, direct issuers and verified P2P routes create different fiat edges. Stablecoin-to-stablecoin FX skips those edges entirely.</p></div></div>
+    <div className="fx-diagram-tabs"><button className={mode==="managed"?"active":""} onClick={()=>setMode("managed")}>Managed provider</button><button className={mode==="peer"?"active":""} onClick={()=>setMode("peer")}>Verified P2P</button><button className={mode==="issuer"?"active":""} onClick={()=>setMode("issuer")}>Direct issuer</button></div>
+    <div className="fx-stage fx-fiat-stage">
+      <div className="fx-fiat-start"><span>CUSTOMER</span><b>R$500,000</b><small>BRL</small></div>
+      <div className="fx-fiat-track"><i/><b>1</b><i/><b>2</b><i/><b>3</b><i/></div>
+      {mode === "peer" ? <div className="fx-edge-workbench peer"><div className="fx-edge-head"><span>VERIFIED P2P</span><b>Fiat payment → escrow release</b></div><div className="fx-peer-flow"><div><span>BUYER</span><b>R$500,000</b><small>pays seller</small></div><div className="fx-payment-proof"><span>PAYMENT</span><b>✓ VERIFIED</b><small>proof accepted</small></div><div className="fx-escrow"><span>ESCROW</span><b>91,820 USDC</b><small>released on proof</small></div></div></div> : mode === "managed" ? <div className="fx-edge-workbench managed"><div className="fx-edge-head"><span>MANAGED PROVIDER</span><b>Payment instruction → provider confirmation</b></div><div className="fx-managed-flow"><div><span>PAYMENT INSTRUCTION</span><b>PIX</b><small>reference 827401</small></div><div><span>STATUS</span><b className="ok-text">CONFIRMED</b><small>provider attested</small></div><div><span>RELEASE</span><b>91,740 USDC</b><small>to customer wallet</small></div></div></div> : <div className="fx-edge-workbench issuer"><div className="fx-edge-head"><span>DIRECT ISSUER</span><b>Fiat received → stablecoin minted</b></div><div className="fx-issued-flow"><div><span>FIAT RECEIVED</span><b>R$500,000</b><small>issuer account</small></div><div className="fx-mint-icon">+</div><div><span>MINTED</span><b>BRL stablecoin</b><small>issuer supply</small></div></div></div>}
+      <div className="fx-token-balance"><span>STABLECOIN BALANCE</span><b>{mode === "issuer" ? "BRL stablecoin" : "USDC"}</b><small>ready for FX</small></div>
+      <div className="fx-fx-market"><span>YOUR FX MARKET</span><b>{mode === "issuer" ? "BRL stablecoin → EURC" : "USDC → EURC"}</b><div className="fx-market-spark"><i/><i/><i/><i/><i/></div><small>own market + connected routes</small></div>
+      <div className="fx-fiat-end"><span>REDEEM / PAYOUT</span><b>EUR</b><small>provider-specific</small></div>
+      <div className="fx-no-edge"><span>NO FIAT EDGE</span><b>USDT → EURC</b><small>enters the FX market directly</small></div>
+    </div>
+  </section>;
 }
 
-const MODELS=[
-  {id:"external",title:"External-first",sub:"Launch with ramps, LPs and external routes. Add your own market later.",own:.15,inst:.45,ext:.9},
-  {id:"hybrid",title:"Hybrid",sub:"Your market handles natural flow. Institutions and venues extend depth.",own:.65,inst:.65,ext:.45},
-  {id:"own",title:"Own-market",sub:"Customer flow, private orders and treasury do most of the work.",own:.95,inst:.35,ext:.2},
-  {id:"issuer",title:"Issuer-led",sub:"Issuer inventory and mint/redeem rails sit beside market-maker partners.",own:.45,inst:.9,ext:.25},
+const MODELS = [
+  {id:"external",title:"External-first",sub:"Launch with ramps, LPs and external routes. Add your own market later.",own:18,firm:42,external:92,foot:"Fast launch. Most execution remains external."},
+  {id:"hybrid",title:"Hybrid",sub:"Your market handles natural flow. Institutions and venues extend depth.",own:66,firm:70,external:44,foot:"Internal flow first. Connected firms extend the market."},
+  {id:"own",title:"Own-market",sub:"Customer flow, private orders and treasury do most of the work.",own:94,firm:35,external:18,foot:"The institution internalises more of the economics."},
+  {id:"issuer",title:"Issuer-led",sub:"Issuer inventory and mint/redeem rails sit beside market-maker partners.",own:48,firm:90,external:24,foot:"Issuer capacity anchors the market; makers add depth."},
 ] as const;
-export function DeploymentBlueprints(){const [idx,setIdx]=useState(1);const m=MODELS[idx];return <section className="fxp-section fx-visual-section"><div className="fxp-section-head"><div><Label>ONE STACK · DIFFERENT BUSINESSES</Label><h2>Choose how much of the market you want to operate.</h2><p>A new fintech can start external-first. A bank can use treasury and JIT relationships. An issuer can centre the market around its own inventory. The underlying interface stays the same.</p></div></div><div className="fx-diagram-tabs">{MODELS.map((x,i)=><button key={x.id} className={i===idx?"active":""} onClick={()=>setIdx(i)}>{x.title}</button>)}</div><div className="fx-canvas"><svg viewBox="0 0 1440 620" role="img" aria-label="Different FX deployment models"><ArrowDefs/>
-  <text x="720" y="55" textAnchor="middle" className="diagramTitle">{m.title}</text><text x="720" y="85" textAnchor="middle" className="diagramSub">{m.sub}</text>
-  <path className="fx-route-main" d="M230 315H480" markerEnd="url(#fx-arrow)"/><path className="fx-route-main" d="M960 315H1210" markerEnd="url(#fx-arrow)"/>
-  <g transform="translate(65 235)"><circle cx="105" cy="80" r="73" className="fiatCircle"/><text x="105" y="66" textAnchor="middle" className="eyebrow">CUSTOMER</text><text x="105" y="96" textAnchor="middle" className="nodeTitle">USD → EUR</text></g>
-  <g transform="translate(475 150)" filter="url(#fx-shadow)"><circle cx="245" cy="165" r="160" className="coreCircle"/><text x="245" y="112" textAnchor="middle" className="eyebrow light">YOUR FX STACK</text><text x="245" y="154" textAnchor="middle" className="heroText">Same interface</text><text x="245" y="191" textAnchor="middle" className="tiny light">market · providers · rails · settlement</text><circle cx="130" cy="260" r={52+38*m.own} className="bubble ownBubble"/><circle cx="245" cy="285" r={52+38*m.inst} className="bubble instBubble"/><circle cx="360" cy="260" r={52+38*m.ext} className="bubble extBubble"/><text x="130" y="264" textAnchor="middle" className="bubbleText">OWN</text><text x="245" y="289" textAnchor="middle" className="bubbleText">FIRMS</text><text x="360" y="264" textAnchor="middle" className="bubbleText">EXTERNAL</text></g>
-  <g transform="translate(1180 235)"><circle cx="105" cy="80" r="73" className="sourceHalo"/><text x="105" y="66" textAnchor="middle" className="eyebrow">RESULT</text><text x="105" y="96" textAnchor="middle" className="nodeTitle">EUR</text></g>
-  <g transform="translate(330 530)"><rect width="780" height="60" rx="20" className="darkNote"/><text x="390" y="37" textAnchor="middle" className="nodeTitle light">Start with what you can access. Internalise more of the economics and execution as you grow.</text></g>
-</svg></div></section>}
+
+export function DeploymentBlueprints() {
+  const [idx,setIdx]=useState(1); const m=MODELS[idx];
+  return <section className="fxp-section fx-visual-section">
+    <div className="fxp-section-head"><div><Label>ONE STACK · DIFFERENT BUSINESSES</Label><h2>Choose how much of the market you want to operate.</h2><p>A new fintech can start external-first. A bank can use treasury and JIT relationships. An issuer can centre the market around its own inventory. The underlying interface stays the same.</p></div></div>
+    <div className="fx-diagram-tabs">{MODELS.map((x,i)=><button key={x.id} className={i===idx?"active":""} onClick={()=>setIdx(i)}>{x.title}</button>)}</div>
+    <div className="fx-stage fx-blueprint-stage">
+      <div className="fx-blueprint-copy"><span>{m.title.toUpperCase()}</span><h3>{m.sub}</h3><p>{m.foot}</p></div>
+      <div className="fx-blueprint-map">
+        <div className="fx-blueprint-customer"><span>CUSTOMER FLOW</span><b>USD → EUR</b></div>
+        <div className="fx-blueprint-engine"><span>YOUR FX STACK</span><b>same interface</b><small>policy · pricing · routing · execution</small></div>
+        <div className="fx-blueprint-result"><span>RESULT</span><b>EUR</b><small>settled</small></div>
+        <div className="fx-blueprint-meter own"><div><span>OWN MARKET</span><b>{m.own}%</b></div><i><em style={{width:`${m.own}%`}}/></i><small>customer flow · private orders · treasury</small></div>
+        <div className="fx-blueprint-meter firm"><div><span>CONNECTED FIRMS</span><b>{m.firm}%</b></div><i><em style={{width:`${m.firm}%`}}/></i><small>issuer · bank · LP · JIT</small></div>
+        <div className="fx-blueprint-meter external"><div><span>EXTERNAL ROUTES</span><b>{m.external}%</b></div><i><em style={{width:`${m.external}%`}}/></i><small>venues · aggregators · ramps</small></div>
+      </div>
+    </div>
+  </section>;
+}
