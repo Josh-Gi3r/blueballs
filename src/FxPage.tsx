@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { FX_RUNTIME_LABEL, FX_RUNTIME_MODE, fxCall } from "./api";
-import { DeveloperInspector } from "./fx/Developer";
 import { Packages } from "./fx/Packages";
 import { Label, LiveBadge, Pill, SettlementRoute } from "./fx/Primitives";
 import { SimulatorLab } from "./fx/Simulator";
 import { AllocationMap } from "./fx/TradeViews";
-import { DeploymentModels, ExecutionStack, FiatEdges, HeroExchangePhone, InfrastructureFlow, InstitutionalFlow, LiquidityProviderPhone, PrivateMarketGraphic } from "./fx/Narrative";
+import { FiatEdgesStory, ImplementationExplorer, OneExchangeFlow, OwnershipStory, PrivateMarket, ProductPhone, ProviderModes, SettlementStates } from "./fx/Story";
 import { SCENARIO_COPY, errorMessage, type MarketState, type PublicTrade, type Scenario } from "./fx/model";
 import "./FxPage.css";
 
@@ -16,23 +15,21 @@ export default function FxPage() {
   async function changeScenario(id:string){if(id===activeScenario)return;setBusy(true);setError(null);const result=await fxCall("POST","/v2/fx/reference/scenario",{id});if(!result.ok){setBusy(false);setError(errorMessage(result));return;}setActiveScenario(id);setMarket(result.body as MarketState);await preview();setBusy(false);}
   const selectedScenario=SCENARIO_COPY[activeScenario]??{title:activeScenario,short:""}; const currentMarket=market??(trade?{id:activeScenario,sources:trade.sourceStatus,reference:{available:true}}:null);
   return <div className="fxp">
-    <section className="fxp-hero"><div className="fxp-hero-copy"><div className="fxp-hero-top"><Label>STABLECOIN FX</Label><span className="fxp-hero-open">OPEN SOURCE · SELF-HOSTABLE</span></div><h1>Build FX into your financial product.</h1><p>Run your own market, connect external providers when needed, and support fiat and stablecoin flows through the same infrastructure.</p><div className="fxp-hero-proof"><div><span>YOUR MARKET</span><b>Private orders and matching</b></div><div><span>CONNECTED</span><b>Issuers, banks and market makers</b></div><div><span>FIAT + TOKENS</span><b>Provider-neutral settlement edges</b></div></div></div><div className="fxp-hero-phone"><HeroExchangePhone/></div></section>
+    <section className="fxp-hero"><div className="fxp-hero-copy"><div className="fxp-hero-top"><Label>STABLECOIN FX</Label><span className="fxp-hero-open">OPEN SOURCE · SELF-HOSTABLE</span></div><h1>Build FX into your financial product.</h1><p>Start with the providers you already use. Add your own market as you grow. Let customers, market makers, issuers, banks and your treasury participate. Keep the same FX infrastructure underneath.</p><div className="fxp-hero-proof"><div><span>START</span><b>Use existing providers to launch.</b></div><div><span>GROW</span><b>Add your own market and counterparties.</b></div><div><span>OWN</span><b>Control more of the economics and execution over time.</b></div></div></div><div className="fxp-hero-phone"><ProductPhone/></div></section>
 
-    <InfrastructureFlow/>
-    <PrivateMarketGraphic/>
-    <LiquidityProviderPhone/>
-    <InstitutionalFlow/>
-    <DeploymentModels/>
-    <FiatEdges/>
+    <OneExchangeFlow/>
+    <OwnershipStory/>
+    <PrivateMarket/>
+    <ProviderModes/>
+    <FiatEdgesStory/>
+    <SettlementStates/>
 
-    <section id="fx-reference" className="fxp-section fxp-live-market"><div className="fxp-section-head"><div><Label>CONNECTED REFERENCE RUNTIME</Label><h2>Inspect how a route changes.</h2><p>This is the repository's current reference market. It uses seeded participants and proof assets to exercise policy, source selection and reservations. It is not presented as a connected commercial market.</p></div><div className="fxp-reference-status"><LiveBadge connected={runtimeReachable} loading={loading} mode={FX_RUNTIME_MODE}/><a href="#fx-developer"><Pill>See the request ↓</Pill></a></div></div>{error&&<div className="fxp-phone-error">{error}</div>}<div className="fxp-market-scenarios">{scenarios.map((item)=>{const copy=SCENARIO_COPY[item.id]??{title:item.label,short:""};return <button type="button" key={item.id} className={activeScenario===item.id?"active":""} onClick={()=>void changeScenario(item.id)} disabled={busy}><b>{copy.title}</b><span>{copy.short}</span></button>;})}</div><div className="fxp-market-note"><span className={currentMarket?.reference.available?"ok":"bad"}/><b>{selectedScenario.title}</b><span>{busy?"Updating reference route…":selectedScenario.short}</span></div><AllocationMap trade={trade} selected={selectedSource} onSelect={setSelectedSource}/></section>
+    <section id="fx-reference" className="fxp-section fxp-live-market"><div className="fxp-section-head"><div><Label>RUN THE REFERENCE MARKET</Label><h2>Change the market. Inspect the route.</h2><p>The repository includes a deterministic reference runtime so the routing, policy and reservation lifecycle can be exercised without pretending commercial providers are connected.</p></div><div className="fxp-reference-status"><LiveBadge connected={runtimeReachable} loading={loading} mode={FX_RUNTIME_MODE}/><a href="#fx-implementation"><Pill>See the code ↓</Pill></a></div></div>{error&&<div className="fxp-phone-error">{error}</div>}<div className="fxp-market-scenarios">{scenarios.map((item)=>{const copy=SCENARIO_COPY[item.id]??{title:item.label,short:""};return <button type="button" key={item.id} className={activeScenario===item.id?"active":""} onClick={()=>void changeScenario(item.id)} disabled={busy}><b>{copy.title}</b><span>{copy.short}</span></button>;})}</div><div className="fxp-market-note"><span className={currentMarket?.reference.available?"ok":"bad"}/><b>{selectedScenario.title}</b><span>{busy?"Updating reference route…":selectedScenario.short}</span></div><AllocationMap trade={trade} selected={selectedSource} onSelect={setSelectedSource}/><div className="fx-reference-caveat"><b>REFERENCE PARTICIPANTS</b><span>Seeded issuer, LP, institution and treasury capacity exercise the same planner and reservation lifecycle. They are not commercial integrations.</span></div></section>
 
-    <ExecutionStack/>
-
-    <section className="fxp-section fxp-reference-settlement"><div className="fxp-section-head"><div><Label>REFERENCE SETTLEMENT GRAPH</Label><h2>See the different finality of each leg.</h2><p>The current repository example uses a BRL payment edge, a BRLX/EURC token swap and an EUR redemption edge. It stays here as an engineering proof rather than defining the product above.</p></div></div><SettlementRoute trade={trade}/></section>
+    <section className="fxp-section fxp-reference-settlement"><div className="fxp-section-head"><div><Label>REFERENCE SETTLEMENT GRAPH</Label><h2>See where finality changes.</h2><p>The current BRL/EUR proof keeps the fiat payment, token swap and redemption as separate settlement edges instead of calling the whole route atomic.</p></div></div><SettlementRoute trade={trade}/></section>
 
     <SimulatorLab/>
-    <DeveloperInspector trade={trade} amount="50000.00"/>
+    <div id="fx-implementation"><ImplementationExplorer/></div>
     <Packages/>
     <div className="fxp-runtime-note">FX runtime: <code>{FX_RUNTIME_LABEL}</code></div>
   </div>;
