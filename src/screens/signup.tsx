@@ -14,7 +14,7 @@ function Field({ tag, value, flex = 1 }: { tag: string; value: string; flex?: nu
   return (
     <div style={{ ...white, flex, borderRadius: 10, padding: "9px 12px" }}>
       <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.14em", color: "#7A8296" }}>{tag}</div>
-      <div style={{ fontSize: 13.5, fontWeight: 500, marginTop: 3, color: "#14161C" }}>{value}</div>
+      <div style={{ fontSize: 13.5, fontWeight: 500, marginTop: 3, color: "#07144F" }}>{value}</div>
     </div>
   );
 }
@@ -40,7 +40,7 @@ export default function SignupScreen() {
         </div>
       </div>
       <div style={{ padding: "14px 20px 22px" }}>
-        <div style={{ background: "#5A6DB8", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
+        <div style={{ background: "#0868FF", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
           Create account
         </div>
         <div style={{ marginTop: 10, fontSize: 11, lineHeight: 1.5, color: "#7A8296", textAlign: "center" }}>

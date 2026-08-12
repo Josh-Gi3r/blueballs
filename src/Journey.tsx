@@ -19,7 +19,7 @@ export default function Journey() {
 
   const chip = (on: boolean): CSSProperties => ({
     cursor: "pointer", fontSize: 12.5, fontWeight: 500, padding: "8px 14px", borderRadius: 999,
-    border: `1px solid ${on ? "#5A6DB8" : "#D7DBE4"}`, background: on ? "#5A6DB8" : "#FFFFFF",
+    border: `1px solid ${on ? "#0868FF" : "#D7DBE4"}`, background: on ? "#0868FF" : "#FFFFFF",
     color: on ? "#FFFFFF" : "#454B5C", whiteSpace: "nowrap",
   });
 
@@ -63,8 +63,8 @@ export default function Journey() {
             <button key={s.meta.id} onClick={() => setStep(i)}
               style={{
                 cursor: "pointer", fontSize: 12, fontWeight: 500, padding: "6px 11px", borderRadius: 8,
-                border: `1px solid ${on ? "#14161C" : "#E7EAF0"}`,
-                background: on ? "#14161C" : "#F7F8FB", color: on ? "#FFFFFF" : "#5B6376",
+                border: `1px solid ${on ? "#07144F" : "#E7EAF0"}`,
+                background: on ? "#07144F" : "#F7F8FB", color: on ? "#FFFFFF" : "#5B6376",
               }}>
               <span style={{ fontFamily: MONO, fontSize: 10, opacity: 0.7, marginRight: 6 }}>
                 {String(i + 1).padStart(2, "0")}
@@ -80,7 +80,7 @@ export default function Journey() {
         <div data-col style={{ display: "grid", gridTemplateColumns: "380px 1fr", gap: 20, alignItems: "start" }}>
           {/* phone */}
           <div style={{ background: "#EDEFF4", border: "1px solid #D7DBE4", borderRadius: 18, padding: "22px 20px", display: "flex", justifyContent: "center" }}>
-            <div style={{ width: 328, border: "1px solid #C9CEDA", borderRadius: 44, background: "#14161C", padding: 10, boxShadow: "0 18px 40px rgba(20,22,28,0.16)" }}>
+            <div style={{ width: 328, border: "1px solid #C9CEDA", borderRadius: 44, background: "#07144F", padding: 10, boxShadow: "0 18px 40px rgba(20,22,28,0.16)" }}>
               <div style={{ background: "#F4F5F8", borderRadius: 35, overflow: "hidden", height: 660, display: "flex", flexDirection: "column", position: "relative" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 24px 4px", fontSize: 12, fontWeight: 600, letterSpacing: "-0.01em" }}>
                   <span>9:41</span>
@@ -105,17 +105,17 @@ export default function Journey() {
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>MATCHING API REQUEST</div>
-              <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6", border: "1px solid #DADFF2", background: "#EEF1FA", borderRadius: 999, padding: "5px 12px" }}>{meta.endpoint}</div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "#0647E8", border: "1px solid #CCE6FF", background: "#EAF4FF", borderRadius: 999, padding: "5px 12px" }}>{meta.endpoint}</div>
             </div>
-            <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 14, padding: "20px 22px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre-wrap", overflowX: "auto", maxHeight: 420 }}>{meta.code}</div>
+            <div style={{ background: "#07144F", color: "#E4E7EE", borderRadius: 14, padding: "20px 22px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre-wrap", overflowX: "auto", maxHeight: 420 }}>{meta.code}</div>
 
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}
-                style={{ fontSize: 13, fontWeight: 500, padding: "10px 16px", borderRadius: 10, border: "1px solid #D7DBE4", background: "#FFFFFF", color: step === 0 ? "#B4BAC8" : "#14161C", cursor: step === 0 ? "default" : "pointer" }}>
+                style={{ fontSize: 13, fontWeight: 500, padding: "10px 16px", borderRadius: 10, border: "1px solid #D7DBE4", background: "#FFFFFF", color: step === 0 ? "#B4BAC8" : "#07144F", cursor: step === 0 ? "default" : "pointer" }}>
                 ← Back
               </button>
               <button onClick={() => setStep(Math.min(screens.length - 1, step + 1))} disabled={step >= screens.length - 1}
-                style={{ fontSize: 13, fontWeight: 500, padding: "10px 18px", borderRadius: 10, border: "1px solid #14161C", background: step >= screens.length - 1 ? "#FFFFFF" : "#14161C", color: step >= screens.length - 1 ? "#B4BAC8" : "#FFFFFF", cursor: step >= screens.length - 1 ? "default" : "pointer" }}>
+                style={{ fontSize: 13, fontWeight: 500, padding: "10px 18px", borderRadius: 10, border: "1px solid #07144F", background: step >= screens.length - 1 ? "#FFFFFF" : "#07144F", color: step >= screens.length - 1 ? "#B4BAC8" : "#FFFFFF", cursor: step >= screens.length - 1 ? "default" : "pointer" }}>
                 Next step →
               </button>
             </div>

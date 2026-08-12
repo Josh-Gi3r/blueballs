@@ -7,6 +7,7 @@ import { TryIt, KeyIssuer, ApiStatus } from "./TryIt";
 import Journey from "./Journey";
 import FxPage from "./FxPage";
 import { call, getStats, ensureKey, type SiteStats } from "./api";
+import { BrandLockup } from "./Brand";
 
 /* ------------------------------------------------------------------ */
 /*  Ported from `Blueballs v2.dc.html` (Claude Design project).         */
@@ -19,7 +20,7 @@ const docSlug = (name: string) => "doc-fam-" + name.toLowerCase().replace(/[^a-z
 
 const MONO = "'IBM Plex Mono', monospace";
 const VERB_COLOR: Record<string, string> = {
-  GET: "#2E7D53", POST: "#4E5FA6", PATCH: "#B0761E", PUT: "#B0761E", DELETE: "#B4453C",
+  GET: "#2E7D53", POST: "#0647E8", PATCH: "#B0761E", PUT: "#B0761E", DELETE: "#B4453C",
 };
 
 type Page = "home" | "products" | "fx" | "dev" | "blog" | "contact";
@@ -278,34 +279,31 @@ export default function App() {
     .filter((f) => f.endpoints.length > 0);
 
   const card: CSSProperties = { background: "#FFFFFF", border: "1px solid #D7DBE4", borderRadius: 18 };
-  const ink: CSSProperties = { fontSize: 14, fontWeight: 500, padding: "14px 24px", cursor: "pointer", border: "1px solid #14161C", borderRadius: 10, background: "#14161C", color: "#FFFFFF" };
+  const ink: CSSProperties = { fontSize: 14, fontWeight: 500, padding: "14px 24px", cursor: "pointer", border: "1px solid #07144F", borderRadius: 10, background: "#07144F", color: "#FFFFFF" };
   const nav: { key: Page; label: string }[] = [
     { key: "home", label: "Home" }, { key: "products", label: "Products" }, { key: "fx", label: "Stablecoin FX" },
     { key: "dev", label: "Developers" }, { key: "blog", label: "Build notes" },
   ];
 
   return (
-    <div style={{ fontFamily: "Archivo, system-ui, sans-serif", color: "#14161C", background: "#E8EAEF", minHeight: "100vh", padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+    <div style={{ fontFamily: "Archivo, system-ui, sans-serif", color: "#07144F", background: "#E8EAEF", minHeight: "100vh", padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
 
       {/* NAV */}
       <div data-pad style={{ width: "100%", maxWidth: 1200, display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap", padding: "12px 24px", background: "#FFFFFF", border: "1px solid #D7DBE4", borderRadius: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 11, marginRight: "auto" }}>
-          <div style={{ width: 24, height: 24, borderRadius: 6, background: "#5A6DB8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ width: 9, height: 9, borderRadius: 2, background: "#FFFFFF" }} />
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em" }}>Blueballs</div>
+          <BrandLockup />
           <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", color: "#7A8296", borderLeft: "1px solid #D7DBE4", paddingLeft: 11 }}>OPEN SOURCE</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
           {nav.map((t) => (
             <H key={t.key} as="button" onClick={() => setPage(t.key)}
-              style={{ fontSize: 13.5, fontWeight: 500, padding: "9px 14px", cursor: "pointer", border: "none", borderRadius: 8, background: page === t.key ? "#F0F2F7" : "transparent", color: page === t.key ? "#14161C" : "#5B6376" }}
-              hover={{ color: "#14161C" }}>{t.label}</H>
+              style={{ fontSize: 13.5, fontWeight: 500, padding: "9px 14px", cursor: "pointer", border: "none", borderRadius: 8, background: page === t.key ? "#F0F2F7" : "transparent", color: page === t.key ? "#07144F" : "#5B6376" }}
+              hover={{ color: "#07144F" }}>{t.label}</H>
           ))}
         </div>
         <H as="button" onClick={() => setPage("dev")}
-          style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #14161C", borderRadius: 10, background: "#14161C", color: "#FFFFFF" }}
-          hover={{ background: "#5A6DB8", borderColor: "#5A6DB8" }}>Try the sandbox</H>
+          style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #07144F", borderRadius: 10, background: "#07144F", color: "#FFFFFF" }}
+          hover={{ background: "#0868FF", borderColor: "#0868FF" }}>Try the sandbox</H>
       </div>
 
       <div style={{ width: "100%", maxWidth: 1200, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -328,18 +326,18 @@ export default function App() {
 
               {/* hero + the call behind this screen */}
               <div data-pad style={{ ...card, padding: "56px 46px 44px", display: "flex", flexDirection: "column", gap: 24 }}>
-                <div style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 8, background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 999, padding: "6px 13px", fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.14em", color: "#4E5FA6" }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#5A6DB8" }} />FREE · MIT LICENSED · SELF-HOSTABLE
+                <div style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 8, background: "#EAF4FF", border: "1px solid #CCE6FF", borderRadius: 999, padding: "6px 13px", fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.14em", color: "#0647E8" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#0868FF" }} />FREE · MIT LICENSED · SELF-HOSTABLE
                 </div>
                 <h1 style={{ margin: 0, fontSize: "clamp(30px, 3.6vw, 50px)", lineHeight: 1.1, fontWeight: 600, letterSpacing: "-0.035em", textWrap: "balance" as CSSProperties["textWrap"] }}>
-                  Open-source software<br />for building a neobank.<br /><span style={{ color: "#5A6DB8" }}>Run it. Read it. Extend it.</span>
+                  Open-source software<br />for building a neobank.<br /><span style={{ color: "#0868FF" }}>Run it. Read it. Extend it.</span>
                 </h1>
                 <p style={{ margin: 0, fontSize: 17, lineHeight: 1.62, maxWidth: "50ch", color: "#454B5C" }}>
                   Blueballs is free, MIT-licensed software for accounts, cards, transfers, onboarding, ledger and FX. Create a sandbox key yourself, run the code locally and connect the services your production deployment needs. The goal is to lower the cost of building financial products so more teams can serve people traditional banks overlook or exclude.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <H as="button" onClick={() => setPage("dev")} style={ink} hover={{ background: "#5A6DB8", borderColor: "#5A6DB8" }}>Try the sandbox</H>
-                  <H as="button" onClick={() => setPage("dev")} style={{ ...ink, border: "1px solid #D7DBE4", background: "#FFFFFF", color: "#14161C" }} hover={{ borderColor: "#14161C" }}>Read the docs</H>
+                  <H as="button" onClick={() => setPage("dev")} style={ink} hover={{ background: "#0868FF", borderColor: "#0868FF" }}>Try the sandbox</H>
+                  <H as="button" onClick={() => setPage("dev")} style={{ ...ink, border: "1px solid #D7DBE4", background: "#FFFFFF", color: "#07144F" }} hover={{ borderColor: "#07144F" }}>Read the docs</H>
                 </div>
                 <div style={{ display: "flex", gap: 32, flexWrap: "wrap", paddingTop: 22, borderTop: "1px solid #E7EAF0", fontFamily: MONO, fontSize: 11, letterSpacing: "0.08em", color: "#7A8296" }}>
                   <span>{stats ? stats.currencies : 6} CURRENCIES</span>
@@ -350,14 +348,14 @@ export default function App() {
                 <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
                     <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>EXAMPLE REQUEST</div>
-                    <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6", border: "1px solid #DADFF2", background: "#EEF1FA", borderRadius: 999, padding: "5px 12px" }}>{active.endpoint}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 11, color: "#0647E8", border: "1px solid #CCE6FF", background: "#EAF4FF", borderRadius: 999, padding: "5px 12px" }}>{active.endpoint}</div>
                   </div>
-                  <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 14, padding: "20px 22px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{active.code}</div>
+                  <div style={{ background: "#07144F", color: "#E4E7EE", borderRadius: 14, padding: "20px 22px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{active.code}</div>
                   <div style={{ display: "flex", gap: 22, flexWrap: "wrap", fontSize: 13, color: "#5B6376" }}>
                     {active.rows.map((sf) => (
                       <span key={sf.k}>
                         <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.12em", color: "#7A8296" }}>{sf.k}</span>{" "}
-                        <span style={{ fontWeight: 500, color: "#14161C" }}>{sf.v}</span>
+                        <span style={{ fontWeight: 500, color: "#07144F" }}>{sf.v}</span>
                       </span>
                     ))}
                   </div>
@@ -380,8 +378,8 @@ export default function App() {
                     const on = p.screen === screen;
                     return (
                       <H key={p.screen} as="button" onClick={show(p.screen!)}
-                        style={{ cursor: "pointer", fontSize: 12, fontWeight: 500, padding: "7px 12px", borderRadius: 999, border: `1px solid ${on ? "#5A6DB8" : "#D7DBE4"}`, background: on ? "#5A6DB8" : "#FFFFFF", color: on ? "#FFFFFF" : "#454B5C" }}
-                        hover={{ borderColor: "#5A6DB8" }}>{p.title}</H>
+                        style={{ cursor: "pointer", fontSize: 12, fontWeight: 500, padding: "7px 12px", borderRadius: 999, border: `1px solid ${on ? "#0868FF" : "#D7DBE4"}`, background: on ? "#0868FF" : "#FFFFFF", color: on ? "#FFFFFF" : "#454B5C" }}
+                        hover={{ borderColor: "#0868FF" }}>{p.title}</H>
                     );
                   })}
                 </div>
@@ -395,9 +393,9 @@ export default function App() {
                 const on = p.screen === screen;
                 return (
                   <H key={p.title} onClick={() => { if (p.screen) show(p.screen)(); else setPage("dev"); }}
-                    style={{ background: on ? "#F4F6FB" : "#FFFFFF", border: `1px solid ${on ? "#5A6DB8" : "#D7DBE4"}`, borderRadius: 16, padding: "22px 20px 20px", display: "flex", flexDirection: "column", gap: 9, cursor: "pointer" }}
-                    hover={{ borderColor: "#5A6DB8" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: "#EEF1FA", border: "1px solid #DADFF2", color: "#4E5FA6", fontFamily: MONO, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.glyph}</div>
+                    style={{ background: on ? "#F4F6FB" : "#FFFFFF", border: `1px solid ${on ? "#0868FF" : "#D7DBE4"}`, borderRadius: 16, padding: "22px 20px 20px", display: "flex", flexDirection: "column", gap: 9, cursor: "pointer" }}
+                    hover={{ borderColor: "#0868FF" }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: "#EAF4FF", border: "1px solid #CCE6FF", color: "#0647E8", fontFamily: MONO, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.glyph}</div>
                     <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em" }}>{p.title}</div>
                     <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#5B6376" }}>{p.short}</div>
                     <div style={{ marginTop: "auto", paddingTop: 12, fontFamily: MONO, fontSize: 10.5, color: "#7A8296" }}>{p.endpoint}</div>
@@ -411,7 +409,7 @@ export default function App() {
             <div data-col style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div data-pad style={{ ...card, padding: "30px 32px 28px" }}>
                 <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296", marginBottom: 16 }}>QUICKSTART</div>
-                <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 12, fontFamily: MONO, fontSize: 12.5, lineHeight: 1.8, padding: "20px 22px", whiteSpace: "pre", overflowX: "auto" }}>{quickstart}</div>
+                <div style={{ background: "#07144F", color: "#E4E7EE", borderRadius: 12, fontFamily: MONO, fontSize: 12.5, lineHeight: 1.8, padding: "20px 22px", whiteSpace: "pre", overflowX: "auto" }}>{quickstart}</div>
               </div>
               <div data-pad style={{ ...card, padding: "30px 32px 26px", display: "flex", flexDirection: "column" }}>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
@@ -428,12 +426,12 @@ export default function App() {
             </div>
 
             {/* CTA */}
-            <div data-pad style={{ background: "#5A6DB8", color: "#FFFFFF", borderRadius: 18, padding: "42px 44px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
+            <div data-pad style={{ background: "#0868FF", color: "#FFFFFF", borderRadius: 18, padding: "42px 44px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ fontSize: "clamp(24px, 2.6vw, 32px)", fontWeight: 600, letterSpacing: "-0.03em" }}>Try the reference API.</div>
                 <div style={{ fontSize: 15.5, lineHeight: 1.6, maxWidth: "48ch", opacity: 0.9 }}>Create a sandbox key here, or clone the repository and run the full reference stack locally.</div>
               </div>
-              <H as="button" onClick={() => setPage("dev")} style={{ fontSize: 14, fontWeight: 500, padding: "15px 26px", cursor: "pointer", border: "1px solid #FFFFFF", borderRadius: 10, background: "#FFFFFF", color: "#14161C" }} hover={{ background: "transparent", color: "#FFFFFF" }}>Get a sandbox key</H>
+              <H as="button" onClick={() => setPage("dev")} style={{ fontSize: 14, fontWeight: 500, padding: "15px 26px", cursor: "pointer", border: "1px solid #FFFFFF", borderRadius: 10, background: "#FFFFFF", color: "#07144F" }} hover={{ background: "transparent", color: "#FFFFFF" }}>Get a sandbox key</H>
             </div>
           </div>
         )}
@@ -454,10 +452,10 @@ export default function App() {
                 <div key={p.title} style={{ ...card, padding: "20px 20px 18px", display: "flex", flexDirection: "column", gap: 13 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 30, height: 30, borderRadius: 9, background: "#EEF1FA", border: "1px solid #DADFF2", color: "#4E5FA6", fontFamily: MONO, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.glyph}</div>
+                      <div style={{ width: 30, height: 30, borderRadius: 9, background: "#EAF4FF", border: "1px solid #CCE6FF", color: "#0647E8", fontFamily: MONO, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>{p.glyph}</div>
                       <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.025em" }}>{p.title}</div>
                     </div>
-                    <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#4E5FA6", background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 999, padding: "3px 9px" }}>{p.tag}</div>
+                    <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#0647E8", background: "#EAF4FF", border: "1px solid #CCE6FF", borderRadius: 999, padding: "3px 9px" }}>{p.tag}</div>
                   </div>
 
                   <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#5B6376" }}>{p.short}</div>
@@ -481,13 +479,13 @@ export default function App() {
                   </div>
 
                   {/* the call behind this screen */}
-                  <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 12, padding: "14px 16px", fontFamily: MONO, fontSize: 11.5, lineHeight: 1.8, whiteSpace: "pre", overflowX: "auto" }}>{p.code}</div>
+                  <div style={{ background: "#07144F", color: "#E4E7EE", borderRadius: 12, padding: "14px 16px", fontFamily: MONO, fontSize: 11.5, lineHeight: 1.8, whiteSpace: "pre", overflowX: "auto" }}>{p.code}</div>
 
                   <div style={{ marginTop: "auto", paddingTop: 4, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <span style={{ fontFamily: MONO, fontSize: 10.5, color: "#7A8296" }}>{p.endpoint}</span>
                     <H as="button" onClick={() => setPage("dev")}
-                      style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.08em", color: "#4E5FA6", background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                      hover={{ color: "#14161C" }}>VIEW ENDPOINT →</H>
+                      style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.08em", color: "#0647E8", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                      hover={{ color: "#07144F" }}>VIEW ENDPOINT →</H>
                   </div>
                 </div>
               ))}
@@ -496,7 +494,7 @@ export default function App() {
 
             <H onClick={() => setPage("fx")}
               style={{ ...card, padding: "26px 28px 24px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}
-              hover={{ borderColor: "#5A6DB8" }}>
+              hover={{ borderColor: "#0868FF" }}>
               <div>
                 <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>STABLECOIN FX</div>
                 <div style={{ fontSize: 21, fontWeight: 600, letterSpacing: "-0.025em", margin: "8px 0 6px" }}>Inspect the canonical FX reference flow.</div>
@@ -504,7 +502,7 @@ export default function App() {
                   Follow one BRL-to-EUR request through policy checks, source selection, reservation and mixed-finality settlement.
                 </div>
               </div>
-              <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6", whiteSpace: "nowrap" }}>OPEN FX DEMO →</div>
+              <div style={{ fontFamily: MONO, fontSize: 11, color: "#0647E8", whiteSpace: "nowrap" }}>OPEN FX DEMO →</div>
             </H>
 
             <Journey />
@@ -519,8 +517,8 @@ export default function App() {
                   </h2>
                 </div>
                 <H as="button" onClick={() => setPage("dev")}
-                  style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #D7DBE4", borderRadius: 10, background: "#FFFFFF", color: "#14161C" }}
-                  hover={{ borderColor: "#14161C" }}>View the API reference →</H>
+                  style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #D7DBE4", borderRadius: 10, background: "#FFFFFF", color: "#07144F" }}
+                  hover={{ borderColor: "#07144F" }}>View the API reference →</H>
               </div>
               <p style={{ margin: "12px 0 20px", fontSize: 15.5, lineHeight: 1.6, maxWidth: "70ch", color: "#454B5C" }}>
                 The API groups {TOTAL_ENDPOINTS} catalogued endpoints into {FAMILIES.length} resource families. Each one is available in the hosted reference sandbox.
@@ -529,10 +527,10 @@ export default function App() {
                 {FAMILIES.map((f) => (
                   <H key={f.name} onClick={() => setPage("dev")}
                     style={{ background: "#F7F8FB", border: "1px solid #E7EAF0", borderRadius: 14, padding: "16px 17px 14px", display: "flex", flexDirection: "column", gap: 7, cursor: "pointer" }}
-                    hover={{ borderColor: "#5A6DB8", background: "#FFFFFF" }}>
+                    hover={{ borderColor: "#0868FF", background: "#FFFFFF" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                       <div style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: "-0.02em" }}>{f.name}</div>
-                      <div style={{ fontFamily: MONO, fontSize: 10, color: "#4E5FA6", background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" }}>{f.endpoints.length}</div>
+                      <div style={{ fontFamily: MONO, fontSize: 10, color: "#0647E8", background: "#EAF4FF", border: "1px solid #CCE6FF", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" }}>{f.endpoints.length}</div>
                     </div>
                     <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "#5B6376" }}>{f.blurb}</div>
                   </H>
@@ -545,7 +543,7 @@ export default function App() {
               <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296", marginBottom: 16 }}>REFERENCE RAILS</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {rails.map((c) => (
-                  <H key={c} style={{ border: "1px solid #DDE1E8", borderRadius: 999, padding: "8px 16px", fontFamily: MONO, fontSize: 11.5, color: "#454B5C" }} hover={{ borderColor: "#5A6DB8", color: "#4E5FA6" }}>{c}</H>
+                  <H key={c} style={{ border: "1px solid #DDE1E8", borderRadius: 999, padding: "8px 16px", fontFamily: MONO, fontSize: 11.5, color: "#454B5C" }} hover={{ borderColor: "#0868FF", color: "#0647E8" }}>{c}</H>
                 ))}
               </div>
             </div>
@@ -572,7 +570,7 @@ export default function App() {
                   // list that doesn't move the page is the bug we are fixing.
                   onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: "auto", block: "start" })}
                   style={{ padding: "9px 22px", fontSize: 13.5, cursor: "pointer", color: "#454B5C" }}
-                  hover={{ color: "#4E5FA6", background: "#F0F2F7" }}>{item.label}</H>
+                  hover={{ color: "#0647E8", background: "#F0F2F7" }}>{item.label}</H>
               ))}
               <div style={{ padding: "16px 22px 0" }}>
                 <div style={{ borderTop: "1px solid #E7EAF0", paddingTop: 14, fontFamily: MONO, fontSize: 11, lineHeight: 1.7, color: "#5B6376" }}>MIT licence<br />Public reference repository</div>
@@ -585,8 +583,8 @@ export default function App() {
                 <p style={{ margin: 0, fontSize: 16.5, lineHeight: 1.62, maxWidth: "58ch", color: "#454B5C" }}>Create a sandbox key, send JSON requests with the x-api-key header and inspect the responses. This is reference behaviour, not a production banking service.</p>
               </div>
               <div data-col style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 18, padding: "24px 26px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{devInstall}</div>
-                <div style={{ background: "#14161C", color: "#E4E7EE", borderRadius: 18, padding: "24px 26px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{devCall}</div>
+                <div style={{ background: "#07144F", color: "#E4E7EE", borderRadius: 18, padding: "24px 26px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{devInstall}</div>
+                <div style={{ background: "#07144F", color: "#E4E7EE", borderRadius: 18, padding: "24px 26px", fontFamily: MONO, fontSize: 12.5, lineHeight: 1.85, whiteSpace: "pre", overflowX: "auto" }}>{devCall}</div>
               </div>
 
               <div id="doc-api" data-pad style={{ ...card, padding: "30px 32px 28px", scrollMarginTop: 90 }}>
@@ -594,7 +592,7 @@ export default function App() {
                   <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.16em", color: "#7A8296" }}>API REFERENCE</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <ApiStatus />
-                    <div style={{ fontFamily: MONO, fontSize: 11, color: "#4E5FA6" }}>{TOTAL_ENDPOINTS} ENDPOINTS · {FAMILIES.length} FAMILIES</div>
+                    <div style={{ fontFamily: MONO, fontSize: 11, color: "#0647E8" }}>{TOTAL_ENDPOINTS} ENDPOINTS · {FAMILIES.length} FAMILIES</div>
                   </div>
                 </div>
                 <div style={{ marginTop: 14 }}>
@@ -633,7 +631,7 @@ export default function App() {
 
               <div id="doc-guides" data-col style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, scrollMarginTop: 90 }}>
                 {guides.map((g) => (
-                  <H key={g.title} style={{ ...card, borderRadius: 16, padding: 22, display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }} hover={{ borderColor: "#5A6DB8" }}>
+                  <H key={g.title} style={{ ...card, borderRadius: 16, padding: 22, display: "flex", flexDirection: "column", gap: 8, cursor: "pointer" }} hover={{ borderColor: "#0868FF" }}>
                     <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296" }}>{g.kind}</div>
                     <div style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.02em" }}>{g.title}</div>
                     <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#5B6376" }}>{g.body}</div>
@@ -662,7 +660,7 @@ export default function App() {
                     <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.025em" }}>{p.title}</div>
                     <div style={{ fontSize: 14.5, lineHeight: 1.58, color: "#5B6376", maxWidth: "70ch" }}>{p.excerpt}</div>
                   </div>
-                  <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.12em", color: "#4E5FA6", textAlign: "right" }}>{p.tag}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.12em", color: "#0647E8", textAlign: "right" }}>{p.tag}</div>
                 </H>
               ))}
             </div>
@@ -678,7 +676,7 @@ export default function App() {
               <p style={{ margin: "0 0 26px", fontSize: 16, lineHeight: 1.62, maxWidth: "52ch", color: "#454B5C" }}>Sandbox keys are available in the developer guide. For bugs, project questions or deployment discussions, use the public GitHub repository.</p>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <a href="https://github.com/Josh-Gi3r/blueballs/issues" target="_blank" rel="noreferrer" style={{ ...ink, display: "inline-block" }}>Open GitHub issues ↗</a>
-                <a href="https://github.com/Josh-Gi3r/blueballs" target="_blank" rel="noreferrer" style={{ ...ink, display: "inline-block", border: "1px solid #D7DBE4", background: "#FFFFFF", color: "#14161C" }}>View repository ↗</a>
+                <a href="https://github.com/Josh-Gi3r/blueballs" target="_blank" rel="noreferrer" style={{ ...ink, display: "inline-block", border: "1px solid #D7DBE4", background: "#FFFFFF", color: "#07144F" }}>View repository ↗</a>
               </div>
               <p style={{ margin: "22px 0 0", fontSize: 13.5, lineHeight: 1.6, color: "#7A8296" }}>There is no contact form or mailing list on this site yet.</p>
             </div>
@@ -692,15 +690,15 @@ export default function App() {
                   </div>
                 ))}
               </div>
-              <a href="https://github.com/Josh-Gi3r/blueballs/blob/main/SECURITY.md" target="_blank" rel="noreferrer" style={{ display: "block", background: "#14161C", color: "#E4E7EE", borderRadius: 18, padding: "22px 24px", fontFamily: MONO, fontSize: 12, lineHeight: 1.85 }}>REPORT A SECURITY ISSUE<br />READ THE SECURITY POLICY ↗</a>
+              <a href="https://github.com/Josh-Gi3r/blueballs/blob/main/SECURITY.md" target="_blank" rel="noreferrer" style={{ display: "block", background: "#07144F", color: "#E4E7EE", borderRadius: 18, padding: "22px 24px", fontFamily: MONO, fontSize: 12, lineHeight: 1.85 }}>REPORT A SECURITY ISSUE<br />READ THE SECURITY POLICY ↗</a>
             </div>
           </div>
         )}
 
         {/* FOOTER */}
-        <div data-pad className="bb-footer" style={{ padding: "26px", display: "grid", gap: 12, background: "#14161C", color: "#FFFFFF", borderRadius: 18 }}>
+        <div data-pad className="bb-footer" style={{ padding: "26px", display: "grid", gap: 12, background: "#07144F", color: "#FFFFFF", borderRadius: 18 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>Blueballs</div>
+            <BrandLockup compact inverse />
             <div style={{ fontSize: 13.5, lineHeight: 1.6, color: "#C5CAD7", maxWidth: "34ch" }}>MIT-licensed reference software for building neobank products.</div>
             <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", color: "#8F98AC", marginTop: 6 }}>© 2026 · MIT LICENCE</div>
           </div>

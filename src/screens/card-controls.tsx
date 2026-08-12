@@ -7,7 +7,7 @@ const white: CSSProperties = { background: "#FFFFFF", border: "1px solid #E3E6EE
 const rowB: CSSProperties = { padding: "10px 0", borderBottom: "1px solid #F0F1F5" };
 
 const toggle = (on: boolean): CSSProperties => ({
-  width: 40, height: 24, borderRadius: 999, position: "relative", background: on ? "#5A6DB8" : "#DDE1E8", flexShrink: 0,
+  width: 40, height: 24, borderRadius: 999, position: "relative", background: on ? "#0868FF" : "#DDE1E8", flexShrink: 0,
 });
 const knob = (on: boolean): CSSProperties => ({
   position: "absolute", top: 2.5, ...(on ? { right: 2.5 } : { left: 2.5 }),
@@ -35,7 +35,7 @@ export default function CardControls() {
             <div style={label}>PER TRANSACTION</div>
             <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em", marginTop: 4 }}>€150<span style={{ color: "#8A91A2" }}>.00</span></div>
           </div>
-          <div style={{ fontSize: 13, color: "#5A6DB8", fontWeight: 500 }}>Edit</div>
+          <div style={{ fontSize: 13, color: "#0868FF", fontWeight: 500 }}>Edit</div>
         </div>
       </div>
 
@@ -43,11 +43,11 @@ export default function CardControls() {
         <div style={{ ...white, borderRadius: 16, padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={label}>MONTHLY LIMIT</div>
-            <div style={{ fontSize: 13, color: "#5A6DB8", fontWeight: 500 }}>Edit</div>
+            <div style={{ fontSize: 13, color: "#0868FF", fontWeight: 500 }}>Edit</div>
           </div>
           <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em", margin: "4px 0 12px" }}>€3,000<span style={{ color: "#8A91A2" }}>.00</span></div>
           <div style={{ height: 7, borderRadius: 999, background: "#EDEFF4", overflow: "hidden" }}>
-            <div style={{ width: "38%", height: "100%", background: "#5A6DB8" }} />
+            <div style={{ width: "38%", height: "100%", background: "#0868FF" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#7A8296", marginTop: 8 }}>
             <span>€1,140.00 spent this month</span><span>38%</span>

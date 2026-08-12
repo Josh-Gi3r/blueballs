@@ -23,7 +23,7 @@ export default function CardDeclined() {
       <div style={{ padding: "0 20px", width: "100%" }}>
         <div style={{ ...white, borderRadius: 14, padding: "14px 16px" }}>
           <div style={label}>REASON</div>
-          <div style={{ fontSize: 15, fontWeight: 600, marginTop: 5, color: "#14161C" }}>Card is frozen</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginTop: 5, color: "#07144F" }}>Card is frozen</div>
           <div style={{ fontSize: 12.5, color: "#5B6376", marginTop: 5, lineHeight: 1.5 }}>
             You froze this card on 3 Aug. Nothing can be charged to it until it's unfrozen — even if the transaction would otherwise be within limits.
           </div>
@@ -32,15 +32,15 @@ export default function CardDeclined() {
 
       <div style={{ padding: "10px 20px 0", width: "100%" }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#7A8296", padding: "6px 4px" }}>
-          <span>Decline reason</span><span style={{ fontFamily: MONO, color: "#14161C" }}>card_frozen</span>
+          <span>Decline reason</span><span style={{ fontFamily: MONO, color: "#07144F" }}>card_frozen</span>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#7A8296", padding: "6px 4px" }}>
-          <span>Network response</span><span style={{ fontFamily: MONO, color: "#14161C" }}>05</span>
+          <span>Network response</span><span style={{ fontFamily: MONO, color: "#07144F" }}>05</span>
         </div>
       </div>
 
       <div style={{ marginTop: "auto", width: "100%", padding: "16px 20px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Unfreeze card</div>
+        <div style={{ background: "#07144F", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Unfreeze card</div>
         <div style={{ ...white, borderRadius: 12, padding: 14, textAlign: "center", fontSize: 13.5, fontWeight: 500, color: "#454B5C" }}>View card</div>
       </div>
     </div>

@@ -7,7 +7,7 @@
 .fxp-code-window-top b{color:#aab6ef;max-width:52%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fxp-code-window pre{min-height:330px;max-height:560px;overflow:auto;margin:0;padding:19px;font:11.5px/1.7 'IBM Plex Mono',monospace;white-space:pre-wrap}
 .fxp-proof-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.fxp-proof-links a{border:1px solid var(--fx-soft-line);border-radius:9px;padding:8px 11px;background:var(--fx-wash);font-size:10px;color:#4d60a5}
+.fxp-proof-links a{border:1px solid var(--fx-soft-line);border-radius:9px;padding:8px 11px;background:var(--fx-wash);font-size:10px;color:#0647E8}
 
 /* Open source */
 .fxp-take{display:grid;grid-template-columns:320px 1fr;gap:28px}
@@ -15,9 +15,9 @@
 .fxp-package-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .fxp-package-grid a{border:1px solid var(--fx-soft-line);border-radius:12px;background:var(--fx-wash);padding:14px;display:flex;flex-direction:column;gap:4px;min-height:104px}
 .fxp-package-grid a:hover{border-color:#adb7df;background:#f1f3fb}
-.fxp-package-grid strong{font-size:12px}.fxp-package-grid span{font-size:9.5px;line-height:1.35;color:var(--fx-muted)}.fxp-package-grid b{margin-top:auto;font:8.5px 'IBM Plex Mono',monospace;color:#4d60a5}
+.fxp-package-grid strong{font-size:12px}.fxp-package-grid span{font-size:9.5px;line-height:1.35;color:var(--fx-muted)}.fxp-package-grid b{margin-top:auto;font:8.5px 'IBM Plex Mono',monospace;color:#0647E8}
 .fxp-run{grid-column:1/-1;border-top:1px solid var(--fx-soft-line);padding-top:17px;display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
 .fxp-run span{font:9px 'IBM Plex Mono',monospace;letter-spacing:.12em;color:var(--fx-muted)}
 .fxp-run code{background:var(--fx-ink);color:#e8eaf0;border-radius:9px;padding:10px 13px;font:10px 'IBM Plex Mono',monospace}
 .fxp-runtime-note{padding:8px 14px;text-align:right;color:var(--fx-muted);font:9px 'IBM Plex Mono',monospace}
-.fxp-runtime-note code{color:#4d60a5}
+.fxp-runtime-note code{color:#0647E8}

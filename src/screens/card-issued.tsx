@@ -27,10 +27,10 @@ export default function CardIssued() {
       </div>
 
       <div style={{ padding: "12px 20px 8px" }}>
-        <div style={{ borderRadius: 18, background: "#14161C", color: "#FFFFFF", padding: 20, height: 186, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div style={{ borderRadius: 18, background: "#07144F", color: "#FFFFFF", padding: 20, height: 186, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.18em", color: "#8B93A6" }}>VIRTUAL · EUR</div>
-            <div style={{ width: 30, height: 20, borderRadius: 4, background: "#5A6DB8" }} />
+            <div style={{ width: 30, height: 20, borderRadius: 4, background: "#0868FF" }} />
           </div>
           <div style={{ width: 40, height: 28, borderRadius: 5, background: "#333949", border: "1px solid #454B5C" }} />
           <div style={{ fontFamily: MONO, fontSize: 15.5, letterSpacing: "0.14em" }}>•••• •••• •••• 4417</div>
@@ -48,7 +48,7 @@ export default function CardIssued() {
 
       <div style={{ padding: "0 20px 14px" }}>
         <div style={{ ...white, borderRadius: 14, padding: "13px 15px", display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 30, height: 30, borderRadius: 8, background: "#14161C" }} />
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: "#07144F" }} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13.5, fontWeight: 500 }}>Wallet provisioning not connected</div>
             <div style={{ fontSize: 11.5, color: "#7A8296" }}>Illustrative action for a future card-provider adapter</div>

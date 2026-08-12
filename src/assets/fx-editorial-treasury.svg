@@ -3,12 +3,12 @@
   <desc id="desc">One-way customer demand consumes treasury inventory until a hard balance-sheet limit stops principal quoting.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#F8F9FC"/><stop offset="1" stop-color="#EEF1F8"/></linearGradient>
-    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7182C6" stop-opacity=".38"/><stop offset="1" stop-color="#7182C6" stop-opacity=".02"/></linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#0A9BFF" stop-opacity=".38"/><stop offset="1" stop-color="#0A9BFF" stop-opacity=".02"/></linearGradient>
     <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#24305A" flood-opacity=".12"/></filter>
   </defs>
   <rect width="2400" height="1350" rx="44" fill="url(#bg)"/>
   <text x="120" y="120" font-family="Arial, sans-serif" font-size="30" letter-spacing="9" fill="#747D92">ONE-WAY FLOW MEETS A HARD LIMIT</text>
-  <text x="120" y="194" font-family="Arial, sans-serif" font-size="62" font-weight="700" fill="#14161C">Treasury can help the market without becoming the market.</text>
+  <text x="120" y="194" font-family="Arial, sans-serif" font-size="62" font-weight="700" fill="#07144F">Treasury can help the market without becoming the market.</text>
   <text x="120" y="244" font-family="Arial, sans-serif" font-size="26" fill="#5B6376">Reservations count immediately. A wider spread never overrides the configured exposure ceiling.</text>
   <g transform="translate(115 355)" filter="url(#shadow)">
     <rect width="1450" height="720" rx="34" fill="#FFFFFF" stroke="#D8DDE8" stroke-width="3"/>
@@ -16,20 +16,20 @@
     <line x1="95" y1="600" x2="1350" y2="600" stroke="#D8DDE8" stroke-width="3"/><line x1="95" y1="150" x2="95" y2="600" stroke="#D8DDE8" stroke-width="3"/>
     <g stroke="#E6E9F0" stroke-width="2"><line x1="95" y1="490" x2="1350" y2="490"/><line x1="95" y1="380" x2="1350" y2="380"/><line x1="95" y1="270" x2="1350" y2="270"/></g>
     <path d="M95 565 C300 545 430 515 610 480 C790 445 920 365 1070 285 C1180 225 1260 195 1350 175 L1350 600 L95 600Z" fill="url(#area)"/>
-    <path d="M95 565 C300 545 430 515 610 480 C790 445 920 365 1070 285 C1180 225 1260 195 1350 175" fill="none" stroke="#5268B9" stroke-width="10" stroke-linecap="round"/>
+    <path d="M95 565 C300 545 430 515 610 480 C790 445 920 365 1070 285 C1180 225 1260 195 1350 175" fill="none" stroke="#0868FF" stroke-width="10" stroke-linecap="round"/>
     <line x1="1110" y1="135" x2="1110" y2="600" stroke="#B4453C" stroke-width="5" stroke-dasharray="16 14"/>
     <rect x="965" y="92" width="290" height="72" rx="18" fill="#FAF0EF" stroke="#E4B8B3" stroke-width="2"/><text x="1110" y="122" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" letter-spacing="3" fill="#9A4E47">HARD LIMIT</text><text x="1110" y="148" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#B4453C">principal stops here</text>
     <g font-family="Arial, sans-serif" font-size="19" fill="#747D92"><text x="95" y="650">balanced</text><text x="560" y="650">one-way demand</text><text x="1050" y="650">limit reached</text></g>
   </g>
   <g transform="translate(1650 355)" font-family="Arial, sans-serif" filter="url(#shadow)">
-    <rect width="635" height="720" rx="34" fill="#14161C"/>
+    <rect width="635" height="720" rx="34" fill="#07144F"/>
     <text x="55" y="70" font-size="21" letter-spacing="4" fill="#AAB3C8">PRINCIPAL RISK BOOK</text>
     <g transform="translate(55 125)"><text font-size="22" fill="#AAB3C8">Settled exposure</text><text x="525" text-anchor="end" font-size="29" font-weight="700" fill="#FFFFFF">€184,000</text></g>
     <g transform="translate(55 215)"><text font-size="22" fill="#AAB3C8">Reserved quotes</text><text x="525" text-anchor="end" font-size="29" font-weight="700" fill="#FFFFFF">€41,000</text></g>
     <line x1="55" y1="270" x2="580" y2="270" stroke="#343944" stroke-width="2"/>
     <g transform="translate(55 325)"><text font-size="22" fill="#AAB3C8">Projected exposure</text><text x="525" text-anchor="end" font-size="36" font-weight="700" fill="#FFFFFF">€225,000</text></g>
     <g transform="translate(55 430)"><text font-size="22" fill="#AAB3C8">Configured limit</text><text x="525" text-anchor="end" font-size="29" font-weight="700" fill="#FFFFFF">€250,000</text></g>
-    <rect x="55" y="495" width="525" height="22" rx="11" fill="#343944"/><rect x="55" y="495" width="472" height="22" rx="11" fill="#7182C6"/>
+    <rect x="55" y="495" width="525" height="22" rx="11" fill="#343944"/><rect x="55" y="495" width="472" height="22" rx="11" fill="#0A9BFF"/>
     <text x="55" y="563" font-size="20" fill="#AAB3C8">Remaining capacity</text><text x="580" y="563" text-anchor="end" font-size="31" font-weight="700" fill="#FFFFFF">€25,000</text>
     <rect x="55" y="610" width="525" height="66" rx="18" fill="#2A2E37"/><text x="318" y="651" text-anchor="middle" font-size="20" font-weight="700" fill="#FFFFFF">NEXT QUOTE ABOVE LIMIT → REFUSED</text>
   </g>

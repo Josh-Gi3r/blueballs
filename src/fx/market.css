@@ -10,7 +10,7 @@
 .fxp-allocation-shell{border:1px solid var(--fx-soft-line);border-radius:16px;background:linear-gradient(180deg,#fafbfe,#f4f6fa);padding:24px;display:grid;grid-template-columns:minmax(0,1.25fr) 250px;gap:18px}
 .fxp-source-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;grid-column:1/-1}
 .fxp-source-grid button{border:1px solid #dfe3ec;border-radius:13px;background:#fff;padding:13px;display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;text-align:left;position:relative;min-height:92px}
-.fxp-source-grid button.used{border-color:#91a1e1;background:#f4f6ff}
+.fxp-source-grid button.used{border-color:#64B7FF;background:#f4f6ff}
 .fxp-source-grid button.selected{box-shadow:0 0 0 3px rgba(90,109,184,.12)}
 .fxp-source-grid button.blocked{opacity:.58;background:#f2f3f5}
 .fxp-source-icon{width:34px;height:34px;border-radius:10px;background:#eef1f8;color:#6574b8;display:grid;place-items:center;font:9px 'IBM Plex Mono',monospace}

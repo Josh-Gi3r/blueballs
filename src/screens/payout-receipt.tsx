@@ -39,7 +39,7 @@ export default function PayoutReceipt() {
 
       <div style={{ marginTop: "auto", width: "100%", padding: "16px 20px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ ...white, borderRadius: 12, padding: 14, textAlign: "center", fontSize: 13.5, fontWeight: 500, color: "#454B5C" }}>Download receipt</div>
-        <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Done</div>
+        <div style={{ background: "#07144F", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Done</div>
       </div>
     </div>
   );

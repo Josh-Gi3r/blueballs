@@ -30,7 +30,7 @@ function StepIcon({ status }: { status: StepStatus }) {
   return (
     <div style={{
       width: 22, height: 22, borderRadius: 999, flexShrink: 0,
-      border: "2.5px solid #DDE1E8", borderTopColor: "#5A6DB8",
+      border: "2.5px solid #DDE1E8", borderTopColor: "#0868FF",
       animation: "bb-kyc-spin 0.8s linear infinite",
     }} />
   );
@@ -45,10 +45,10 @@ export default function KycProcessingScreen() {
         <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.03em", marginTop: 4 }}>Verifying your identity</div>
       </div>
       <div style={{ padding: "14px 20px 10px" }}>
-        <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 18, padding: "20px 20px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ background: "#07144F", color: "#FFFFFF", borderRadius: 18, padding: "20px 20px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8B93A6" }}>STATUS · SUBMITTED</div>
           <div style={{ height: 7, borderRadius: 999, background: "#2A2E3A", overflow: "hidden" }}>
-            <div style={{ width: "66%", height: "100%", background: "#5A6DB8" }} />
+            <div style={{ width: "66%", height: "100%", background: "#0868FF" }} />
           </div>
           <div style={{ fontSize: 12, color: "#B9BFCC" }}>2 of 3 sandbox steps complete</div>
         </div>
@@ -61,7 +61,7 @@ export default function KycProcessingScreen() {
               <div style={{ fontSize: 13.5, fontWeight: 500 }}>{s.title}</div>
               <div style={{ fontSize: 11.5, color: "#7A8296" }}>{s.sub}</div>
             </div>
-            <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.1em", color: s.status === "completed" ? "#2E7D53" : "#5A6DB8" }}>
+            <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.1em", color: s.status === "completed" ? "#2E7D53" : "#0868FF" }}>
               {s.status === "completed" ? "DONE" : "PENDING"}
             </div>
           </div>

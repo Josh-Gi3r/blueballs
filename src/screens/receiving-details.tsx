@@ -79,7 +79,7 @@ export default function ReceivingDetails() {
           {actions.map((a, i) => (
             <div key={a} style={{
               borderRadius: 12, padding: "13px 4px", textAlign: "center", fontSize: 12.5, fontWeight: 500,
-              ...(i === 0 ? { background: "#14161C", color: "#FFFFFF" } : { ...white, color: "#454B5C" }),
+              ...(i === 0 ? { background: "#07144F", color: "#FFFFFF" } : { ...white, color: "#454B5C" }),
             }}>{a}</div>
           ))}
         </div>

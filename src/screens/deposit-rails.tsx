@@ -44,15 +44,15 @@ export default function DepositRails() {
           const sel = r.id === selectedId;
           return (
             <div key={r.id} style={{
-              borderRadius: 14, border: `1px solid ${sel ? "#5A6DB8" : "#E3E6EE"}`,
-              background: sel ? "#EEF1FA" : "#FFFFFF", padding: "12px 15px",
+              borderRadius: 14, border: `1px solid ${sel ? "#0868FF" : "#E3E6EE"}`,
+              background: sel ? "#EAF4FF" : "#FFFFFF", padding: "12px 15px",
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 500 }}>{r.name}</div>
                   <div style={{ ...label, color: "#7A8296", letterSpacing: "0.1em" }}>{r.currency}</div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: sel ? "#4E5FA6" : "#454B5C" }}>{r.fee}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: sel ? "#0647E8" : "#454B5C" }}>{r.fee}</div>
               </div>
               <div style={{ fontSize: 11.5, color: "#7A8296", marginTop: 3 }}>{r.speed}</div>
               <div style={{ display: "flex", gap: 10, marginTop: 6, fontFamily: MONO, fontSize: 10, color: "#8A91A2" }}>
@@ -67,9 +67,9 @@ export default function DepositRails() {
 
       <div style={{ marginTop: "auto", padding: "14px 20px 22px", background: "#FFFFFF", borderTop: "1px solid #E3E6EE" }}>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296", marginBottom: 12 }}>
-          <span>Selected</span><span style={{ color: "#14161C" }}>SEPA Instant · Free</span>
+          <span>Selected</span><span style={{ color: "#07144F" }}>SEPA Instant · Free</span>
         </div>
-        <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Continue</div>
+        <div style={{ background: "#07144F", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Continue</div>
       </div>
     </div>
   );

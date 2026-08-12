@@ -3,7 +3,7 @@ import { call, signup, ping, getKey, clearKey, sampleBody, API_BASE } from "./ap
 
 const MONO = "'IBM Plex Mono', monospace";
 const VERB_COLOR: Record<string, string> = {
-  GET: "#2E7D53", POST: "#4E5FA6", PATCH: "#B0761E", PUT: "#B0761E", DELETE: "#B4453C",
+  GET: "#2E7D53", POST: "#0647E8", PATCH: "#B0761E", PUT: "#B0761E", DELETE: "#B4453C",
 };
 
 /** Live status pill — proves the API is actually reachable from the page. */
@@ -51,14 +51,14 @@ export function KeyIssuer() {
 
   if (key) {
     return (
-      <div style={{ background: "#EEF1FA", border: "1px solid #DADFF2", borderRadius: 12, padding: "13px 15px" }}>
-        <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#4E5FA6", marginBottom: 7 }}>
+      <div style={{ background: "#EAF4FF", border: "1px solid #CCE6FF", borderRadius: 12, padding: "13px 15px" }}>
+        <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", color: "#0647E8", marginBottom: 7 }}>
           SANDBOX KEY · STORED IN THIS BROWSER
         </div>
-        <div style={{ fontFamily: MONO, fontSize: 12.5, wordBreak: "break-all", color: "#14161C" }}>{key}</div>
+        <div style={{ fontFamily: MONO, fontSize: 12.5, wordBreak: "break-all", color: "#07144F" }}>{key}</div>
         <div style={{ display: "flex", gap: 14, marginTop: 10, alignItems: "center" }}>
           <button onClick={() => { navigator.clipboard?.writeText(key); }}
-            style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", color: "#4E5FA6", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.08em", color: "#0647E8", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
             COPY
           </button>
           <button onClick={() => { clearKey(); setKeyState(null); }}
@@ -78,7 +78,7 @@ export function KeyIssuer() {
         placeholder="you@example.com"
         style={{ flex: "1 1 220px", minWidth: 0, border: "1px solid #DDE1E8", borderRadius: 10, background: "#F7F8FB", padding: "11px 14px", fontSize: 14.5, outline: "none" }} />
       <button onClick={go} disabled={busy}
-        style={{ fontSize: 13.5, fontWeight: 500, padding: "11px 20px", cursor: busy ? "wait" : "pointer", border: "1px solid #14161C", borderRadius: 10, background: "#14161C", color: "#fff" }}>
+        style={{ fontSize: 13.5, fontWeight: 500, padding: "11px 20px", cursor: busy ? "wait" : "pointer", border: "1px solid #07144F", borderRadius: 10, background: "#07144F", color: "#fff" }}>
         {busy ? "Issuing…" : "Get a sandbox key"}
       </button>
       {err && <div style={{ fontSize: 13, color: "#B4453C", flexBasis: "100%" }}>{err}</div>}
@@ -116,8 +116,8 @@ export function TryIt({ verb, path }: { verb: string; path: string }) {
   const btn: CSSProperties = {
     display: "inline-flex", alignItems: "center", gap: 5,
     fontFamily: MONO, fontSize: 10, letterSpacing: "0.08em", cursor: "pointer",
-    border: `1px solid ${open ? "#5A6DB8" : "#DDE1E8"}`, borderRadius: 7,
-    background: open ? "#5A6DB8" : "#fff", color: open ? "#fff" : "#4E5FA6",
+    border: `1px solid ${open ? "#0868FF" : "#DDE1E8"}`, borderRadius: 7,
+    background: open ? "#0868FF" : "#fff", color: open ? "#fff" : "#0647E8",
     padding: "4px 10px", whiteSpace: "nowrap", transition: "all .12s ease",
   };
 
@@ -135,7 +135,7 @@ export function TryIt({ verb, path }: { verb: string; path: string }) {
             <input value={pathInput} onChange={(e) => setPathInput(e.target.value)}
               style={{ flex: "1 1 260px", minWidth: 0, fontFamily: MONO, fontSize: 12.5, border: "1px solid #DDE1E8", borderRadius: 8, padding: "8px 10px", background: "#fff", outline: "none" }} />
             <button onClick={run} disabled={busy}
-              style={{ fontSize: 12.5, fontWeight: 500, padding: "8px 18px", cursor: busy ? "wait" : "pointer", border: "1px solid #14161C", borderRadius: 8, background: "#14161C", color: "#fff" }}>
+              style={{ fontSize: 12.5, fontWeight: 500, padding: "8px 18px", cursor: busy ? "wait" : "pointer", border: "1px solid #07144F", borderRadius: 8, background: "#07144F", color: "#fff" }}>
               {busy ? "Running…" : "Run"}
             </button>
           </div>
@@ -155,7 +155,7 @@ export function TryIt({ verb, path }: { verb: string; path: string }) {
                 </span>
                 <span style={{ color: "#7A8296" }}>{res.ms} MS</span>
               </div>
-              <pre style={{ margin: 0, background: "#14161C", color: "#E4E7EE", borderRadius: 10, padding: "14px 16px", fontFamily: MONO, fontSize: 12, lineHeight: 1.7, overflowX: "auto", maxHeight: 320 }}>
+              <pre style={{ margin: 0, background: "#07144F", color: "#E4E7EE", borderRadius: 10, padding: "14px 16px", fontFamily: MONO, fontSize: 12, lineHeight: 1.7, overflowX: "auto", maxHeight: 320 }}>
 {res.error ? res.error : JSON.stringify(res.body, null, 2)}
               </pre>
             </div>

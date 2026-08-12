@@ -54,7 +54,7 @@ function QrBlock() {
     <div style={{ width: GRID * CELL, height: GRID * CELL, position: "relative", background: "#FFFFFF" }}>
       {cells.map(({ row, col }) => (
         <div key={`${row}-${col}`} style={{
-          position: "absolute", top: row * CELL, left: col * CELL, width: CELL, height: CELL, background: "#14161C",
+          position: "absolute", top: row * CELL, left: col * CELL, width: CELL, height: CELL, background: "#07144F",
         }} />
       ))}
     </div>
@@ -73,8 +73,8 @@ export default function DepositOnchain() {
         {networks.map((n) => (
           <div key={n.id} style={{
             borderRadius: 999, padding: "7px 13px", fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap",
-            border: `1px solid ${n.sel ? "#5A6DB8" : "#E3E6EE"}`,
-            background: n.sel ? "#EEF1FA" : "#FFFFFF", color: n.sel ? "#4E5FA6" : "#454B5C",
+            border: `1px solid ${n.sel ? "#0868FF" : "#E3E6EE"}`,
+            background: n.sel ? "#EAF4FF" : "#FFFFFF", color: n.sel ? "#0647E8" : "#454B5C",
           }}>{n.name}</div>
         ))}
       </div>

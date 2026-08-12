@@ -1,5 +1,5 @@
 .fxp{
-  --fx-ink:#14161c;
+  --fx-ink:#07144F;
   --fx-text:#454b5c;
   --fx-muted:#747d92;
   --fx-line:#d7dbe4;
@@ -7,9 +7,9 @@
   --fx-panel:#fff;
   --fx-wash:#f7f8fb;
   --fx-wash-2:#edeff4;
-  --fx-accent:#5a6db8;
-  --fx-accent-dark:#46599f;
-  --fx-accent-wash:#eef1fa;
+  --fx-accent:#0868FF;
+  --fx-accent-dark:#063AC8;
+  --fx-accent-wash:#EAF4FF;
   --fx-green:#2e7d53;
   --fx-green-wash:#e9f4ee;
   --fx-red:#b4453c;
@@ -29,7 +29,7 @@
 .fxp h2{font-size:clamp(30px,3.4vw,44px);line-height:1.04;margin:10px 0 12px;font-weight:620}
 .fxp p{color:var(--fx-text);line-height:1.62}
 .fxp-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.17em;color:var(--fx-muted)}
-.fxp-pill{display:inline-flex;align-items:center;gap:6px;min-height:29px;padding:6px 10px;border-radius:999px;border:1px solid #d9def0;background:var(--fx-accent-wash);color:#4d60a5;font:9.5px 'IBM Plex Mono',monospace;letter-spacing:.04em;white-space:nowrap}
+.fxp-pill{display:inline-flex;align-items:center;gap:6px;min-height:29px;padding:6px 10px;border-radius:999px;border:1px solid #d9def0;background:var(--fx-accent-wash);color:#0647E8;font:9.5px 'IBM Plex Mono',monospace;letter-spacing:.04em;white-space:nowrap}
 .fxp-pill.green{border-color:#cfe5d8;background:var(--fx-green-wash);color:var(--fx-green)}
 .fxp-pill.red{border-color:#ecd1ce;background:var(--fx-red-wash);color:var(--fx-red)}
 .fxp-pill.grey{border-color:#dfe3eb;background:#f3f4f7;color:#6e7688}

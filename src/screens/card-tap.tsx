@@ -14,10 +14,10 @@ export default function CardTap() {
       </div>
 
       <div style={{ position: "relative", width: 148, height: 148, display: "flex", alignItems: "center", justifyContent: "center", margin: "18px 0 10px" }}>
-        <div style={{ position: "absolute", inset: 0, borderRadius: 999, border: "1px solid #DADFF2" }} />
+        <div style={{ position: "absolute", inset: 0, borderRadius: 999, border: "1px solid #CCE6FF" }} />
         <div style={{ position: "absolute", inset: 20, borderRadius: 999, border: "1px solid #C3CAEB" }} />
         <div style={{
-          width: 78, height: 50, borderRadius: 8, background: "#14161C", display: "flex", flexDirection: "column",
+          width: 78, height: 50, borderRadius: 8, background: "#07144F", display: "flex", flexDirection: "column",
           justifyContent: "space-between", padding: "8px 9px", boxShadow: "0 10px 22px rgba(20,22,28,0.22)",
         }}>
           <div style={{ width: 14, height: 10, borderRadius: 2, background: "#454B5C" }} />

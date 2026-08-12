@@ -29,7 +29,7 @@ export default function DepositPending() {
 
       <div style={{ padding: "6px 20px 14px", textAlign: "center" }}>
         <div style={label}>AMOUNT ARRIVING</div>
-        <div style={{ fontSize: 38, fontWeight: 600, letterSpacing: "-0.04em", marginTop: 6, color: "#4E5FA6" }}>+ $12,000<span style={{ color: "#8A91A2" }}>.00</span></div>
+        <div style={{ fontSize: 38, fontWeight: 600, letterSpacing: "-0.04em", marginTop: 6, color: "#0647E8" }}>+ $12,000<span style={{ color: "#8A91A2" }}>.00</span></div>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, background: "#FBF3E4", color: "#8A6A1F", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 500 }}>
           <span style={{ width: 6, height: 6, borderRadius: 999, background: "#C99A2E" }} />
           <span>Confirming</span>
@@ -58,17 +58,17 @@ export default function DepositPending() {
           <div key={s.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
             <div style={{
               width: 9, height: 9, borderRadius: 999,
-              background: s.current ? "#C99A2E" : s.done ? "#4E5FA6" : "#DDE1E8",
+              background: s.current ? "#C99A2E" : s.done ? "#0647E8" : "#DDE1E8",
               boxShadow: s.current ? "0 0 0 3px #FBF3E4" : "none",
             }} />
-            <div style={{ fontSize: 12.5, fontWeight: 500, color: s.done ? "#14161C" : "#B4B9C6" }}>{s.name}</div>
+            <div style={{ fontSize: 12.5, fontWeight: 500, color: s.done ? "#07144F" : "#B4B9C6" }}>{s.name}</div>
             {i < steps.length - 1 && <div style={{ flex: 1, height: 1, background: "#F0F1F5" }} />}
           </div>
         ))}
       </div>
 
       <div style={{ marginTop: "auto", padding: "14px 20px 22px", background: "#FFFFFF", borderTop: "1px solid #E3E6EE", fontSize: 11.5, lineHeight: 1.55, color: "#7A8296" }}>
-        <span style={{ fontFamily: MONO, color: "#14161C" }}>trf_9k2ncQ81pR</span> is a sample transfer reference, not proof of settlement. The example balance changes only after the sandbox rail confirms.
+        <span style={{ fontFamily: MONO, color: "#07144F" }}>trf_9k2ncQ81pR</span> is a sample transfer reference, not proof of settlement. The example balance changes only after the sandbox rail confirms.
       </div>
     </div>
   );

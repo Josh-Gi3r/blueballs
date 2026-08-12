@@ -13,10 +13,10 @@ const white: CSSProperties = { background: "#FFFFFF", border: "1px solid #E3E6EE
 const rowB: CSSProperties = { padding: "10px 0", borderBottom: "1px solid #F0F1F5" };
 
 const txns = [
-  { name: "Deposit · SEPA Instant", when: "Just now", amount: "+ €5,000.00", color: "#4E5FA6", inbound: true },
-  { name: "Monoprix", when: "Today · 08:12", amount: "− €24.80", color: "#14161C", inbound: false },
-  { name: "Deutsche Bahn", when: "Yesterday · 19:40", amount: "− €89.00", color: "#14161C", inbound: false },
-  { name: "Refund · Uniqlo", when: "Yesterday · 12:03", amount: "+ €42.00", color: "#4E5FA6", inbound: false },
+  { name: "Deposit · SEPA Instant", when: "Just now", amount: "+ €5,000.00", color: "#0647E8", inbound: true },
+  { name: "Monoprix", when: "Today · 08:12", amount: "− €24.80", color: "#07144F", inbound: false },
+  { name: "Deutsche Bahn", when: "Yesterday · 19:40", amount: "− €89.00", color: "#07144F", inbound: false },
+  { name: "Refund · Uniqlo", when: "Yesterday · 12:03", amount: "+ €42.00", color: "#0647E8", inbound: false },
 ];
 
 export default function FundedHome() {
@@ -24,7 +24,7 @@ export default function FundedHome() {
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "14px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 999, background: "#5A6DB8", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 600 }}>AL</div>
+          <div style={{ width: 32, height: 32, borderRadius: 999, background: "#0868FF", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 600 }}>AL</div>
           <div style={{ fontSize: 15, fontWeight: 600 }}>Ada</div>
         </div>
         <div style={{ width: 32, height: 32, borderRadius: 999, border: "1px solid #DDE1E8", background: "#FFFFFF" }} />
@@ -33,7 +33,7 @@ export default function FundedHome() {
       <div style={{ padding: "20px 20px 14px" }}>
         <div style={label}>EUR ACCOUNT · BALANCE</div>
         <div style={{ fontSize: 36, fontWeight: 600, letterSpacing: "-0.04em", marginTop: 6 }}>€23,402<span style={{ color: "#8A91A2" }}>.10</span></div>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6, background: "#EEF1FA", color: "#4E5FA6", borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 500 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6, background: "#EAF4FF", color: "#0647E8", borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 500 }}>
           <span>↓</span><span>+ €5,000.00 just credited</span>
         </div>
       </div>
@@ -50,7 +50,7 @@ export default function FundedHome() {
           <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 12, ...rowB }}>
             <div style={{
               width: 32, height: 32, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center",
-              background: t.inbound ? "#EEF1FA" : "#F0F2F7", color: t.inbound ? "#4E5FA6" : "#454B5C", fontSize: 13,
+              background: t.inbound ? "#EAF4FF" : "#F0F2F7", color: t.inbound ? "#0647E8" : "#454B5C", fontSize: 13,
             }}>{t.inbound ? "↓" : "↑"}</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13.5, fontWeight: 500 }}>{t.name}</div>

@@ -25,7 +25,7 @@
 .fxp-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}
 .fxp-bank-source-list{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:14px}
 .fxp-bank-source-list button{display:grid;grid-template-columns:9px minmax(0,1fr) auto;align-items:center;gap:9px;border:1px solid var(--fx-soft-line);background:#fff;border-radius:10px;padding:10px;text-align:left;min-width:0}
-.fxp-bank-source-list button.selected{border-color:#91a1e1;box-shadow:0 0 0 2px rgba(90,109,184,.10)}
+.fxp-bank-source-list button.selected{border-color:#64B7FF;box-shadow:0 0 0 2px rgba(90,109,184,.10)}
 .fxp-bank-source-list button.blocked{background:#f5f5f7;color:#8a91a0}
 .fxp-bank-source-list .dot{width:7px;height:7px;border-radius:50%;background:var(--fx-green)}
 .fxp-bank-source-list button.blocked .dot{background:#bbc0ca}

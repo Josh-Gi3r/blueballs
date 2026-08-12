@@ -15,7 +15,7 @@ export default function AccountOpenScreen() {
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: SANS }}>
       <div style={{ padding: "14px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 999, background: "#5A6DB8", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 600 }}>AL</div>
+          <div style={{ width: 32, height: 32, borderRadius: 999, background: "#0868FF", color: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 600 }}>AL</div>
           <div style={{ fontSize: 15, fontWeight: 600 }}>Ada</div>
         </div>
         <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.1em", color: "#2E7D53", background: "#E7F3EC", border: "1px solid #BEE3CE", borderRadius: 999, padding: "4px 9px" }}>NEW</div>

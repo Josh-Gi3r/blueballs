@@ -48,7 +48,7 @@ export default function LinkExternal() {
       </div>
 
       <div style={{ marginTop: "auto", padding: "16px 20px 22px" }}>
-        <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Link account</div>
+        <div style={{ background: "#07144F", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>Link account</div>
       </div>
     </div>
   );

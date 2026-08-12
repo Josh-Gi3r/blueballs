@@ -28,7 +28,7 @@ export default function TierLimitsScreen() {
         <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: "-0.03em" }}>Limits</div>
       </div>
       <div style={{ padding: "0 20px 14px" }}>
-        <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 18, padding: "20px 20px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ background: "#07144F", color: "#FFFFFF", borderRadius: 18, padding: "20px 20px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#8B93A6" }}>REFERENCE TIER 3</div>
           <div style={{ fontSize: 15.5, fontWeight: 500 }}>Configured sandbox limits for the reference product.</div>
         </div>
@@ -47,7 +47,7 @@ export default function TierLimitsScreen() {
         ))}
       </div>
       <div style={{ padding: "14px 20px 22px" }}>
-        <div style={{ background: "#5A6DB8", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
+        <div style={{ background: "#0868FF", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
           Limit changes are illustrative
         </div>
       </div>

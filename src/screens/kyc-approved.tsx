@@ -39,7 +39,7 @@ export default function KycApprovedScreen() {
         </div>
       </div>
       <div style={{ padding: "14px 20px 22px" }}>
-        <div style={{ background: "#14161C", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
+        <div style={{ background: "#07144F", color: "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
           View configured capabilities
         </div>
       </div>
