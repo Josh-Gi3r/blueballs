@@ -122,20 +122,11 @@ export function pageMetadata(pathname) {
 }
 
 export function robotsText() {
-  return `User-agent: Claude-User
-Allow: /
-
-User-agent: anthropic-ai
-Allow: /
-
-# Model-training crawler remains opted out. User-requested Claude browsing is allowed above.
-User-agent: ClaudeBot
-Disallow: /
-
+  return `# Blueballs is public and may be indexed, quoted and used by search and AI systems.
 User-agent: *
 Allow: /
 
-Content-Signal: search=yes, ai-input=yes, ai-train=no, use=reference
+Content-Signal: search=yes, ai-input=yes, ai-train=yes, use=full
 Sitemap: ${SITE}/sitemap.xml
 `;
 }
