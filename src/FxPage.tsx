@@ -71,7 +71,7 @@ export default function FxPage() {
 
   const currentMarket=market??(trade?{id:activeScenario,sources:trade.sourceStatus,reference:{available:true}}:null);
 
-  return <div className="fxp fxs-page">
+  return <div className="fxp fxs-page fxn-page">
     <FxOverview
       trade={trade}
       market={currentMarket}
