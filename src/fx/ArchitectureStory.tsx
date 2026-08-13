@@ -113,8 +113,9 @@ export function CustomerAndMaker({ trade }: { trade: PublicTrade | null }) {
           <h2>Customer and business liquidity</h2>
           <p>
             Verified customers and businesses can place signed FX orders against
-            balances they control. Their identity and orders remain inside the
-            institution's market.
+            balances they control. They choose the rate and amount. The order
+            remains private, can fill in parts, and is reduced only when a
+            completed exchange supplies settlement evidence.
           </p>
         </div>
       </div>
@@ -191,6 +192,40 @@ export function CustomerAndMaker({ trade }: { trade: PublicTrade | null }) {
           <small>Private identities · signed orders · partial fills</small>
         </div>
       </div>
+      <div className="fxn-explain-flow">
+        <div>
+          <span>1</span>
+          <b>Verify the maker</b>
+          <p>
+            The institution links the order to a known participant and
+            settlement account.
+          </p>
+        </div>
+        <div>
+          <span>2</span>
+          <b>Sign the order</b>
+          <p>
+            Asset pair, amount, rate, expiry and policy authorisation are bound
+            to the order.
+          </p>
+        </div>
+        <div>
+          <span>3</span>
+          <b>Match and reserve</b>
+          <p>
+            Price-time priority selects available quantity and holds it for the
+            customer route.
+          </p>
+        </div>
+        <div>
+          <span>4</span>
+          <b>Fill or release</b>
+          <p>
+            Completed fills reduce the order. Failed or expired reservations
+            return its capacity.
+          </p>
+        </div>
+      </div>
     </section>
   );
 }
@@ -205,7 +240,9 @@ export function PrivateSettlement() {
           <p>
             Identity, orders, pricing, matching, reservations and limits remain
             off-chain. The selected token fills are authorised and settled
-            on-chain.
+            on-chain. This keeps the institution's market private without asking
+            counterparties to trust an internal ledger for the exchange of
+            tokenised money.
           </p>
         </div>
       </div>
@@ -242,6 +279,18 @@ export function PrivateSettlement() {
           <small>The token fills settle together.</small>
         </div>
       </div>
+      <div className="fxn-explain-split">
+        <p>
+          <b>Private market:</b> the operator knows the customer and maker,
+          applies KYC/KYB and account rules, builds the price and route, and
+          keeps the full order book out of public view.
+        </p>
+        <p>
+          <b>Financial enforcement:</b> the router verifies current
+          authorisation, signatures, bounds, cancellation and fill state before
+          every selected token transfer settles together.
+        </p>
+      </div>
     </section>
   );
 }
@@ -254,9 +303,10 @@ export function OneTradeManyWays({ trade }: { trade: PublicTrade | null }) {
           <Label>ROUTING</Label>
           <h2>Multi-source execution</h2>
           <p>
-            The planner combines eligible prices and capacity from one or more
-            counterparties into a complete quote. If the full amount cannot be
-            filled, it returns no route.
+            Every source is converted into the same executable form: price,
+            capacity, expiry and authorisation. The planner compares exact
+            rational prices and combines eligible capacity into a complete
+            quote. If the full amount cannot be filled, it returns no route.
           </p>
         </div>
       </div>
@@ -307,6 +357,47 @@ export function OneTradeManyWays({ trade }: { trade: PublicTrade | null }) {
           <small>{formatCurrency(trade?.to.amount, "EUR")}</small>
         </div>
       </div>
+      <div className="fxn-explain-flow five">
+        <div>
+          <span>1</span>
+          <b>Exclude</b>
+          <p>
+            Remove the wrong participant, pair, account, jurisdiction, size or
+            expired capacity.
+          </p>
+        </div>
+        <div>
+          <span>2</span>
+          <b>Compare</b>
+          <p>
+            Order executable prices without converting financial values to
+            floating point.
+          </p>
+        </div>
+        <div>
+          <span>3</span>
+          <b>Allocate</b>
+          <p>
+            Take the best capacity until the requested output is filled in full.
+          </p>
+        </div>
+        <div>
+          <span>4</span>
+          <b>Reserve</b>
+          <p>
+            Hold each selected leg. If one fails, release the earlier holds in
+            reverse order.
+          </p>
+        </div>
+        <div>
+          <span>5</span>
+          <b>Settle</b>
+          <p>
+            Submit the selected token fills together, or return no partial
+            customer exchange.
+          </p>
+        </div>
+      </div>
     </section>
   );
 }
@@ -322,7 +413,8 @@ export function InstitutionalControl() {
             The operator decides who can participate, which accounts and
             currencies are eligible, and the limits that apply. Aggregate depth
             can be shared without exposing maker identity, customer attribution
-            or signed orders.
+            or signed orders. A signature proves who signed; it does not replace
+            the institution's current permission to execute the trade.
           </p>
         </div>
       </div>
@@ -357,6 +449,18 @@ export function InstitutionalControl() {
           <small>Share what is required without publishing the L3 book.</small>
         </div>
       </div>
+      <div className="fxn-explain-split">
+        <p>
+          <b>Before pricing:</b> participant, credential, account, corridor,
+          asset, jurisdiction and ticket rules decide whether a source is
+          eligible.
+        </p>
+        <p>
+          <b>Before execution:</b> short-lived authorisation is checked again.
+          Revoked or changed policy stops a reserved route before token
+          submission.
+        </p>
+      </div>
     </section>
   );
 }
@@ -368,16 +472,43 @@ export function ProviderParticipation() {
       k: "RESTING ORDER",
       h: "Price and size remain in the market.",
       s: "The order remains available until it fills, expires or is cancelled.",
+      steps: [
+        ["Maker signs", "Pair, amount, rate, expiry and policy authority"],
+        ["Market admits", "Identity stays private; aggregate depth changes"],
+        ["Planner selects", "Available quantity competes by price and time"],
+        [
+          "Reserve + fill",
+          "Partial fill reduces the order; failure releases it",
+        ],
+      ],
     },
     inventory: {
       k: "AVAILABLE INVENTORY",
       h: "Capacity is exposed through an adapter.",
       s: "The available amount can change without placing a resting order.",
+      steps: [
+        ["Adapter reads", "Current pair, price and tradable inventory"],
+        ["Slice normalises", "Price, maximum output, expiry and authority"],
+        ["Planner selects", "Inventory competes with every eligible source"],
+        [
+          "Adapter reserves",
+          "A source-specific handle holds selected capacity",
+        ],
+      ],
     },
     rfq: {
       k: "FIRM QUOTE",
       h: "Price one request when it arrives.",
       s: "A bank, issuer or market maker returns price, size and expiry for that request.",
+      steps: [
+        ["Request arrives", "Exact pair, direction and customer amount"],
+        ["Firm responds", "A price and size valid for a short expiry"],
+        ["Planner compares", "The quote competes with orders and inventory"],
+        [
+          "Selected quote holds",
+          "Only chosen capacity is reserved and reconciled",
+        ],
+      ],
     },
   }[mode];
   return (
@@ -388,7 +519,9 @@ export function ProviderParticipation() {
           <h2>Resting orders, inventory and firm quotes</h2>
           <p>
             Banks, issuers and market makers can participate without using the
-            same liquidity model or leaving all capacity in an order book.
+            same liquidity model or leaving all capacity in an order book. The
+            adapter preserves the different reservation and expiry behaviour of
+            each mode while presenting comparable capacity to the planner.
           </p>
         </div>
       </div>
@@ -418,68 +551,45 @@ export function ProviderParticipation() {
           <b>{copy.h}</b>
           <p>{copy.s}</p>
         </div>
-        <div className="fxn-provider-request">
-          <span>{mode === "rfq" ? "REQUEST" : "PAIR"}</span>
-          <b>
-            {mode === "rfq"
-              ? "Exact customer amount"
-              : "Supported currency pair"}
-          </b>
-          <small>{mode === "rfq" ? "short expiry" : "private capacity"}</small>
+        <div className="fxn-participation-flow">
+          {copy.steps.map(([title, detail], index) => (
+            <div key={title}>
+              <span>{index + 1}</span>
+              <b>{title}</b>
+              <p>{detail}</p>
+              {index < copy.steps.length - 1 && <i>→</i>}
+            </div>
+          ))}
         </div>
-        <div className="fxn-provider-table">
-          <div className="head">
-            <span>FIRM</span>
-            <span>PRICE</span>
-            <span>AMOUNT</span>
-            <span>STATE</span>
-          </div>
-          <div className="row selected">
-            <span>
-              <Dot kind="firm" />
-              Issuer A
-            </span>
-            <b>firm</b>
-            <strong>capacity</strong>
-            <em>{mode === "rfq" ? "expires" : "ready"}</em>
-          </div>
-          <div className="row selected">
-            <span>
-              <Dot kind="firm" />
-              Bank B
-            </span>
-            <b>firm</b>
-            <strong>capacity</strong>
-            <em>{mode === "rfq" ? "expires" : "ready"}</em>
-          </div>
-          <div className="row">
-            <span>
-              <Dot kind="firm" />
-              Maker C
-            </span>
-            <b>firm</b>
-            <strong>capacity</strong>
-            <em>{mode === "rfq" ? "expires" : "ready"}</em>
-          </div>
-          <div className="summary">
-            <span>USED</span>
-            <b>Issuer A + Bank B</b>
-          </div>
-        </div>
+      </div>
+      <div className="fxn-explain-split three">
+        <p>
+          <b>Resting order:</b> a signed price and amount remain available until
+          filled, expired or cancelled. Capacity is visible to the private
+          market.
+        </p>
+        <p>
+          <b>Available inventory:</b> an adapter reports what the firm will
+          trade now. Nothing has to be left as a permanent order.
+        </p>
+        <p>
+          <b>Firm quote:</b> the firm prices one customer request with a fixed
+          size and short expiry. Only the selected quote is reserved.
+        </p>
       </div>
     </section>
   );
 }
 
 export function FiatModels() {
-  const [mode, setMode] = useState<"provider" | "customers" | "peer">(
-    "customers",
-  );
+  const [mode, setMode] = useState<
+    "provider" | "customers" | "issuer" | "ledger" | "bank" | "peer"
+  >("customers");
   const data = {
     provider: {
       label: "PROVIDER",
       title: "Provider-managed fiat leg",
-      body: "A banking or ramp provider moves the fiat and returns settlement evidence.",
+      body: "A banking or ramp provider such as Bridge moves the fiat and returns settlement evidence under the provider and institution's KYC/AML programme.",
       left: "CUSTOMER BANK",
       middle: "PROVIDER",
       note: "provider-managed",
@@ -487,15 +597,39 @@ export function FiatModels() {
     customers: {
       label: "YOUR CUSTOMERS",
       title: "Verified customer transfer",
-      body: "When both sides are customers of the institution, the fiat transfer remains inside its account and compliance perimeter.",
+      body: "When both sides are your customers, their KYC/KYB, accounts, source-of-funds information, screening, monitoring and limits remain attributable inside your institution.",
       left: "CUSTOMER A",
       middle: "CUSTOMER B",
       note: "inside your customer perimeter",
     },
+    issuer: {
+      label: "ISSUER",
+      title: "Issuer mint and redemption",
+      body: "An issuer mints tokenised currency after fiat arrives and redeems it before fiat is paid out. Mint, token exchange and payout remain separate route edges.",
+      left: "FIAT ACCOUNT",
+      middle: "ISSUER",
+      note: "issuer evidence and timing",
+    },
+    ledger: {
+      label: "INTERNAL LEDGER",
+      title: "Movement between your own accounts",
+      body: "An authoritative posted ledger event can satisfy a fiat-side movement when both accounts are inside the institution.",
+      left: "ACCOUNT A",
+      middle: "INTERNAL LEDGER",
+      note: "institution-controlled evidence",
+    },
+    bank: {
+      label: "BANK RAIL",
+      title: "Bank transfer and payout",
+      body: "A bank rail moves local money and returns its own payment state. Submission is recorded before the external call and confirmation follows the rail's evidence.",
+      left: "CUSTOMER BANK",
+      middle: "BANK RAIL",
+      note: "asynchronous external settlement",
+    },
     peer: {
       label: "OPEN P2P",
       title: "External peer-to-peer payment",
-      body: "A Peer-style adapter supplies proof of an external fiat payment before crypto is released.",
+      body: "A Peer-style adapter discovers external crypto sellers, creates an intent, verifies the buyer's fiat payment and releases crypto after the proof is accepted. Those peers are outside your own customer and KYC perimeter.",
       left: "FIAT PAYER",
       middle: "EXTERNAL PEER",
       note: "outside your customer perimeter",
@@ -508,9 +642,11 @@ export function FiatModels() {
           <Label>FIAT CONNECTIONS</Label>
           <h2>Fiat settlement options</h2>
           <p>
-            Provider, verified-customer and external peer-to-peer fiat routes
-            connect to the same token FX market. The fiat model does not
-            determine the FX market model.
+            A provider, transfers between verified customers, issuer mint and
+            redemption, internal ledger movements, bank rails or an external
+            peer-to-peer service can move value to and from the same token FX
+            market. The fiat connection does not determine who makes the FX
+            price or supplies its liquidity.
           </p>
         </div>
       </div>
@@ -526,6 +662,24 @@ export function FiatModels() {
           onClick={() => setMode("customers")}
         >
           Your customers
+        </button>
+        <button
+          className={mode === "issuer" ? "active" : ""}
+          onClick={() => setMode("issuer")}
+        >
+          Issuer
+        </button>
+        <button
+          className={mode === "ledger" ? "active" : ""}
+          onClick={() => setMode("ledger")}
+        >
+          Internal ledger
+        </button>
+        <button
+          className={mode === "bank" ? "active" : ""}
+          onClick={() => setMode("bank")}
+        >
+          Bank rail
         </button>
         <button
           className={mode === "peer" ? "active" : ""}
@@ -555,14 +709,26 @@ export function FiatModels() {
                 ? "payment proof"
                 : mode === "customers"
                   ? "account transfer"
-                  : "confirmation"}
+                  : mode === "issuer"
+                    ? "mint / redeem"
+                    : mode === "ledger"
+                      ? "posted event"
+                      : mode === "bank"
+                        ? "payment state"
+                        : "confirmation"}
             </b>
             <small>
               {mode === "peer"
                 ? "external evidence"
                 : mode === "customers"
                   ? "known accounts"
-                  : "provider evidence"}
+                  : mode === "issuer"
+                    ? "issuer evidence"
+                    : mode === "ledger"
+                      ? "authoritative ledger"
+                      : mode === "bank"
+                        ? "rail evidence"
+                        : "provider evidence"}
             </small>
           </div>
           <i>→</i>
@@ -583,6 +749,54 @@ export function FiatModels() {
           <b>Skip the fiat leg.</b>
         </div>
       </div>
+      <div className="fxn-explain-split">
+        <p>
+          <b>Institution-controlled:</b> providers, verified customer transfers,
+          issuers, internal ledgers and bank rails operate through known
+          accounts and the institution's chosen compliance perimeter.
+        </p>
+        <p>
+          <b>Open or external:</b> Peer-style counterparties sit outside the
+          institution's own customer/KYC perimeter. Payment proof can connect
+          the edge without turning it into the private customer model.
+        </p>
+      </div>
+      {mode === "peer" && (
+        <div className="fxn-peer-process">
+          <div>
+            <span>1</span>
+            <b>Find a seller</b>
+            <p>
+              Read deposits and available crypto, including payment method,
+              price, size and limits.
+            </p>
+          </div>
+          <div>
+            <span>2</span>
+            <b>Signal an intent</b>
+            <p>
+              Bind the selected deposit, fiat amount, crypto amount, recipient
+              and payment details.
+            </p>
+          </div>
+          <div>
+            <span>3</span>
+            <b>Pay outside</b>
+            <p>
+              The buyer sends fiat to the seller through the supported bank or
+              payment application.
+            </p>
+          </div>
+          <div>
+            <span>4</span>
+            <b>Prove and release</b>
+            <p>
+              Payment evidence fulfils the intent and releases crypto. That
+              balance can then enter the FX market.
+            </p>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -601,7 +815,9 @@ export function TreasuryGraphic({ trade }: { trade: PublicTrade | null }) {
           <p>
             Treasury and principal participate as sources inside the market.
             Positions and outstanding reservations consume hard asset limits;
-            exhausted capacity is removed from the plan.
+            exhausted capacity is removed from the plan. Principal pricing can
+            start from validated reference inputs and add configured spread,
+            volatility, size, corridor, rail and inventory components.
           </p>
         </div>
       </div>
@@ -655,6 +871,40 @@ export function TreasuryGraphic({ trade }: { trade: PublicTrade | null }) {
           </span>
         </div>
       </div>
+      <div className="fxn-explain-flow">
+        <div>
+          <span>1</span>
+          <b>Price</b>
+          <p>
+            Build a principal quote from current reference observations and
+            configured price components.
+          </p>
+        </div>
+        <div>
+          <span>2</span>
+          <b>Check</b>
+          <p>
+            Apply the projected asset deltas to current positions and every
+            active reservation.
+          </p>
+        </div>
+        <div>
+          <span>3</span>
+          <b>Reserve</b>
+          <p>
+            Consume risk capacity when the quote becomes firm so it cannot be
+            promised twice.
+          </p>
+        </div>
+        <div>
+          <span>4</span>
+          <b>Settle or release</b>
+          <p>
+            Convert reserved exposure into a settled position, or return it when
+            the route fails.
+          </p>
+        </div>
+      </div>
     </section>
   );
 }
@@ -670,7 +920,9 @@ export function FinalityGraphic({ trade }: { trade: PublicTrade | null }) {
           <p>
             The selected token fills settle together in one router transaction.
             Fiat payments, internal ledgers, mints, redemptions and payouts keep
-            the evidence and timing of the system that performs them.
+            the evidence and timing of the system that performs them. The route
+            records these boundaries instead of describing an entire
+            fiat-to-fiat exchange as one atomic transaction.
           </p>
         </div>
       </div>
@@ -702,6 +954,22 @@ export function FinalityGraphic({ trade }: { trade: PublicTrade | null }) {
           <span>STABLECOIN → STABLECOIN</span>
           <b>Pure stablecoin FX enters the atomic centre directly.</b>
         </div>
+      </div>
+      <div className="fxn-explain-split three">
+        <p>
+          <b>Token exchange:</b> all selected maker fills execute in one router
+          transaction. If any signature, bound, nonce, cancellation or transfer
+          check fails, the transaction reverts.
+        </p>
+        <p>
+          <b>External fiat:</b> payment intent, submission, verification and
+          settlement are separate states. An unknown result remains submitted
+          for reconciliation.
+        </p>
+        <p>
+          <b>Internal movement:</b> ledger postings and issuer events use their
+          own authoritative evidence and do not inherit blockchain finality.
+        </p>
       </div>
     </section>
   );
@@ -740,7 +1008,9 @@ export function DeploymentBlueprints() {
           <h2>Operating configurations</h2>
           <p>
             The same customer interface and API can run with provider-led, mixed
-            or institution-operated liquidity behind it.
+            or institution-operated liquidity behind it. These are valid
+            configurations, not maturity grades: the operator can change the
+            market behind the product without replacing the customer FX API.
           </p>
         </div>
       </div>
@@ -791,6 +1061,22 @@ export function DeploymentBlueprints() {
           <b>Same exchange screen.</b>
           <small>What changes is behind it.</small>
         </div>
+      </div>
+      <div className="fxn-explain-split three">
+        <p>
+          <b>Provider-led:</b> buy the price and capacity from connected firms
+          while retaining one quote, reservation, execution and reconciliation
+          interface.
+        </p>
+        <p>
+          <b>Mixed:</b> let private customer flow, issuers or direct
+          institutions compete with outside providers for the same exchange.
+        </p>
+        <p>
+          <b>Institution-operated:</b> make the private market and balance sheet
+          primary while retaining external liquidity as optional depth or
+          fallback.
+        </p>
       </div>
     </section>
   );

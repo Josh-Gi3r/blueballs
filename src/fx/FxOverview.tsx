@@ -10,8 +10,17 @@ import {
   ProviderParticipation,
   TreasuryGraphic,
 } from "./ArchitectureStory";
+import {
+  ArchitecturePlanes,
+  ExchangeLifecycle,
+  ImplementationMap,
+  ParticipantRoles,
+  ProductFlows,
+} from "./DeepDive";
 import { Label } from "./Primitives";
-import { AllocationMap } from "./TradeViews";
+import { DeveloperInspector } from "./Developer";
+import { Packages } from "./Packages";
+import { AllocationMap, ApiView } from "./TradeViews";
 import {
   SCENARIO_COPY,
   type MarketState,
@@ -47,14 +56,32 @@ export function FxOverview(props: OverviewProps) {
         <ProductExchangeVisual trade={props.trade} />
         <div className="fxm-hero-detail">
           <p>
-            Operate a private FX market inside your product. Customers,
-            businesses, issuers, market makers, financial institutions, treasury
-            and connected providers can supply liquidity to the same exchange.
+            Add fiat and stablecoin exchange to your product and operate the
+            market behind it. Customers and businesses can leave private orders.
+            Issuers, market makers and other institutions can provide inventory
+            or quote when asked. Treasury and principal can participate within
+            the limits you set.
           </p>
           <p>
-            Keep identity, orders, pricing, matching and risk controls private.
-            Settle the selected token fills atomically on-chain.
+            Identity, orders, pricing, matching, reservations and risk remain in
+            your systems. The selected token fills are authorised and exchanged
+            atomically on-chain. Fiat entry and payout remain separate
+            settlement legs with their own evidence and timing.
           </p>
+          <div className="fxm-hero-scope">
+            <span>
+              <b>Market</b> signed orders and aggregate depth
+            </span>
+            <span>
+              <b>Liquidity</b> orders, inventory and firm quotes
+            </span>
+            <span>
+              <b>Control</b> participant policy and hard risk limits
+            </span>
+            <span>
+              <b>Settlement</b> atomic token fills and typed fiat legs
+            </span>
+          </div>
           <div className="fxm-hero-actions">
             <a href="#fx-market">See the market</a>
             <a href="#fx-proof">Run the implementation</a>
@@ -62,9 +89,12 @@ export function FxOverview(props: OverviewProps) {
         </div>
       </section>
 
+      <ProductFlows trade={props.trade} />
+      <ArchitecturePlanes />
       <div id="fx-market">
         <PrivateSettlement />
       </div>
+      <ParticipantRoles />
       <CustomerAndMaker trade={props.trade} />
       <OneTradeManyWays trade={props.trade} />
       <ProviderParticipation />
@@ -72,7 +102,9 @@ export function FxOverview(props: OverviewProps) {
       <InstitutionalControl />
       <TreasuryGraphic trade={props.trade} />
       <FinalityGraphic trade={props.trade} />
+      <ExchangeLifecycle trade={props.trade} />
       <DeploymentBlueprints />
+      <ImplementationMap />
 
       <section id="fx-proof" className="fxp-section fxn-section fxm-proof">
         <div className="fxp-section-head">
@@ -130,6 +162,18 @@ export function FxOverview(props: OverviewProps) {
           </div>
         </div>
         {props.error && <div className="fxm-error">{props.error}</div>}
+        <div className="fxm-proof-api">
+          <div>
+            <Label>REQUEST</Label>
+            <h3>The product calls one FX API.</h3>
+            <p>
+              The response carries the complete quote, selected source legs,
+              settlement route and current evidence. Reservation, execution and
+              reconciliation continue against the same trade lifecycle.
+            </p>
+          </div>
+          <ApiView trade={props.trade} amount={props.amount} />
+        </div>
         <AllocationMap
           trade={props.trade}
           selected={props.selectedSource}
@@ -159,6 +203,8 @@ export function FxOverview(props: OverviewProps) {
           </a>
         </div>
       </section>
+      <DeveloperInspector trade={props.trade} amount={props.amount} />
+      <Packages />
     </>
   );
 }
