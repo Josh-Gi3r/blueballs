@@ -200,7 +200,7 @@ export default function App() {
           out.push(rail.cutoff ? `${label} CUT-OFF ${rail.cutoff}` : `${label} · ${rail.speed.toUpperCase()}`);
         }
       }
-      out.push("REFERENCE SANDBOX · NO REAL MONEY MOVES");
+      out.push(page === "fx" ? "OPEN SOURCE · RUN LOCALLY" : "REFERENCE SANDBOX · NO REAL MONEY MOVES");
       if (stats) {
         out.push(`ACCOUNTS OPEN ${stats.accounts}`);
         out.push(`CUSTOMERS ${stats.customers}`);
@@ -210,7 +210,7 @@ export default function App() {
       setTicks(out.length ? out : ["SANDBOX DATA UNAVAILABLE — IS THE API RUNNING?"]);
     })();
     return () => { alive = false; };
-  }, [stats]);
+  }, [page, stats]);
 
   // Real quote round-trip — replaces the invented "340MS QUOTES" fact.
   const [quoteMs, setQuoteMs] = useState<number | null>(null);
