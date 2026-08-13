@@ -5,7 +5,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 export type Screen =
   | "accounts" | "cards" | "transfers" | "exchange"
-  | "vaults" | "credit" | "business" | "ledger";
+  | "vaults" | "credit" | "business" | "ledger" | "fx";
 
 const MONO = "'IBM Plex Mono', monospace";
 const label: CSSProperties = { fontFamily: MONO, fontSize: 10, letterSpacing: "0.16em", color: "#7A8296" };
@@ -62,6 +62,17 @@ const entries = [
 export type FxQuote = {
   rate: string; spread_bps: number; settlement: string; expires_at: string;
   receives: { amount: string; currency: string };
+};
+
+/** Minimal shape of a canonical FX-runtime trade preview — kept structural so this
+ *  shared component does not import the FX page's model. */
+export type FxTrade = {
+  from: { symbol: string; requested?: string; charged?: string };
+  to: { symbol: string; amount: string };
+  rate: string;
+  expiresAt: number;
+  sources: Array<{ sourceId: string }>;
+  settlement: { guarantee: { atomic?: boolean; class?: string } };
 };
 
 const fmt = (v: string | number) =>
@@ -137,10 +148,84 @@ function ExchangeScreen({ fxQuote, fxErr }: { fxQuote?: FxQuote | null; fxErr?: 
   );
 }
 
-export default function PhoneScreen({ screen = "accounts", fxQuote, fxErr }: {
-  screen?: Screen; fxQuote?: FxQuote | null; fxErr?: boolean;
+const money = (symbol: string, v: string | number | undefined) => {
+  if (v === undefined || v === null || v === "") return "—";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  const f = n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return symbol === "BRL" ? `R$${f}` : symbol === "EUR" ? `€${f}` : `${f} ${symbol}`;
+};
+
+/** Exchange screen driven by the canonical FX runtime (POST /v2/fx/reference/trades/preview). */
+function FxTradeScreen({ fxTrade, fxTradeErr }: { fxTrade?: FxTrade | null; fxTradeErr?: boolean }) {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (!fxTrade) { setSecondsLeft(null); return; }
+    const expiryMs = fxTrade.expiresAt > 1e12 ? fxTrade.expiresAt : fxTrade.expiresAt * 1000;
+    const tick = () => setSecondsLeft(Math.max(0, Math.round((expiryMs - Date.now()) / 1000)));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, [fxTrade]);
+  const expired = secondsLeft !== null && secondsLeft <= 0;
+  const sent = fxTrade?.from.charged ?? fxTrade?.from.requested;
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ padding: "14px 20px 8px", fontSize: 19, fontWeight: 600, letterSpacing: "-0.03em" }}>Exchange</div>
+      <div style={{ padding: "4px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ ...white, borderRadius: 16, padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", color: "#7A8296" }}><span>FROM</span><span>{fxTrade ? fxTrade.from.symbol : ""}</span></div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+            <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em" }}>{fxTrade ? money(fxTrade.from.symbol, sent) : fxTradeErr ? "—" : "…"}</div>
+            <div style={{ border: "1px solid #DDE1E8", borderRadius: 999, padding: "7px 13px", fontFamily: MONO, fontSize: 12 }}>{fxTrade?.from.symbol ?? "—"} ▾</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", margin: "-18px 0", position: "relative", zIndex: 1 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 999, background: "#FFFFFF", border: "1px solid #DDE1E8", display: "flex", alignItems: "center", justifyContent: "center", color: "#0868FF" }}>⇅</div>
+        </div>
+        <div style={{ ...white, borderRadius: 16, padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", color: "#7A8296" }}>
+            <span>TO</span><span>{fxTrade ? `${fxTrade.sources.length} SOURCE${fxTrade.sources.length === 1 ? "" : "S"}` : ""}</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
+            <div style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em", color: "#0647E8" }}>
+              {fxTrade ? money(fxTrade.to.symbol, fxTrade.to.amount) : fxTradeErr ? "—" : "…"}
+            </div>
+            <div style={{ border: "1px solid #DDE1E8", borderRadius: 999, padding: "7px 13px", fontFamily: MONO, fontSize: 12 }}>{fxTrade?.to.symbol ?? "—"} ▾</div>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: "12px 20px 4px", display: "flex", flexDirection: "column", gap: 7 }}>
+        {fxTrade ? (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>Rate</span><span style={{ color: "#07144F" }}>1 {fxTrade.from.symbol} = {Number(fxTrade.rate).toFixed(4)} {fxTrade.to.symbol}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>Filled from</span><span style={{ color: "#07144F" }}>{fxTrade.sources.length} source{fxTrade.sources.length === 1 ? "" : "s"} in your market</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>Token exchange</span><span style={{ color: "#07144F" }}>One on-chain transaction</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "#7A8296" }}><span>Quote expires</span><span style={{ color: expired ? "#B4453C" : "#07144F" }}>{expired ? "expired" : `${secondsLeft}s`}</span></div>
+          </>
+        ) : fxTradeErr ? (
+          <div style={{ fontSize: 12.5, color: "#B4453C" }}>Could not reach the FX runtime.</div>
+        ) : (
+          <div style={{ fontSize: 12.5, color: "#7A8296" }}>Fetching a live preview from the FX runtime…</div>
+        )}
+      </div>
+      <div style={{ margin: "10px 20px 0", ...white, borderRadius: 16, padding: "13px 16px", fontSize: 11.5, lineHeight: 1.55, color: "#5B6376" }}>
+        Every number on this screen comes from <span style={{ fontFamily: MONO }}>POST /v2/fx/reference/trades/preview</span> in this repository.
+      </div>
+      <div style={{ marginTop: "auto", padding: "14px 20px 22px" }}>
+        <div style={{ background: expired ? "#DDE1E8" : "#0868FF", color: expired ? "#7A8296" : "#FFFFFF", borderRadius: 12, padding: 15, textAlign: "center", fontSize: 14.5, fontWeight: 500 }}>
+          {fxTrade ? (expired ? "Quote expired · re-quote" : `Review exchange · rate holds ${secondsLeft}s`) : "Review exchange"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PhoneScreen({ screen = "accounts", fxQuote, fxErr, fxTrade, fxTradeErr }: {
+  screen?: Screen; fxQuote?: FxQuote | null; fxErr?: boolean; fxTrade?: FxTrade | null; fxTradeErr?: boolean;
 }) {
-  const isLive = screen === "exchange" && !!fxQuote;
+  const isLive = (screen === "exchange" && !!fxQuote) || (screen === "fx" && !!fxTrade);
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ width: 328, border: "1px solid #C9CEDA", borderRadius: 44, background: "#07144F", padding: 10, boxShadow: "0 18px 40px rgba(20,22,28,0.16)" }}>
@@ -153,7 +238,7 @@ export default function PhoneScreen({ screen = "accounts", fxQuote, fxErr }: {
             fontFamily: MONO, fontSize: 9, letterSpacing: "0.12em", padding: "3px 8px", borderRadius: 999,
             background: isLive ? "#E7F3EC" : "#F0F1F5", color: isLive ? "#2E7D53" : "#7A8296",
             border: `1px solid ${isLive ? "#BEE3CE" : "#DDE1E8"}`,
-          }}>{isLive ? "REFERENCE QUOTE" : "ILLUSTRATIVE · SAMPLE"}</div>
+          }}>{isLive ? (screen === "fx" ? "LIVE · FX RUNTIME" : "REFERENCE QUOTE") : "ILLUSTRATIVE · SAMPLE"}</div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 24px 4px", fontSize: 12, fontWeight: 600, letterSpacing: "-0.01em" }}>
             <span>9:41</span>
@@ -283,6 +368,11 @@ export default function PhoneScreen({ screen = "accounts", fxQuote, fxErr }: {
           {/* ---------- EXCHANGE — wired to a real POST /v2/quotes result ---------- */}
           {screen === "exchange" && (
             <ExchangeScreen fxQuote={fxQuote} fxErr={fxErr} />
+          )}
+
+          {/* ---------- FX — wired to the canonical FX runtime trade preview ---------- */}
+          {screen === "fx" && (
+            <FxTradeScreen fxTrade={fxTrade} fxTradeErr={fxTradeErr} />
           )}
 
           {/* ---------- VAULTS ---------- */}

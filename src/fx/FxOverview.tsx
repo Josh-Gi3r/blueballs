@@ -6,7 +6,6 @@ import {
   InstitutionalControl,
   OneTradeManyWays,
   PrivateSettlement,
-  ProductExchangeVisual,
   ProviderParticipation,
   TreasuryGraphic,
 } from "./ArchitectureStory";
@@ -18,6 +17,7 @@ import {
   ProductFlows,
 } from "./DeepDive";
 import { Label } from "./Primitives";
+import { FxHero } from "./FxHero";
 import { DeveloperInspector } from "./Developer";
 import { Packages } from "./Packages";
 import { AllocationMap, ApiView } from "./TradeViews";
@@ -48,46 +48,11 @@ type OverviewProps = {
 export function FxOverview(props: OverviewProps) {
   return (
     <>
-      <section className="fxp-section fxm-hero">
-        <div className="fxm-hero-copy">
-          <Label>OPEN-SOURCE FX INFRASTRUCTURE</Label>
-          <h1>Build and operate FX.</h1>
-        </div>
-        <ProductExchangeVisual trade={props.trade} />
-        <div className="fxm-hero-detail">
-          <p>
-            Add fiat and stablecoin exchange to your product and operate the
-            market behind it. Customers and businesses can leave private orders.
-            Issuers, market makers and other institutions can provide inventory
-            or quote when asked. Treasury and principal can participate within
-            the limits you set.
-          </p>
-          <p>
-            Identity, orders, pricing, matching, reservations and risk remain in
-            your systems. The selected token fills are authorised and exchanged
-            atomically on-chain. Fiat entry and payout remain separate
-            settlement legs with their own evidence and timing.
-          </p>
-          <div className="fxm-hero-scope">
-            <span>
-              <b>Market</b> signed orders and aggregate depth
-            </span>
-            <span>
-              <b>Liquidity</b> orders, inventory and firm quotes
-            </span>
-            <span>
-              <b>Control</b> participant policy and hard risk limits
-            </span>
-            <span>
-              <b>Settlement</b> atomic token fills and typed fiat legs
-            </span>
-          </div>
-          <div className="fxm-hero-actions">
-            <a href="#fx-market">See the market</a>
-            <a href="#fx-proof">Run the implementation</a>
-          </div>
-        </div>
-      </section>
+      <FxHero
+        trade={props.trade}
+        loading={props.loading}
+        runtimeReachable={props.runtimeReachable}
+      />
 
       <ProductFlows trade={props.trade} />
       <ArchitecturePlanes />
