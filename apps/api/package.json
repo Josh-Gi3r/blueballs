@@ -1,0 +1,12 @@
+{
+  "name": "@blueballs/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=24.15.0" },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test:ci": "node --test test/*.test.js"
+  }
+}

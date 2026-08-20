@@ -1,0 +1,21 @@
+# node:24.15.0-alpine, pinned to the multi-platform OCI index.
+FROM node:24.15.0-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f
+
+RUN corepack enable && corepack prepare pnpm@11.21.0 --activate
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps ./apps
+COPY packages ./packages
+COPY scripts ./scripts
+COPY spec ./spec
+COPY src ./src
+COPY public ./public
+COPY index.html tsconfig.json vite.config.ts ./
+
+RUN pnpm install --frozen-lockfile
+
+EXPOSE 5280 5290 8788
+
+CMD ["pnpm", "dev"]

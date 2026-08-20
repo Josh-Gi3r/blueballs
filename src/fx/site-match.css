@@ -1,0 +1,159 @@
+/* FX page — match the sitewide shell grammar (Home/Products).
+   Loaded last: re-materialises the fxn design system to the site system.
+   Site tokens: ink #07144F · line #D7DBE4 · wash #EDEFF4 · screen #F4F5F8
+   accent #0868FF · white cards, flat borders, no gradient washes. */
+
+/* ---------- hero grid ---------- */
+.fxh-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  align-items: stretch;
+}
+@media (max-width: 960px) {
+  .fxh-grid { grid-template-columns: 1fr; }
+  .fxh-grid > div:first-child { padding: 30px 24px 26px; }
+}
+
+/* ---------- type scale: sections are chapters, not heroes ---------- */
+.fxp.fxn-page h2 { font-size: clamp(24px, 2.3vw, 32px); line-height: 1.12; }
+.fxn-page .fxp-section-head p { font-size: 15px; }
+.fxn-page .fxp-section { padding: 34px 36px; }
+.fxn-page .fxn-intro { padding-top: 34px; }
+
+/* ---------- stages: grey site panels, not gradient slabs ---------- */
+.fxn-page .fxn-stage,
+.fxn-page .fxn-hero-machine {
+  background: #EDEFF4;
+  border: 1px solid #D7DBE4;
+  border-radius: 18px;
+  box-shadow: none;
+  padding: 28px;
+}
+.fxn-page .fxn-stage::before,
+.fxn-page .fxn-hero-machine::before { display: none; }
+
+/* ---------- mini phones: the site device, not navy toys ----------
+   PhoneScreen materials — navy bezel, light screen, white inner cards. */
+.fxn-page .fxn-phone {
+  background: #F4F5F8;
+  border: 7px solid #07144F;
+  border-radius: 30px;
+  padding: 12px 11px 13px;
+  color: #07144F;
+  box-shadow: 0 18px 40px rgba(20, 22, 28, 0.16);
+}
+.fxn-page .fxn-phone-bar { color: #454B5C; font-size: 10px; margin: 0 3px 12px; }
+.fxn-page .fxn-eyebrow { color: #7A8296; font-size: 9.5px; }
+.fxn-page .fxn-money {
+  background: #FFFFFF;
+  border: 1px solid #E3E6EE;
+  border-radius: 14px;
+}
+.fxn-page .fxn-money.receive { background: #FFFFFF; }
+.fxn-page .fxn-money small { color: #7A8296; font-size: 9.5px; }
+.fxn-page .fxn-money b { color: #07144F; font-size: 18px; }
+.fxn-page .fxn-money.receive b { color: #0647E8; }
+.fxn-page .fxn-money > span { color: #7A8296; font-size: 10px; }
+.fxn-page .fxn-rate { color: #7A8296; font-size: 9.5px; }
+.fxn-page .fxn-rate b { color: #07144F; font-size: 9.5px; }
+.fxn-page .fxn-maker-field span { color: #7A8296; font-size: 9.5px; }
+.fxn-page .fxn-phone button { font-size: 11px; border-radius: 10px; }
+
+/* ---------- cards: flat site borders, calmer shadows ---------- */
+.fxn-page .fxn-leg { box-shadow: none; border-color: #D7DBE4; }
+.fxn-page .fxn-hero-core,
+.fxn-page .fxn-core-settle { box-shadow: none; }
+
+/* ---------- maker phone: same light device as the customer phone ---------- */
+.fxn-page .fxn-pair,
+.fxn-page .fxn-maker-field {
+  background: #FFFFFF;
+  border: 1px solid #E3E6EE;
+}
+.fxn-page .fxn-pair b { color: #07144F; }
+.fxn-page .fxn-pair small { color: #7A8296; font-size: 9.5px; }
+.fxn-page .fxn-maker-field b { color: #07144F; }
+.fxn-page .fxn-maker-status { color: #7A8296; font-size: 9.5px; }
+
+/* ---------- dead space: containers size to their content ---------- */
+.fxn-page .fxn-hero-machine,
+.fxn-page .fxn-two-phones,
+.fxn-page .fxn-boundary,
+.fxn-page .fxn-route,
+.fxn-page .fxn-provider,
+.fxn-page .fxn-fiat,
+.fxn-page .fxn-treasury,
+.fxn-page .fxn-finality,
+.fxn-page .fxn-deploy { min-height: 0; }
+.fxn-page .fxn-section { padding-top: 44px; padding-bottom: 44px; }
+
+/* ---------- flat site cards: no floaty shadows, site radii ---------- */
+.fxn-page .fxn-market-center,
+.fxn-page .fxn-boundary-side,
+.fxn-page .fxn-trade,
+.fxn-page .fxn-route-total,
+.fxn-page .fxn-route-sources > div,
+.fxn-page .fxn-provider-request,
+.fxn-page .fxn-provider-table,
+.fxn-page .fxn-limit,
+.fxn-page .fxn-fiat-flow > div,
+.fxn-page .fxn-market-link i {
+  box-shadow: none;
+  border-radius: 16px;
+}
+.fxn-page .fxn-market-link i { border-radius: 999px; }
+
+/* ---------- micro-type: nothing below 9.5px ---------- */
+.fxn-page .fxn-trade span,
+.fxn-page .fxn-route-total span,
+.fxn-page .fxn-route-sources span,
+.fxn-page .fxn-provider-intro > span,
+.fxn-page .fxn-provider-request > span,
+.fxn-page .fxn-fiat-copy > span,
+.fxn-page .fxn-fiat-flow span,
+.fxn-page .fxn-limit > span,
+.fxn-page .fxn-next-trade > span,
+.fxn-page .fxn-treasury-answer span,
+.fxn-page .fxn-leg > span,
+.fxn-page .fxn-deploy-copy > span,
+.fxn-page .fxn-deploy-constant > span,
+.fxn-page .fxn-market-center > span,
+.fxn-page .fxn-boundary-side > span { font-size: 10px; letter-spacing: 0.13em; }
+.fxn-page .fxn-trade small,
+.fxn-page .fxn-route-total small,
+.fxn-page .fxn-route-sources small,
+.fxn-page .fxn-provider-request small,
+.fxn-page .fxn-fiat-flow small,
+.fxn-page .fxn-market-center small,
+.fxn-page .fxn-boundary-side small,
+.fxn-page .fxn-legend,
+.fxn-page .fxn-fiat-direct,
+.fxn-page .fxn-boundary-arrow,
+.fxn-page .fxn-boundary-arrow small,
+.fxn-page .fxn-market-link,
+.fxn-page .fxn-maker-status,
+.fxn-page .fxn-fiat-copy small,
+.fxn-page .fxn-bars p > span { font-size: 10px; }
+.fxn-page .fxn-boundary-side p { font-size: 12.5px; }
+.fxn-page .fxn-provider-table .head { font-size: 9px; }
+.fxn-page .fxn-provider-table .row,
+.fxn-page .fxn-provider-table .row > span,
+.fxn-page .fxn-provider-table .row b,
+.fxn-page .fxn-provider-table .row strong { font-size: 10.5px; }
+.fxn-page .fxn-provider-table .summary span { font-size: 9px; }
+.fxn-page .fxn-provider-table .summary b { font-size: 10.5px; }
+.fxn-page .fxn-leg em,
+.fxn-page .fxn-leg.atomic em { font-size: 9.5px; }
+
+/* ---------- micro-type (original block) ---------- */
+.fxn-page .fxn-core-title span,
+.fxn-page .fxn-core-row small,
+.fxn-page .fxn-core-settle span,
+.fxn-page .fxn-leg small,
+.fxn-page .fxn-treasury-answer small,
+.fxn-page .fxn-next-trade small,
+.fxn-page .fxn-finality-status > div,
+.fxn-page .fxn-rule { font-size: 10px; }
+.fxn-page .fxn-core-row b,
+.fxn-page .fxn-core-row strong,
+.fxn-page .fxn-core-settle b { font-size: 11px; }

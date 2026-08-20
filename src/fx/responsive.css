@@ -1,0 +1,28 @@
+@media(max-width:1060px){
+  .fxp-hero{grid-template-columns:1fr}
+  .fxp-hero-copy{min-height:auto}
+  .fxp-hero-phone{padding:30px}
+  .fxp-artwork,.fxp-artwork.reverse{grid-template-columns:1fr}
+  .fxp-artwork.reverse .fxp-art-copy{order:0}
+  .fxp-market-scenarios{grid-template-columns:1fr 1fr}
+  .fxp-take{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  .fxp-section,.fxp-hero-copy{padding:25px 20px}
+  .fxp-hero-copy h1{font-size:44px}
+  .fxp-hero-proof{grid-template-columns:1fr}
+  .fxp-bank-source-list,.fxp-source-grid,.fxp-market-scenarios,.fxp-sim-grid,.fxp-sim-stats,.fxp-package-grid{grid-template-columns:1fr}
+  .fxp-allocation-shell{grid-template-columns:1fr;padding:14px}
+  .fxp-source-grid{grid-column:auto}
+  .fxp-artwork{padding:20px}
+  .fxp-art-copy{padding:0}
+  .fxp-hero-phone{padding:16px 8px;overflow:hidden}
+  .fxp-product-phone{transform:scale(.94);transform-origin:center}
+  .fxp-take{gap:12px}
+  .fxp-code-window pre{min-height:260px}
+}
+@media(max-width:420px){
+  .fxp-hero-copy h1{font-size:38px}
+  .fxp-product-phone{transform:scale(.9)}
+  .fxp-market-note{align-items:flex-start;flex-wrap:wrap}
+}

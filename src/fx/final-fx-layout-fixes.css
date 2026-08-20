@@ -1,0 +1,140 @@
+/* Final typography and flow corrections for the FX simulation. */
+
+.bbfx h1,
+.bbfx h2,
+.bbfx h3,
+.bbfx p,
+.bbfx b,
+.bbfx span {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.bbfx .section {
+  padding-top: 62px;
+  padding-bottom: 62px;
+}
+
+.bbfx .sim-console {
+  margin: 24px auto 0;
+  position: relative;
+  z-index: 1;
+}
+
+.bbfx .section-head {
+  grid-template-columns: minmax(132px, 160px) minmax(0, 1fr);
+  width: 100%;
+  max-width: none;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+.bbfx .section-head > div:last-child {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+
+.bbfx .section-head h2 {
+  width: 100%;
+  max-width: none;
+  margin-bottom: 14px;
+  font-size: clamp(34px, 2.8vw, 46px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.bbfx .section-head p {
+  width: 100%;
+  max-width: 1000px;
+  font-size: 15px;
+  line-height: 1.58;
+  text-wrap: pretty;
+}
+
+.bbfx .hero {
+  min-height: 0;
+  padding-top: 56px;
+  padding-bottom: 48px;
+}
+
+.bbfx .hero-grid {
+  grid-template-columns: minmax(430px, .88fr) minmax(560px, 1.12fr);
+  gap: 46px;
+  align-items: center;
+}
+
+.bbfx .hero-copy,
+.bbfx .hero-copy > p,
+.bbfx .hero h1,
+.bbfx .plane h3,
+.bbfx .closing h2,
+.bbfx .closing p,
+.bbfx .journey-detail p {
+  max-width: none;
+}
+
+.bbfx .hero h1 {
+  font-size: clamp(56px, 4.7vw, 74px);
+  line-height: .95;
+  margin-bottom: 22px;
+  text-wrap: balance;
+}
+
+.bbfx .hero-copy > p {
+  max-width: 62ch;
+  margin-bottom: 22px;
+  font-size: 17px;
+  line-height: 1.58;
+}
+
+.bbfx .hero-machine {
+  min-height: 560px;
+}
+
+.bbfx .hero-proof {
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin-top: 28px;
+  padding-top: 10px;
+}
+
+.bbfx .hero-proof > div {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--soft-line);
+}
+
+.bbfx .hero-proof > div:last-child { border-bottom: 0; }
+.bbfx .hero-proof span { margin: 0; padding-top: 2px; }
+.bbfx .hero-proof b { font-size: 13px; line-height: 1.45; font-weight: 650; }
+
+.bbfx .plane h3 { line-height: 1.12; }
+.bbfx .closing h2 { font-size: clamp(44px, 5vw, 72px); line-height: .98; }
+
+@media (max-width: 1180px) {
+  .bbfx .hero-grid { grid-template-columns: 1fr; gap: 34px; }
+  .bbfx .hero-copy { max-width: 860px; }
+  .bbfx .hero-machine { max-width: none; }
+  .bbfx .section-head h2 { font-size: clamp(34px, 4.2vw, 46px); }
+}
+
+@media (max-width: 860px) {
+  .bbfx .section { padding-top: 54px; padding-bottom: 54px; }
+  .bbfx .sim-console { margin-top: 22px; }
+  .bbfx .section-head { grid-template-columns: 1fr; gap: 12px; }
+  .bbfx .section-head h2 { max-width: none; font-size: clamp(32px, 7vw, 44px); line-height: 1.08; }
+  .bbfx .section-head p { max-width: none; }
+  .bbfx .hero { padding-top: 44px; }
+}
+
+@media (max-width: 640px) {
+  .bbfx .hero-proof > div { grid-template-columns: 1fr; gap: 6px; }
+  .bbfx .hero-proof span { padding-top: 0; }
+  .bbfx .hero h1 { font-size: clamp(44px, 13vw, 58px); }
+}

@@ -1,0 +1,33 @@
+/* Phone */
+.fxp-phone{width:338px;border-radius:48px;background:#11141a;padding:10px;box-shadow:0 24px 55px rgba(20,22,28,.18)}
+.fxp-phone-inner{height:680px;background:#f4f5f8;border-radius:38px;padding:0 21px 20px;display:flex;flex-direction:column;overflow:hidden}
+.fxp-phone-status{display:flex;justify-content:space-between;padding:15px 4px 5px;font-size:12px;font-weight:650}
+.fxp-phone-title-row{display:flex;align-items:center;justify-content:space-between;margin:14px 0 11px}
+.fxp-phone-title{font-size:21px;font-weight:650;letter-spacing:-.03em}
+.fxp-phone-title-row>span{font:8px 'IBM Plex Mono',monospace;letter-spacing:.1em;border:1px solid #dce0e9;background:#fff;border-radius:999px;padding:5px 8px;color:#687188}
+.fxp-phone-box{background:#fff;border:1px solid #e1e4ec;border-radius:17px;padding:15px}
+.fxp-phone-box-label{display:flex;justify-content:space-between;gap:9px;color:#7a8296;font:8.5px 'IBM Plex Mono',monospace;letter-spacing:.09em;text-transform:uppercase}
+.fxp-phone-amount{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px}
+.fxp-phone-amount input,.fxp-phone-amount strong{min-width:0;width:180px;border:0;background:transparent;outline:0;font:650 26px Archivo,system-ui,sans-serif;letter-spacing:-.04em;color:var(--fx-ink)}
+.fxp-phone-amount b{font:500 10px 'IBM Plex Mono',monospace;border:1px solid #dce0e8;border-radius:999px;padding:7px 10px;background:#fff}
+.fxp-phone-swap{width:35px;height:35px;display:grid;place-items:center;margin:-7px auto;border-radius:50%;border:1px solid #dce0e8;background:#fff;color:var(--fx-accent);z-index:2}
+.fxp-phone-summary{margin-top:15px;padding:0 2px}
+.fxp-phone-summary div,.fxp-phone-lines div,.fxp-review-card div{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:6px 0;font-size:11.5px;color:#757e91}
+.fxp-phone-summary b,.fxp-phone-lines b,.fxp-review-card b{color:var(--fx-ink);font-weight:550;text-align:right}
+.fxp-phone-primary,.fxp-phone-result>button{margin-top:auto;border:0;background:var(--fx-accent);color:#fff;border-radius:12px;padding:14px 13px;font-size:13px;font-weight:600}
+.fxp-phone-primary:hover,.fxp-phone-result>button:hover{background:var(--fx-accent-dark)}
+.fxp-phone-error{margin-top:10px;border:1px solid #ebd2cf;background:var(--fx-red-wash);color:#91443e;padding:9px 10px;border-radius:9px;font-size:10px;line-height:1.4}
+.fxp-phone-back{width:max-content;border:0;background:transparent;color:#657088;padding:12px 0 6px;font-size:11px}
+.fxp-review-value{text-align:center;padding:28px 0 22px;display:flex;flex-direction:column;gap:8px}
+.fxp-review-value span{font-size:11px;color:var(--fx-muted)}
+.fxp-review-value strong{font-size:38px;letter-spacing:-.05em}
+.fxp-review-card{background:#fff;border:1px solid #e1e4ec;border-radius:15px;padding:13px 15px}
+.fxp-phone-evidence{display:flex;align-items:center;gap:7px;margin-top:12px;font:8.5px 'IBM Plex Mono',monospace;color:var(--fx-green)}
+.fxp-phone-evidence span{width:7px;height:7px;border-radius:50%;background:var(--fx-green)}
+.fxp-phone-disclosure{font-size:9.5px!important;line-height:1.45!important;color:#81899a!important;text-align:center;margin:10px 8px 0!important}
+.fxp-phone-result{display:flex;flex-direction:column;align-items:center;text-align:center;padding:80px 4px 0;height:100%}
+.fxp-boundary-icon{width:58px;height:58px;border-radius:18px;background:var(--fx-accent-wash);color:var(--fx-accent);display:grid;place-items:center;font-size:28px;margin-bottom:20px}
+.fxp-phone-result h3{font-size:25px;margin:10px 0 12px}
+.fxp-phone-result p{font-size:12px;max-width:29ch;margin-bottom:24px}
+.fxp-phone-lines{width:100%;background:#fff;border:1px solid #e1e4ec;border-radius:14px;padding:12px 14px;text-align:left}
+.fxp-phone-lines b{max-width:155px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

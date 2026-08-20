@@ -1,0 +1,10 @@
+{
+  "provider": "dakota",
+  "asOf": "2026-08-20",
+  "relationship": "none-claimed",
+  "technicalMaturity": "included-not-connected",
+  "implemented": false,
+  "networkCalls": 0,
+  "blueballsModules": ["customers", "applications", "accounts", "receiving-details", "wallets", "transfers"],
+  "sources": ["https://docs.dakota.xyz/", "https://www.dakota.xyz/"]
+}

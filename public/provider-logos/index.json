@@ -1,0 +1,277 @@
+{
+  "column": {
+    "name": "Column",
+    "source": "https://column.com/favicon.ico",
+    "officialDomain": true
+  },
+  "clearbank": {
+    "name": "ClearBank",
+    "source": "https://clear.bank/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "griffin": {
+    "name": "Griffin",
+    "source": "https://griffin.com/favicon-180.png",
+    "officialDomain": true
+  },
+  "swan": {
+    "name": "Swan",
+    "source": "https://cdn.prod.website-files.com/609a39f33751ff4530c610e2/676937c25b705cda9d695e79_icon-256x256.png",
+    "officialDomain": true
+  },
+  "unit": {
+    "name": "Unit",
+    "source": "https://cdn.prod.website-files.com/67ab6f3014e9ebd84ecef25a/67ab6f3014e9ebd84ecef419_favicon.svg",
+    "officialDomain": true
+  },
+  "treasury-prime": {
+    "name": "Treasury Prime",
+    "source": "https://cdn.prod.website-files.com/600b2a653e800f6ea70d169a/655bbc923a64afe2edf7d176_webclip-2.png",
+    "officialDomain": true
+  },
+  "synctera": {
+    "name": "Synctera",
+    "source": "https://cdn.prod.website-files.com/6810e7be6310602d172dc008/6810e7be6310602d172dc038_FAVICON%20(1).png",
+    "officialDomain": true
+  },
+  "increase": {
+    "name": "Increase",
+    "source": "https://increase.com/favicon.svg",
+    "officialDomain": true
+  },
+  "currencycloud": {
+    "name": "Currencycloud",
+    "source": "https://www.currencycloud.com/favicon.ico?favicon.0yrid62x5fl.n.ico",
+    "officialDomain": true
+  },
+  "nium": {
+    "name": "Nium",
+    "source": "https://nium-r2.we-saas.com/uploads/2037ac50-fea0-4eea-ad12-2e186a93addb/1683732696_337906171_538400941542888_7594000133159782570_n1(1).png",
+    "officialDomain": true
+  },
+  "modulr": {
+    "name": "Modulr",
+    "source": "https://www.modulrfinance.com/hubfs/Modulr-June2016/favicon_2.ico",
+    "officialDomain": true
+  },
+  "openpayd": {
+    "name": "OpenPayd",
+    "source": "https://www.openpayd.com/wp-content/uploads/2025/05/openpayd-icon-300x300.png",
+    "officialDomain": true
+  },
+  "thunes": {
+    "name": "Thunes",
+    "source": "https://www.thunes.com/wp-content/uploads/2021/07/cropped-thunes-favicon-180x180.png",
+    "officialDomain": true
+  },
+  "dlocal": {
+    "name": "dLocal",
+    "source": "https://www.dlocal.com/assets/images/static/favicon-2024-light.png",
+    "officialDomain": true
+  },
+  "sumsub": {
+    "name": "Sumsub",
+    "source": "https://sumsub.com/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "persona": {
+    "name": "Persona",
+    "source": "https://withpersona.com/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "alloy": {
+    "name": "Alloy",
+    "source": "https://www.alloy.com/icons/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "trulioo": {
+    "name": "Trulioo",
+    "source": "https://cdn-ilekfbc.nitrocdn.com/mtBokNEFZNzuFdVHqVbMIVtBnPePruUJ/assets/images/optimized/rev-8cdc245/www.trulioo.com/wp-content/themes/trulioo-twenty-three/resources/img/favicon/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "complyadvantage": {
+    "name": "ComplyAdvantage",
+    "source": "https://complyadvantage.com/wp-content/uploads/2025/05/cropped-CA-logo-180x180.jpg",
+    "officialDomain": true
+  },
+  "chainalysis": {
+    "name": "Chainalysis",
+    "source": "https://www.chainalysis.com/wp-content/themes/chainalysis/static/icon-512x512.png",
+    "officialDomain": true
+  },
+  "trm-labs": {
+    "name": "TRM Labs",
+    "source": "https://cdn.prod.website-files.com/6082dc5b67056233213587a4/6082dc5b670562e01135880f_webclip.png",
+    "officialDomain": true
+  },
+  "bvnk": {
+    "name": "BVNK",
+    "source": "https://cdn.prod.website-files.com/69a54cb4d53bea14443280cb/69e1f40dbae1c30d22b103aa_webclip.png",
+    "officialDomain": true
+  },
+  "bridge": {
+    "name": "Bridge",
+    "source": "https://cdn.prod.website-files.com/66b5e40961664331645e962a/66be379d66e20db990e056ca_Frame.png",
+    "officialDomain": true
+  },
+  "circle": {
+    "name": "Circle",
+    "source": "https://cdn.prod.website-files.com/668c08d1b8a9330bd1d786ad/669a20df8ac2810a6dd50e67_favicon-256.svg",
+    "officialDomain": true
+  },
+  "zero-hash": {
+    "name": "Zero Hash",
+    "source": "https://cdn.prod.website-files.com/68c59605946d2fed8ac8bcbd/6a0c76136695e559d8cffe0f_zerohash%20-%20512.png",
+    "officialDomain": true
+  },
+  "transak": {
+    "name": "Transak",
+    "source": "https://transak.com/favicon-new.png",
+    "officialDomain": true
+  },
+  "ramp-network": {
+    "name": "Ramp Network",
+    "source": "https://cdn.prod.website-files.com/63fe1b7ead2cd2d5e0af02e7/6a71d6c39e20dc034e63a865_webclip-opaque-512.png",
+    "officialDomain": true
+  },
+  "fireblocks": {
+    "name": "Fireblocks",
+    "source": "https://www.fireblocks.com/wp-content/themes/fireblocks-block-theme/assets/favicon.png",
+    "officialDomain": true
+  },
+  "bitgo": {
+    "name": "BitGo",
+    "source": "https://www.bitgo.com/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "anchorage": {
+    "name": "Anchorage Digital",
+    "source": "https://cdn.prod.website-files.com/649e7e19aca422fdfb636e26/64de142d90faade0441ac39c_favicon-256x256.png",
+    "officialDomain": true
+  },
+  "dfns": {
+    "name": "Dfns",
+    "source": "https://dfns.co/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "turnkey": {
+    "name": "Turnkey",
+    "source": "https://cdn.prod.website-files.com/676848b756c25a3a99d7f262/677680514040d89a9e94fb1f_webclip.png",
+    "officialDomain": true
+  },
+  "lithic": {
+    "name": "Lithic",
+    "source": "https://cdn.prod.website-files.com/669fb74007a2fb8f4db2a8fd/66cc93ff66fe75d4ecd85284_Variant%3DChip%20in%20Square%20256.png",
+    "officialDomain": true
+  },
+  "marqeta": {
+    "name": "Marqeta",
+    "source": "https://www.marqeta.com/icon.png?e679eef5a03bc4db",
+    "officialDomain": true
+  },
+  "stripe-issuing": {
+    "name": "Stripe Issuing",
+    "source": "https://images.stripeassets.com/fzn2n1nzq965/4vVgZi0ZMoEzOhkcv7EVwK/8cce6fdcf2733b2ec8e99548908847ed/favicon.png?w=180&h=180",
+    "officialDomain": true
+  },
+  "adyen-issuing": {
+    "name": "Adyen Issuing",
+    "source": "https://www.adyen.com/favicon.ico",
+    "officialDomain": true
+  },
+  "highnote": {
+    "name": "Highnote",
+    "source": "https://highnote.com/favicon.svg",
+    "officialDomain": true
+  },
+  "enfuce": {
+    "name": "Enfuce",
+    "source": "https://enfuce.com/apple-icon-180x180.png",
+    "officialDomain": true
+  },
+  "lmax": {
+    "name": "LMAX Group",
+    "source": "https://www.lmax.com/wp-content/themes/lmax/img/favicon/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "fxspotstream": {
+    "name": "FXSpotStream",
+    "source": "https://www.fxspotstream.com/wp-content/uploads/2019/05/logo_main-1.png",
+    "officialDomain": true
+  },
+  "b2c2": {
+    "name": "B2C2",
+    "source": "https://cdn.prod.website-files.com/6140ac854c72f30bea35cc50/61532edabbe7a31ed2659cfb_250.png",
+    "officialDomain": true
+  },
+  "kaiko": {
+    "name": "Kaiko",
+    "source": "https://www.kaiko.com/assets/sites/1/2026/04/cropped-0357725b-6aa1-4dea-9a4f-1431fea40de3.webp",
+    "officialDomain": true
+  },
+  "coin-metrics": {
+    "name": "Coin Metrics",
+    "source": "https://cdn.prod.website-files.com/637e4cd92c6f22a30d5225fc/653fcae36eb6c6980a631d61_Talos%20Favicon%20256.png",
+    "officialDomain": true
+  },
+  "plaid": {
+    "name": "Plaid",
+    "source": "https://plaid.com/assets/img/favicons/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "tink": {
+    "name": "Tink",
+    "source": "https://tink.com/favicon.ico",
+    "officialDomain": true
+  },
+  "truelayer": {
+    "name": "TrueLayer",
+    "source": "https://truelayer.com/icons/icon-512x512.png?v=5db58021c7b05029ddf717674d5b768e",
+    "officialDomain": true
+  },
+  "yapily": {
+    "name": "Yapily",
+    "source": "https://www.yapily.com/favicon.ico",
+    "officialDomain": true
+  },
+  "mx": {
+    "name": "MX",
+    "source": "https://assets.mx.com/favicons/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "belvo": {
+    "name": "Belvo",
+    "source": "https://belvo.com/favicon.svg",
+    "officialDomain": true
+  },
+  "brankas": {
+    "name": "Brankas",
+    "source": "https://www.brankas.com/images/favicon/apple-touch-icon.png",
+    "officialDomain": true
+  },
+  "modern-treasury": {
+    "name": "Modern Treasury",
+    "source": "https://www.moderntreasury.com/favicon.png",
+    "officialDomain": true
+  },
+  "formance": {
+    "name": "Formance",
+    "source": "https://www.formance.com/favicons/android-chrome-512x512.png",
+    "officialDomain": true
+  },
+  "fragment": {
+    "name": "Fragment",
+    "source": "https://fragment.dev/favicon.ico",
+    "officialDomain": true
+  },
+  "hummingbird": {
+    "name": "Hummingbird",
+    "source": "https://www.hummingbird.co/hubfs/bird-500.png",
+    "officialDomain": true
+  },
+  "vgs": {
+    "name": "VGS",
+    "source": "https://www.verygoodsecurity.com/favicon.ico",
+    "officialDomain": true
+  }
+}

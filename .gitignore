@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.data/
+artifacts/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.DS_Store
+*.log
+.wrangler/
+.dev.vars*
+
+# Foundry / FX contracts
+packages/fx-contracts/lib/
+packages/fx-contracts/out/
+packages/fx-contracts/cache/
+packages/fx-contracts/broadcast/
+packages/fx-contracts/abi/
+tsconfig.tsbuildinfo

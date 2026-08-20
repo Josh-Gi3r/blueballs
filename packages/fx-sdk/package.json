@@ -1,0 +1,28 @@
+{
+  "name": "@blueballs/fx-sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Dependency-free JavaScript client for the self-hostable Blueballs FX node",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Josh-Gi3r/blueballs.git",
+    "directory": "packages/fx-sdk"
+  },
+  "engines": { "node": ">=24.15.0" },
+  "files": ["src/index.js", "src/index.d.ts", "README.md", "LICENSE"],
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    }
+  },
+  "types": "./src/index.d.ts",
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:ci": "node --test --test-reporter=spec test/*.test.js",
+    "pack:check": "npm pack --dry-run"
+  }
+}
