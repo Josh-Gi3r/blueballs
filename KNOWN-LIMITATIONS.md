@@ -47,8 +47,9 @@ maintained in [`spec/fx/KNOWN-LIMITATIONS.md`](spec/fx/KNOWN-LIMITATIONS.md).
 
 - The builder provisions tenant-isolated reference data, not a regulated bank,
   a production environment or deployable consumer application.
-- Blueprint generation is currently deterministic and structured. It does not
-  call an AI provider, execute generated code or store a model credential.
+- Builder chat calls Kimi K2.6 through Cloudflare Workers AI. It is prompted at
+  runtime with the repository-generated banking and FX operation indexes; it is
+  not a separately fine-tuned Blueballs model.
 - The Launch stage does not connect sponsor banks, identity vendors, card
   processors, wallets, production payment rails or compliance systems.
 - The Cloudflare reference keeps tenant ownership in Durable Object SQLite but

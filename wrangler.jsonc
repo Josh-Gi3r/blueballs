@@ -13,6 +13,15 @@
     { "binding": "API", "service": "blueballs-api" },
     { "binding": "FX", "service": "blueballs-fx" }
   ],
+  "ai": { "binding": "AI", "remote": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "NeobankBuilder", "class_name": "NeobankBuilder" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["NeobankBuilder"] }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

@@ -1,4 +1,5 @@
 import { BANK_OPENAPI_YAML } from "./openapi.generated.js";
+import { canonicalRedirectUrl } from "./canonical-url.js";
 import {
   crawlerDocument,
   llmsText,
@@ -6,6 +7,8 @@ import {
   robotsText,
   sitemapXml,
 } from "./crawler-pages.js";
+import { getAgentByName } from "agents";
+export { NeobankBuilder } from "./neobank-builder.js";
 
 /** Path prefixes served by the FX node rather than the banking API. */
 const FX_NODE_PATHS = [
@@ -28,19 +31,6 @@ const KNOWN_PAGES = new Set([
 
 const isFxNodePath = (pathname) =>
   FX_NODE_PATHS.some((base) => pathname === base || pathname.startsWith(base + "/"));
-
-export function canonicalRedirectUrl(input, requestHost = null, localDev = false) {
-  const url = input instanceof URL ? new URL(input) : new URL(input);
-  if (localDev) return null;
-  const hostHeader = String(requestHost ?? "").split(":")[0].toLowerCase();
-  if (hostHeader && hostHeader !== "blueballs.tech" && hostHeader !== "www.blueballs.tech") return null;
-  const isApex = url.hostname === "blueballs.tech";
-  const isWww = url.hostname === "www.blueballs.tech";
-  if (!isWww && !(isApex && url.protocol === "http:")) return null;
-  url.hostname = "blueballs.tech";
-  url.protocol = "https:";
-  return url.toString();
-}
 
 function internalRequest(request, headers) {
   const next = new Headers(request.headers);
@@ -148,6 +138,20 @@ async function handleRequest(request, env) {
 
     if (url.pathname === "/openapi.fx.yaml") {
       return env.FX.fetch(internalRequest(new Request(new URL("/openapi.yaml", url), request), {}));
+    }
+
+    if (url.pathname === "/v2/builder-agent/chat") {
+      const apiKey = request.headers.get("x-api-key");
+      if (!apiKey) return Response.json({ error: "A sandbox key is required." }, { status: 401 });
+      const accessCheck = await env.API.fetch(internalRequest(new Request(new URL("/v2/keys", url), {
+        method: "GET",
+        headers: request.headers,
+      }), {}));
+      if (!accessCheck.ok) return new Response(accessCheck.body, { status: accessCheck.status, headers: accessCheck.headers });
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(apiKey));
+      const instance = [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("").slice(0, 32);
+      const agent = await getAgentByName(env.NeobankBuilder, instance);
+      return agent.fetch(request);
     }
 
     if (url.pathname === "/v2" || url.pathname.startsWith("/v2/")) {

@@ -31,7 +31,7 @@ for (const [label, args] of commands) start(label, args);
 // Workers above. Staggering the site avoids a transient not-connected state.
 setTimeout(() => start("site", [
   "exec", "wrangler", "dev", "-c", "wrangler.jsonc", "--port", "5380",
-  "--inspector-port", "9330", "--local", "--persist-to", ".wrangler/state/site",
+  "--inspector-port", "9330", "--persist-to", ".wrangler/state/site",
   "--var", "LOCAL_DEV:true",
 ]), 750);
 

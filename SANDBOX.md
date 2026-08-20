@@ -10,7 +10,8 @@ Open `http://localhost:5280/sandbox` after starting the repository with
 ## Product journey
 
 1. **Brief** — name the product, describe its users, then choose markets,
-   currencies, capabilities, rails and a simple brand direction.
+   currencies, capabilities, rails and a simple brand direction. The Builder
+   Agent can turn that conversation into the structured form.
 2. **Blueprint** — inspect the structured product surface, provider model,
    commercial plan and protected-core boundary before anything is provisioned.
 3. **Build** — create three approved test identities, up to nine currency
@@ -37,9 +38,11 @@ All routes require a tenant sandbox key created through `/v2/auth/signup`.
 | `PATCH` | `/v2/builder/projects/:id` | Revise an unprovisioned blueprint |
 | `POST` | `/v2/builder/projects/:id/provision` | Provision deterministic test data once |
 | `POST` | `/v2/builder/projects/:id/test-payments` | Settle a test payment through the ledger |
+| `POST` | `/v2/builder-agent/chat` | Ask the Builder Agent to draft or refine the blueprint |
 
 The generated banking OpenAPI includes the request and response contracts for
-these operations.
+the six project operations. Builder chat is owned by the site Worker because it
+routes to a stateful Cloudflare Agent.
 
 ### Minimal API flow
 
@@ -75,20 +78,18 @@ write a ledger row, alter idempotency state, change transaction state or reserve
 FX liquidity. Provisioning and test payments cross trusted server routes and
 post balanced ledger legs.
 
-The browser stores no model credential. The current blueprint engine is
-deterministic and structured; a deployer may connect a model through a
-server-side adapter without giving generated output authority over the protected
-financial core.
+The Builder Agent runs Moonshot AI Kimi K2.6 through the Cloudflare Workers AI
+binding. Its system context is generated from both repository OpenAPI contracts:
+all 180 banking operations and the canonical FX node surface. Each sandbox key
+gets a persistent Agents SDK conversation backed by its own Durable Object.
+Model output is normalized to the builder's supported markets, currencies,
+capabilities and rails before it can update the form. The browser receives no
+model credential.
 
-## Commercial and provider boundary
+## Model configuration
 
-- The reference plan shown in the builder is free through 10,000 monthly active
-  users.
-- AI is bring-your-own; no model provider is silently bundled.
-- Identity, bank, card, wallet, payment and other provider charges are
-  pass-through deployment costs.
-- Every included identity and rail record is simulated. No real money moves and
-  no production provider relationship is implied.
+Builder chat uses Cloudflare Workers AI. Self-hosters can replace the model
+binding and model ID without changing the blueprint or project APIs.
 
 Read [`KNOWN-LIMITATIONS.md`](KNOWN-LIMITATIONS.md), [`SECURITY.md`](SECURITY.md)
 and [`ARCHITECTURE.md`](ARCHITECTURE.md) before extending the sandbox toward a

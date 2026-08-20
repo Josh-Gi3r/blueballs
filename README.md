@@ -16,6 +16,7 @@
   <a href="https://blueballs.tech/products">Products</a> ·
   <a href="https://blueballs.tech/fx">FX</a> ·
   <a href="https://blueballs.tech/cards">Cards</a> ·
+  <a href="https://blueballs.tech/sandbox">Sandbox</a> ·
   <a href="https://blueballs.tech/developers">API</a> ·
   <a href="docs/partners/README.md">Providers</a>
 </p>
@@ -37,10 +38,9 @@ create. Blueballs turns the brief into a structured blueprint, provisions an
 isolated tenant environment with test users and multi-currency accounts, then
 lets you settle a test payment through the protected double-entry ledger.
 
-The builder is free through 10,000 active users, uses bring-your-own AI, and
-keeps external provider costs separate. It moves no real money and connects no
-live bank, card, identity or wallet provider. Start at `/sandbox` or follow the
-complete [`SANDBOX.md`](SANDBOX.md) product and API guide.
+The Builder Agent runs Kimi K2.6 on Cloudflare Workers AI and works from the
+repository-generated banking and FX API contracts. Start at `/sandbox` or
+follow the complete [`SANDBOX.md`](SANDBOX.md) product and API guide.
 
 ## See the stack
 

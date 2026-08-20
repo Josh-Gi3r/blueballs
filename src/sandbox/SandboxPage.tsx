@@ -39,6 +39,8 @@ type FormState = {
   brand: { accent: string; personality: string };
 };
 
+type BuilderMessage = { role: "assistant" | "user"; content: string };
+
 const INITIAL: FormState = {
   name: "",
   brief: "",
@@ -106,6 +108,12 @@ export default function SandboxPage() {
   const [busy, setBusy] = useState("Connecting to the sandbox…");
   const [error, setError] = useState("");
   const [payment, setPayment] = useState({ from_account: "", amount: "125.00", recipient: "Studio Supplies", rail: "" });
+  const [agentInput, setAgentInput] = useState("");
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentReady, setAgentReady] = useState(false);
+  const [agentMessages, setAgentMessages] = useState<BuilderMessage[]>([
+    { role: "assistant", content: "Tell me who you want to serve and what they should be able to do." },
+  ]);
 
   useEffect(() => {
     let alive = true;
@@ -158,6 +166,36 @@ export default function SandboxPage() {
     setProjects((items) => [next, ...items]);
     setStage(1);
     window.history.replaceState({}, "", `/sandbox?project=${next.id}`);
+  }
+
+  async function talkToBuilder() {
+    const message = agentInput.trim();
+    if (!message || agentBusy) return;
+    setAgentInput("");
+    setAgentMessages((items) => [...items, { role: "user", content: message }]);
+    setAgentBusy(true);
+    setError("");
+    const result = await call("POST", "/v2/builder-agent/chat", { message });
+    setAgentBusy(false);
+    if (!result.ok) {
+      setError(errorDetail(result.body, "The Builder Agent could not respond."));
+      return;
+    }
+    const response = result.body as { reply: string; ready: boolean; draft: FormState };
+    setAgentMessages((items) => [...items, { role: "assistant", content: response.reply }]);
+    setAgentReady(response.ready);
+    setForm((current) => ({
+      ...current,
+      ...response.draft,
+      name: response.draft.name || current.name,
+      brief: response.draft.brief || current.brief,
+      audience: response.draft.audience || current.audience,
+      markets: response.draft.markets.length ? response.draft.markets : current.markets,
+      currencies: response.draft.currencies.length ? response.draft.currencies : current.currencies,
+      capabilities: response.draft.capabilities.length ? response.draft.capabilities : current.capabilities,
+      rails: response.draft.rails.length ? response.draft.rails : current.rails,
+      brand: response.draft.brand ?? current.brand,
+    }));
   }
 
   async function provision() {
@@ -251,6 +289,19 @@ export default function SandboxPage() {
             </section>
 
             <section className="sb-form-card">
+              <div className="sb-agent">
+                <div className="sb-agent-head"><div><span>BUILDER AGENT</span><b>Design the product in conversation</b></div><small>{agentReady ? "BLUEPRINT READY" : "KIMI K2.6"}</small></div>
+                <div className="sb-agent-messages">
+                  {agentMessages.slice(-6).map((message, index) => <div className={message.role} key={`${message.role}-${index}`}><span>{message.role === "assistant" ? "B" : "YOU"}</span><p>{message.content}</p></div>)}
+                  {agentBusy && <div className="assistant thinking"><span>B</span><p>Working through the product…</p></div>}
+                </div>
+                <form className="sb-agent-input" onSubmit={(event) => { event.preventDefault(); void talkToBuilder(); }}>
+                  <textarea value={agentInput} onChange={(event) => setAgentInput(event.target.value)} placeholder="Help me build a neobank for my gaming community…" />
+                  <button type="submit" disabled={!agentInput.trim() || agentBusy}>Send <span>→</span></button>
+                </form>
+                <small className="sb-agent-note">Grounded in the Blueballs banking and FX API contracts. It updates the blueprint as you talk.</small>
+              </div>
+              <div className="sb-form-divider"><span>REVIEW THE BLUEPRINT</span></div>
               <div className="sb-presets">
                 {PRESETS.map((preset) => <button key={preset.label} onClick={() => setForm({
                   ...INITIAL,

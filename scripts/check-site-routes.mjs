@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { crawlerDocument, pageMetadata, sitemapXml } from "../workers/site/crawler-pages.js";
-import { canonicalRedirectUrl } from "../workers/site/index.js";
+import { canonicalRedirectUrl } from "../workers/site/canonical-url.js";
 
 const worker = readFileSync(new URL("../workers/site/index.js", import.meta.url), "utf8");
 const preview = readFileSync(new URL("./dev-cloudflare.mjs", import.meta.url), "utf8");

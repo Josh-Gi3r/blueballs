@@ -117,7 +117,7 @@ function blueprintFrom(body) {
       payments: "sandbox rails",
       cards: capabilities.includes("cards") ? "sandbox card records" : "disabled",
       wallets: capabilities.includes("wallets") ? "sandbox wallet records" : "disabled",
-      ai: "bring your own model — not connected in this sandbox",
+      ai: "Cloudflare Workers AI · Kimi K2.6",
     },
     trust_boundary: {
       configurable: ["application UI", "customer journeys", "brand", "product rules", "provider adapters"],

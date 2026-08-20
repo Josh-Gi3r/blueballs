@@ -2,6 +2,7 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
+  core-js-pure: false
   esbuild: true
   workerd: true
 minimumReleaseAgeExclude:
