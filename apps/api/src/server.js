@@ -511,6 +511,7 @@ const HERE = process.env.CLOUDFLARE_WORKER === "true"
   ? "."
   : dirname(fileURLToPath(import.meta.url));
 const FAMILY_MODULES = [
+  ["builder.js", () => import("./routes/builder.js")],
   ["business.js", () => import("./routes/business.js")],
   ["cards.js", () => import("./routes/cards.js")],
   ["fx-lp.js", () => import("./routes/fx-lp.js")],

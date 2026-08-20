@@ -11,6 +11,7 @@ full-page files remain separate QA evidence in `../screenshots/`.
 | `fx.png` | `../screenshots/fx-desktop.png` | 1440 × 900 from top | Stablecoin FX market |
 | `cards.png` | `../screenshots/cards-desktop.png` | 1440 × 900 from top | Custom card builder |
 | `developers.png` | `../screenshots/developers-desktop.png` | 1440 × 900 from top | Developer API |
+| `sandbox.png` | `../screenshots/sandbox-desktop.png` | 1440 × 1000 viewport | Sandbox Builder workspace |
 
 Regenerate only from an exact candidate capture. Never place the full-height QA
 images directly in the root README: GitHub scales them into unreadable strips.

@@ -9,8 +9,8 @@ canonical FX runtime and replaceable integration boundaries.
 
 | Layer | Source | Responsibility |
 | --- | --- | --- |
-| Product demonstrator | `src/`, `workers/site/` | Product narrative, simulated journeys, API catalogue and provider research |
-| Banking API | `apps/api/`, `workers/api/` | Tenant product resources, exact ledger, events, webhooks and 174-operation contract |
+| Product demonstrator | `src/`, `workers/site/` | Product narrative, Sandbox Builder, simulated journeys, API catalogue and provider research |
+| Banking API | `apps/api/`, `workers/api/` | Tenant product resources, builder projects, exact ledger, events, webhooks and 180-operation contract |
 | Canonical FX node | `apps/fx-node/`, `workers/fx/` | Policy-aware pricing, routing, reservation and settlement lifecycle |
 | FX domain packages | `packages/fx-*` | Policy, pricing, liquidity, market, fiat, SDK, simulator and contracts |
 | Public contracts | `spec/`, generated OpenAPI | Behaviour, invariants, threat boundaries and extension rules |
@@ -58,6 +58,20 @@ Banking amounts enter as base-10 strings, convert to exact minor units and post
 through a double-entry transaction. Multi-leg operations—such as credit draw or
 repayment—commit in one Node or Durable Object transaction and roll back as a
 unit.
+
+## Sandbox Builder boundary
+
+`src/sandbox/` owns the five-stage Brief → Blueprint → Build → Test → Launch
+experience. Trusted routes in `apps/api/src/routes/builder.js` own persistent
+projects and journeys. Provisioning creates tenant-owned customers and accounts;
+opening balances and test payments always enter through the protected ledger.
+
+The builder emits configuration, not executable application code. It may shape
+presentation, journeys, brands, product rules and adapter choices, but it cannot
+write balances, ledger rows, idempotency records, transaction state or FX
+reservations. The current blueprint engine is deterministic. A self-hoster may
+add server-side model adapters while preserving that authority boundary. See
+[`SANDBOX.md`](SANDBOX.md).
 
 ## FX lifecycle
 

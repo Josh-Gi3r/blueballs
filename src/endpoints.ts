@@ -304,8 +304,14 @@ export const FAMILIES: Family[] = [
     ],
   },
   {
-    name: "Sandbox", blurb: "Trigger predefined scenarios and advance paused simulations.",
+    name: "Sandbox", blurb: "Design, provision and test isolated financial-product sandboxes.",
     endpoints: [
+      { verb: "POST", path: "/v2/builder/projects", does: "Create a structured product blueprint", access: "TENANT" },
+      { verb: "GET", path: "/v2/builder/projects", does: "List builder projects", access: "TENANT" },
+      { verb: "GET", path: "/v2/builder/projects/:id", does: "Retrieve a builder project and its environment", access: "TENANT" },
+      { verb: "PATCH", path: "/v2/builder/projects/:id", does: "Revise an unprovisioned blueprint", access: "TENANT" },
+      { verb: "POST", path: "/v2/builder/projects/:id/provision", does: "Provision seeded users, accounts and balances", access: "TENANT" },
+      { verb: "POST", path: "/v2/builder/projects/:id/test-payments", does: "Run a protected-ledger test payment", access: "TENANT" },
       { verb: "GET", path: "/v2/sandbox/scenarios", does: "Scenario catalogue", access: "TENANT" },
       { verb: "POST", path: "/v2/sandbox/payments", does: "Simulate an inbound payment", access: "TENANT" },
       { verb: "POST", path: "/v2/sandbox/onboarding", does: "Simulate an onboarding transition", access: "TENANT" },

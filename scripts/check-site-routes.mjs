@@ -5,6 +5,7 @@ import { crawlerDocument, pageMetadata, sitemapXml } from "../workers/site/crawl
 
 const worker = readFileSync(new URL("../workers/site/index.js", import.meta.url), "utf8");
 assert.match(worker, /KNOWN_PAGES[\s\S]*"\/cards"/, "/cards must be an allowed HTML route");
+assert.match(worker, /KNOWN_PAGES[\s\S]*"\/sandbox"/, "/sandbox must be an allowed HTML route");
 assert.match(worker, /fonts\.googleapis\.com/, "CSP must allow the site's loaded webfonts");
 assert.match(worker, /fonts\.gstatic\.com/, "CSP must allow font file origin");
 assert.match(worker, /content-security-policy/, "the site must emit a CSP");
@@ -15,4 +16,7 @@ assert.equal(pageMetadata("/cards").title, "Card programme research — Blueball
 assert.match(crawlerDocument("/cards"), /not the Blueballs Cards API/i);
 assert.match(crawlerDocument("/cards"), /Not connected/);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/cards<\/loc>/);
-console.log("site route contract: /cards is allowlisted, titled, crawlable and present in the sitemap");
+assert.equal(pageMetadata("/sandbox").title, "Build a fintech sandbox — Blueballs");
+assert.match(crawlerDocument("/sandbox"), /protected double-entry ledger/i);
+assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/sandbox<\/loc>/);
+console.log("site route contract: /cards and /sandbox are allowlisted, crawlable and present in the sitemap");

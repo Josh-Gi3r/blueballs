@@ -65,8 +65,8 @@ if (undocumentedCreated.length || missingCreated.length || unknownCreated.length
   for (const operation of missingCreated) console.log(`  OpenAPI returns 201 but router returns 200: ${operation}`);
   for (const operation of unknownCreated) console.log(`  OpenAPI declares an unknown created operation: ${operation}`);
 }
-if (catalogueRows.length !== 174) console.log(`\nEXPECTED 174 ACCESS-CLASSIFIED OPERATIONS, FOUND ${catalogueRows.length}`);
-if (!undocumented.length && !phantom.length && !invalidAccess.length && !undocumentedCreated.length && !missingCreated.length && !unknownCreated.length && catalogueRows.length === 174) {
+if (catalogueRows.length !== 180) console.log(`\nEXPECTED 180 ACCESS-CLASSIFIED OPERATIONS, FOUND ${catalogueRows.length}`);
+if (!undocumented.length && !phantom.length && !invalidAccess.length && !undocumentedCreated.length && !missingCreated.length && !unknownCreated.length && catalogueRows.length === 180) {
   console.log("\ncatalogue matches the router, including access classes and success statuses");
 }
-process.exit(undocumented.length || phantom.length || invalidAccess.length || undocumentedCreated.length || missingCreated.length || unknownCreated.length || catalogueRows.length !== 174 ? 1 : 0);
+process.exit(undocumented.length || phantom.length || invalidAccess.length || undocumentedCreated.length || missingCreated.length || unknownCreated.length || catalogueRows.length !== 180 ? 1 : 0);

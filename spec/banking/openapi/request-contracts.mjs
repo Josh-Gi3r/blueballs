@@ -225,4 +225,29 @@ export const REQUEST_BODIES = {
     outcome: { type: "string", enum: ["settle", "fail"] },
     decision: { type: "string", enum: ["approved", "declined", "withdrawn"] },
   }), false),
+  postBuilderProjects: contract(obj({
+    name: string("Product name", { maxLength: 80 }),
+    brief: string("Plain-language product brief", { maxLength: 2000 }),
+    audience: string("Intended users", { maxLength: 240 }),
+    markets: array(string("Market code", { example: "SG" })),
+    currencies: array(currency),
+    capabilities: array(string("Blueballs capability", { example: "accounts" })),
+    rails: array(string("Configured sandbox rail", { example: "paynow" })),
+    brand: obj({
+      accent: string("Six-digit hexadecimal accent colour", { pattern: "^#[0-9A-Fa-f]{6}$" }),
+      personality: string("Product personality", { maxLength: 120 }),
+    }),
+  }, ["name", "brief", "audience"])),
+  patchBuilderProjectsId: contract(obj({
+    name: string("Product name", { maxLength: 80 }),
+    brief: string("Plain-language product brief", { maxLength: 2000 }),
+    audience: string("Intended users", { maxLength: 240 }),
+    markets: array(string("Market code")), currencies: array(currency),
+    capabilities: array(string("Blueballs capability")), rails: array(string("Sandbox rail")),
+    brand: obj({ accent: string("Hex accent colour"), personality: string("Product personality") }),
+  })),
+  postBuilderProjectsIdTestpayments: contract(obj({
+    from_account: id, amount, recipient: string("Test recipient name", { maxLength: 120 }),
+    rail: string("Configured sandbox rail"),
+  }, ["from_account", "amount", "recipient"])),
 };

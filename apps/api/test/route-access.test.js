@@ -4,10 +4,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createApiFixture } from "./helpers/api-process.js";
 
-test("all 174 catalogue operations have an explicit access class", async () => {
+test("all 180 catalogue operations have an explicit access class", async () => {
   const source = await readFile(new URL("../../../src/endpoints.ts", import.meta.url), "utf8");
   const rows = [...source.matchAll(/verb:\s*"([A-Z]+)"\s*,\s*path:\s*"([^"]+)"[^\n]+access:\s*"(\w+)"/g)];
-  assert.equal(rows.length, 174);
+  assert.equal(rows.length, 180);
   const allowed = new Set(["PUBLIC", "TENANT", "OPERATOR", "GLOBAL_READ"]);
   for (const [, method, path, access] of rows) {
     assert.ok(allowed.has(access), `${method} ${path} has invalid access ${access}`);

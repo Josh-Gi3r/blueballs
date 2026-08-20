@@ -24,9 +24,23 @@
   <img src="docs/assets/readme/home-hero.png" alt="Blueballs homepage showing the open-source neobank proposition, banking API request and illustrative customer account" width="100%" />
 </p>
 
-Blueballs is an MIT-licensed, self-hostable **neobank reference stack**: product screens, a 174-operation banking API, a double-entry ledger, and a canonical FX engine.
+Blueballs is an MIT-licensed, self-hostable **neobank reference stack**: product screens, a 180-operation banking API, a double-entry ledger, and a canonical FX engine.
 
 Fork it, run it locally, hit the sandbox API, then replace reference adapters with the providers your deployment needs. It is software for founders building a bank, neobank, embedded-finance product or stablecoin-enabled product — not a licensed bank, and not a live Dakota or Bridge integration.
+
+## Design, build and test a product
+
+[![Blueballs sandbox workspace with tenant test users, exact balances and a protected-ledger payment journey](docs/assets/readme/sandbox.png)](https://blueballs.tech/sandbox)
+
+Open the **Sandbox Builder** and describe the financial product you want to
+create. Blueballs turns the brief into a structured blueprint, provisions an
+isolated tenant environment with test users and multi-currency accounts, then
+lets you settle a test payment through the protected double-entry ledger.
+
+The builder is free through 10,000 active users, uses bring-your-own AI, and
+keeps external provider costs separate. It moves no real money and connects no
+live bank, card, identity or wallet provider. Start at `/sandbox` or follow the
+complete [`SANDBOX.md`](SANDBOX.md) product and API guide.
 
 ## See the stack
 
@@ -57,7 +71,7 @@ rendered here. Screenshots do not claim that an external provider is connected.
 - double-entry ledger and event history;
 - product screens, journeys and executable API documentation.
 
-All 174 catalogued banking operations have an explicit access class and machine-readable contract. They are reference implementations, not production-provider integrations. Consumer iOS and Android applications are not included.
+All 180 catalogued banking operations have an explicit access class and machine-readable contract. They are reference implementations, not production-provider integrations. Consumer iOS and Android applications are not included.
 
 ### Canonical FX foundation
 
@@ -238,7 +252,7 @@ http://localhost:8788/openapi.yaml
 
 ```mermaid
 flowchart LR
-  UI[Demo and simulation pages] -->|sandbox HTTP| BANK[Banking API\n174 operations]
+  UI[Demo and simulation pages] -->|sandbox HTTP| BANK[Banking API\n180 operations]
   SDK[FX SDK and integrator] --> FX[Canonical FX node]
   BANK --> NDB[(Node SQLite)]
   BANK --> BDO[(Banking Durable Object)]
@@ -316,7 +330,7 @@ check because they require a running daemon.
 
 | Surface | Status | Evidence boundary |
 | --- | --- | --- |
-| Banking API | Reference implementation | 174 access-classified operations; tenant-isolation tests |
+| Banking API | Reference implementation | 180 access-classified operations; tenant-isolation tests |
 | Cloudflare banking runtime | Reference implementation | Durable Object transaction and restart tests |
 | Canonical FX node | Reference implementation | Public preview; authenticated state changes; fail-closed execution |
 | FX packages and SDK | Implemented | Unit/integration tests and five-file SDK tarball boundary |
@@ -339,6 +353,7 @@ check because they require a running daemon.
 | [`GOVERNANCE.md`](GOVERNANCE.md) | Decision ownership and compatibility policy |
 | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) | Community expectations and enforcement |
 | [`RELEASE.md`](RELEASE.md) | Reproducible release procedure and artefact bundle |
+| [`SANDBOX.md`](SANDBOX.md) | Builder journey, API, trust boundary and provider model |
 
 ### Builder guides
 

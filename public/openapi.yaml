@@ -4,7 +4,7 @@ openapi: 3.1.0
 info:
   title: "Blueballs banking API"
   version: "2026-08-06"
-  description: "174 endpoints across 28 resource families. Money is always a decimal string with an explicit currency; errors are RFC 9457 problem+json. Self-serve a key with POST /v2/auth/signup."
+  description: "180 endpoints across 28 resource families. Money is always a decimal string with an explicit currency; errors are RFC 9457 problem+json. Self-serve a key with POST /v2/auth/signup."
   license:
     name: "MIT"
     identifier: "MIT"
@@ -65,7 +65,7 @@ tags:
   - name: "Events"
     description: "Query API event records."
   - name: "Sandbox"
-    description: "Trigger predefined scenarios and advance paused simulations."
+    description: "Design, provision and test isolated financial-product sandboxes."
   - name: "Reference data"
     description: "Query countries, currencies and networks configured in this reference API."
 paths:
@@ -8863,6 +8863,332 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+  "/v2/builder/projects":
+    post:
+      summary: "Create a structured product blueprint"
+      operationId: "postBuilderProjects"
+      tags: ["Sandbox"]
+      x-blueballs-access: "TENANT"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type":"object","additionalProperties":false,"properties":{"name":{"type":"string","description":"Product name","maxLength":80},"brief":{"type":"string","description":"Plain-language product brief","maxLength":2000},"audience":{"type":"string","description":"Intended users","maxLength":240},"markets":{"type":"array","items":{"type":"string","description":"Market code","example":"SG"}},"currencies":{"type":"array","items":{"$ref":"#/components/schemas/CurrencyCode"}},"capabilities":{"type":"array","items":{"type":"string","description":"Blueballs capability","example":"accounts"}},"rails":{"type":"array","items":{"type":"string","description":"Configured sandbox rail","example":"paynow"}},"brand":{"type":"object","additionalProperties":false,"properties":{"accent":{"type":"string","description":"Six-digit hexadecimal accent colour","pattern":"^#[0-9A-Fa-f]{6}$"},"personality":{"type":"string","description":"Product personality","maxLength":120}}}},"required":["name","brief","audience"]}
+      responses:
+        "201":
+          description: "Sandbox response"
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/SandboxProject"}
+              example: {"id":"prj_example","object":"sandbox_project","status":"ready","blueprint":{"name":"Community Bank","markets":["SG"],"currencies":["SGD","USD"]},"build":{"state":"complete"},"environment":{"mode":"sandbox","state":"ready"},"customers":[],"accounts":[],"journeys":[],"created_at":"2026-08-21T00:00:00.000Z"}
+        "400":
+          description: "Invalid request"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          description: "Missing or invalid API key"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "403":
+          description: "Insufficient access"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404":
+          description: "Resource not found"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: "State or idempotency conflict"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          description: "Rate limit exceeded"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        default:
+          description: "RFC 9457 problem document"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+    get:
+      summary: "List builder projects"
+      operationId: "getBuilderProjects"
+      tags: ["Sandbox"]
+      x-blueballs-access: "TENANT"
+      parameters:
+        - { name: "limit", in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: "cursor", in: query, required: false, schema: { type: string } }
+        - { name: "starting_after", in: query, required: false, schema: { type: string } }
+        - { name: "ending_before", in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: "Paginated sandbox collection"
+          content:
+            application/json:
+              schema: {"type":"object","additionalProperties":true,"required":["data"],"properties":{"object":{"type":"string","const":"list"},"data":{"type":"array","items":{"$ref":"#/components/schemas/SandboxProject"}},"has_more":{"type":"boolean"},"next_cursor":{"type":["string","null"]}}}
+              example: {"object":"list","data":[{"id":"prj_example","object":"sandbox_project","status":"ready","blueprint":{"name":"Community Bank","markets":["SG"],"currencies":["SGD","USD"]},"build":{"state":"complete"},"environment":{"mode":"sandbox","state":"ready"},"customers":[],"accounts":[],"journeys":[],"created_at":"2026-08-21T00:00:00.000Z"}],"has_more":false,"next_cursor":null}
+        "400":
+          description: "Invalid request"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          description: "Missing or invalid API key"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "403":
+          description: "Insufficient access"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404":
+          description: "Resource not found"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: "State or idempotency conflict"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          description: "Rate limit exceeded"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        default:
+          description: "RFC 9457 problem document"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  "/v2/builder/projects/{id}":
+    get:
+      summary: "Retrieve a builder project and its environment"
+      operationId: "getBuilderProjectsId"
+      tags: ["Sandbox"]
+      x-blueballs-access: "TENANT"
+      parameters:
+        - name: "id"
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: "Sandbox response"
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/SandboxProject"}
+              example: {"id":"prj_example","object":"sandbox_project","status":"ready","blueprint":{"name":"Community Bank","markets":["SG"],"currencies":["SGD","USD"]},"build":{"state":"complete"},"environment":{"mode":"sandbox","state":"ready"},"customers":[],"accounts":[],"journeys":[],"created_at":"2026-08-21T00:00:00.000Z"}
+        "400":
+          description: "Invalid request"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          description: "Missing or invalid API key"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "403":
+          description: "Insufficient access"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404":
+          description: "Resource not found"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: "State or idempotency conflict"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          description: "Rate limit exceeded"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        default:
+          description: "RFC 9457 problem document"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+    patch:
+      summary: "Revise an unprovisioned blueprint"
+      operationId: "patchBuilderProjectsId"
+      tags: ["Sandbox"]
+      x-blueballs-access: "TENANT"
+      parameters:
+        - name: "id"
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type":"object","additionalProperties":false,"properties":{"name":{"type":"string","description":"Product name","maxLength":80},"brief":{"type":"string","description":"Plain-language product brief","maxLength":2000},"audience":{"type":"string","description":"Intended users","maxLength":240},"markets":{"type":"array","items":{"type":"string","description":"Market code"}},"currencies":{"type":"array","items":{"$ref":"#/components/schemas/CurrencyCode"}},"capabilities":{"type":"array","items":{"type":"string","description":"Blueballs capability"}},"rails":{"type":"array","items":{"type":"string","description":"Sandbox rail"}},"brand":{"type":"object","additionalProperties":false,"properties":{"accent":{"type":"string","description":"Hex accent colour"},"personality":{"type":"string","description":"Product personality"}}}}}
+      responses:
+        "200":
+          description: "Sandbox response"
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/SandboxProject"}
+              example: {"id":"prj_example","object":"sandbox_project","status":"ready","blueprint":{"name":"Community Bank","markets":["SG"],"currencies":["SGD","USD"]},"build":{"state":"complete"},"environment":{"mode":"sandbox","state":"ready"},"customers":[],"accounts":[],"journeys":[],"created_at":"2026-08-21T00:00:00.000Z"}
+        "400":
+          description: "Invalid request"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          description: "Missing or invalid API key"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "403":
+          description: "Insufficient access"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404":
+          description: "Resource not found"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: "State or idempotency conflict"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          description: "Rate limit exceeded"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        default:
+          description: "RFC 9457 problem document"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  "/v2/builder/projects/{id}/provision":
+    post:
+      summary: "Provision seeded users, accounts and balances"
+      operationId: "postBuilderProjectsIdProvision"
+      tags: ["Sandbox"]
+      x-blueballs-access: "TENANT"
+      parameters:
+        - name: "id"
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: "Sandbox response"
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/SandboxProject"}
+              example: {"id":"prj_example","object":"sandbox_project","status":"ready","blueprint":{"name":"Community Bank","markets":["SG"],"currencies":["SGD","USD"]},"build":{"state":"complete"},"environment":{"mode":"sandbox","state":"ready"},"customers":[],"accounts":[],"journeys":[],"created_at":"2026-08-21T00:00:00.000Z"}
+        "400":
+          description: "Invalid request"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          description: "Missing or invalid API key"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "403":
+          description: "Insufficient access"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404":
+          description: "Resource not found"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: "State or idempotency conflict"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          description: "Rate limit exceeded"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        default:
+          description: "RFC 9457 problem document"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  "/v2/builder/projects/{id}/test-payments":
+    post:
+      summary: "Run a protected-ledger test payment"
+      operationId: "postBuilderProjectsIdTestpayments"
+      tags: ["Sandbox"]
+      x-blueballs-access: "TENANT"
+      parameters:
+        - name: "id"
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type":"object","additionalProperties":false,"properties":{"from_account":{"$ref":"#/components/schemas/Identifier"},"amount":{"$ref":"#/components/schemas/DecimalAmount"},"recipient":{"type":"string","description":"Test recipient name","maxLength":120},"rail":{"type":"string","description":"Configured sandbox rail"}},"required":["from_account","amount","recipient"]}
+      responses:
+        "200":
+          description: "Sandbox response"
+          content:
+            application/json:
+              schema: {"$ref":"#/components/schemas/SandboxProject"}
+              example: {"id":"prj_example","object":"sandbox_project","status":"ready","blueprint":{"name":"Community Bank","markets":["SG"],"currencies":["SGD","USD"]},"build":{"state":"complete"},"environment":{"mode":"sandbox","state":"ready"},"customers":[],"accounts":[],"journeys":[],"created_at":"2026-08-21T00:00:00.000Z"}
+        "400":
+          description: "Invalid request"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          description: "Missing or invalid API key"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "403":
+          description: "Insufficient access"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "404":
+          description: "Resource not found"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: "State or idempotency conflict"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429":
+          description: "Rate limit exceeded"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        default:
+          description: "RFC 9457 problem document"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
   "/v2/sandbox/scenarios":
     get:
       summary: "Scenario catalogue"
@@ -9291,6 +9617,7 @@ components:
     Webhook: {"type":"object","additionalProperties":false,"properties":{"id":{"$ref":"#/components/schemas/Identifier"},"created_at":{"$ref":"#/components/schemas/Timestamp"},"url":{"type":"string","description":"HTTPS delivery URL","format":"uri"},"events":{"type":"array","items":{"type":"string"}},"status":{"type":"string","description":"Target state"}},"required":["id","url","events"]}
     Event: {"type":"object","additionalProperties":false,"properties":{"id":{"$ref":"#/components/schemas/Identifier"},"created_at":{"$ref":"#/components/schemas/Timestamp"},"type":{"type":"string","description":"Event type"},"data":{"type":"object","additionalProperties":true}},"required":["id","type","data"]}
     SandboxRun: {"type":"object","additionalProperties":false,"properties":{"id":{"$ref":"#/components/schemas/Identifier"},"created_at":{"$ref":"#/components/schemas/Timestamp"},"scenario":{"type":"string","description":"Scenario identifier"},"status":{"type":"string","description":"Simulation state"},"history":{"type":"array","items":{"type":"object","additionalProperties":true}}},"required":["id","status"]}
+    SandboxProject: {"type":"object","additionalProperties":false,"properties":{"id":{"$ref":"#/components/schemas/Identifier"},"created_at":{"$ref":"#/components/schemas/Timestamp"},"object":{"type":"string","const":"sandbox_project"},"status":{"type":"string","description":"Builder lifecycle state"},"blueprint":{"type":"object","additionalProperties":true},"build":{"type":"object","additionalProperties":true},"environment":{"type":["object","null"],"additionalProperties":true},"customers":{"type":"array","items":{"$ref":"#/components/schemas/Customer"}},"accounts":{"type":"array","items":{"$ref":"#/components/schemas/Account"}},"journeys":{"type":"array","items":{"type":"object","additionalProperties":true}}},"required":["id","object","status","blueprint","build","customers","accounts","journeys"]}
     ReferenceItem: {"type":"object","additionalProperties":false,"properties":{"code":{"type":"string","description":"Reference code"},"name":{"type":"string","description":"Display name"},"status":{"type":"string","description":"Availability"}},"required":["code"]}
     KeySecret: {"type":"object","additionalProperties":true,"properties":{"id":{"$ref":"#/components/schemas/Identifier"},"tenant_id":{"$ref":"#/components/schemas/Identifier"},"key":{"type":"string","description":"Secret API key; returned once and never retrievable"},"scope":{"type":"string","description":"Granted key scope"},"created_at":{"$ref":"#/components/schemas/Timestamp"},"note":{"type":"string","description":"Secret-handling instruction"}},"required":["id","tenant_id","key","scope","created_at"]}
     Capability: {"type":"object","additionalProperties":false,"properties":{"rail":{"type":"string","description":"Payment rail"},"status":{"type":"string","description":"Capability state"},"requirements":{"type":"array","items":{"type":"string"}},"limit":{"$ref":"#/components/schemas/DecimalAmount"}},"required":["rail","status","requirements","limit"]}

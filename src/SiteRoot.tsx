@@ -4,6 +4,7 @@ import App from "./App";
 import EcosystemPage from "./EcosystemPage";
 import CardsPage from "./CardsPage";
 import { BrandLockup } from "./Brand";
+import SandboxPage from "./sandbox/SandboxPage";
 
 const MONO = "'IBM Plex Mono', monospace";
 function navigate(path: string) {
@@ -208,7 +209,7 @@ function DirectoryShell({ page }: { page: "cards" | "ecosystem" }) {
         </div>
         <button
           type="button"
-          onClick={() => navigate("/developers")}
+          onClick={() => navigate("/sandbox")}
           style={{
             fontSize: 13.5,
             fontWeight: 500,
@@ -372,6 +373,7 @@ export default function SiteRoot() {
   }, [path]);
   if (path === "/ecosystem") return <DirectoryShell page="ecosystem" />;
   if (path === "/cards") return <DirectoryShell page="cards" />;
+  if (path === "/sandbox") return <SandboxPage />;
   return (
     <>
       <App />

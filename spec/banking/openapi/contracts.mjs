@@ -88,6 +88,16 @@ export const SCHEMAS = {
   Webhook: resource({ url: string("HTTPS delivery URL", { format: "uri" }), events: { type: "array", items: { type: "string" } }, status: string("Target state") }, ["url", "events"]),
   Event: resource({ type: string("Event type"), data: { type: "object", additionalProperties: true } }, ["type", "data"]),
   SandboxRun: resource({ scenario: string("Scenario identifier"), status: string("Simulation state"), history: { type: "array", items: { type: "object", additionalProperties: true } } }, ["status"]),
+  SandboxProject: resource({
+    object: { type: "string", const: "sandbox_project" },
+    status: string("Builder lifecycle state"),
+    blueprint: { type: "object", additionalProperties: true },
+    build: { type: "object", additionalProperties: true },
+    environment: { type: ["object", "null"], additionalProperties: true },
+    customers: { type: "array", items: { $ref: "#/components/schemas/Customer" } },
+    accounts: { type: "array", items: { $ref: "#/components/schemas/Account" } },
+    journeys: { type: "array", items: { type: "object", additionalProperties: true } },
+  }, ["object", "status", "blueprint", "build", "customers", "accounts", "journeys"]),
   ReferenceItem: object({ code: string("Reference code"), name: string("Display name"), status: string("Availability") }, ["code"]),
   KeySecret: openObject({
     id: { $ref: "#/components/schemas/Identifier" }, tenant_id: { $ref: "#/components/schemas/Identifier" },
@@ -136,6 +146,7 @@ export const BODYLESS_OPERATIONS = new Set([
   "deleteVaultsId", "deletePoliciesId", "deletePoliciesIdRulesRid",
   "deleteOrgsIdMembersMid", "deleteWebhooksId", "postWebhooksDeliveriesDidReplay",
   "postFxRfqIdAccept", "postFxIntentsIdCancel", "postFxNet", "postFxLpIdWithdraw",
+  "postBuilderProjectsIdProvision",
 ]);
 
 export const CREATED_OPERATIONS = new Set([
@@ -145,6 +156,7 @@ export const CREATED_OPERATIONS = new Set([
   "postCards", "postCardsIdAuthorisations", "postDisputes", "postVaults", "postCredit", "postPolicies",
   "postPoliciesIdRules", "postApprovalchains", "postOrgs", "postOrgsIdMembers", "postStatements", "postLinks",
   "postMandates", "postSubscriptions", "postWebhooks", "postSandboxPayments", "postSandboxOnboarding",
+  "postBuilderProjects",
 ]);
 
 export function schemaForFamily(family) {

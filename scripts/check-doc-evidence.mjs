@@ -24,6 +24,8 @@ const captures = [
   "docs/assets/screenshots/products-mobile.png",
   "docs/assets/screenshots/fx-mobile.png",
   "docs/assets/screenshots/developers-mobile.png",
+  "docs/assets/screenshots/sandbox-desktop.png",
+  "docs/assets/screenshots/sandbox-mobile.png",
 ];
 
 const readmeCrops = [
@@ -32,11 +34,13 @@ const readmeCrops = [
   "docs/assets/readme/fx.png",
   "docs/assets/readme/cards.png",
   "docs/assets/readme/developers.png",
+  "docs/assets/readme/sandbox.png",
 ];
 
 for (const capture of captures) {
   const { size } = statSync(capture);
-  if (size < 50_000) {
+  const minimumSize = capture.endsWith("sandbox-mobile.png") ? 30_000 : 50_000;
+  if (size < minimumSize) {
     throw new Error(`${capture} is missing or too small to be a real capture`);
   }
 }
@@ -46,7 +50,7 @@ for (const crop of readmeCrops) {
   if (size < 50_000) throw new Error(`${crop} is missing or too small to be a readable product crop`);
 }
 const systemMap = readFileSync("docs/assets/blueballs-system-map.svg", "utf8");
-if (!systemMap.includes("Blueballs open-source neobank system map") || !systemMap.includes("174 operations")) {
+if (!systemMap.includes("Blueballs open-source neobank system map") || !systemMap.includes("180 operations")) {
   throw new Error("system map is missing its accessible title or API contract count");
 }
 const readme = readFileSync("README.md", "utf8");
@@ -62,6 +66,10 @@ for (const document of handbook) {
   const contents = readFileSync(document, "utf8");
   if (contents.length < 500) throw new Error(`${document} is missing or too thin for the public handbook`);
   if (!readme.includes(`(${document})`)) throw new Error(`README documentation map omits ${document}`);
+}
+const sandboxGuide = readFileSync("SANDBOX.md", "utf8");
+if (sandboxGuide.length < 2000 || !readme.includes("(SANDBOX.md)")) {
+  throw new Error("SANDBOX.md is missing, too thin, or absent from the README documentation map");
 }
 const manifest = readFileSync("docs/assets/screenshots/README.md", "utf8");
 for (const capture of captures) {

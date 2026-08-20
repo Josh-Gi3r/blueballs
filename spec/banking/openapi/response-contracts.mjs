@@ -22,6 +22,7 @@ const LIST_SCHEMAS = {
   getLedger: "LedgerEntry", getLedgerBalances: "LedgerBalance", getRails: "Rail", getRailsIdCalendar: "RailCalendarDay",
   getSubscriptions: "Subscription", getWebhooks: "Webhook", getWebhooksIdDeliveries: "WebhookDelivery",
   getEvents: "Event", getSandboxScenarios: "SandboxScenario", getCountries: "ReferenceItem",
+  getBuilderProjects: "SandboxProject",
   getCurrencies: "ReferenceItem", getNetworks: "ReferenceItem",
 };
 
@@ -38,6 +39,9 @@ const SINGLE_SCHEMAS = {
   postQrDecode: "QrDecode", postQrGenerate: "QrCode", postLinks: "PaymentLink", getLinksId: "PaymentLink",
   postMandates: "Mandate", getMandatesId: "Mandate",
   postWebhooksDeliveriesDidReplay: "WebhookDelivery", getSandboxId: "SandboxRun",
+  postBuilderProjects: "SandboxProject", getBuilderProjectsId: "SandboxProject",
+  patchBuilderProjectsId: "SandboxProject", postBuilderProjectsIdProvision: "SandboxProject",
+  postBuilderProjectsIdTestpayments: "SandboxProject",
 };
 
 const EXAMPLES = {
@@ -81,6 +85,7 @@ const EXAMPLES = {
   WebhookDelivery: { id: "wdl_example", webhook: "wh_example", status: "delivered", response_code: 200, attempted_at: "2026-08-21T00:00:00.000Z" },
   Event: { id: "evt_example", type: "transfer.created", data: { id: "trf_example" }, created_at: "2026-08-21T00:00:00.000Z" },
   SandboxRun: { id: "sim_example", scenario: "payment_received", status: "complete", history: [], created_at: "2026-08-21T00:00:00.000Z" },
+  SandboxProject: { id: "prj_example", object: "sandbox_project", status: "ready", blueprint: { name: "Community Bank", markets: ["SG"], currencies: ["SGD", "USD"] }, build: { state: "complete" }, environment: { mode: "sandbox", state: "ready" }, customers: [], accounts: [], journeys: [], created_at: "2026-08-21T00:00:00.000Z" },
   SandboxScenario: { id: "payment_received", name: "Inbound payment", description: "Simulate an inbound payment and emitted event." },
   ReferenceItem: { code: "DE", name: "Germany", status: "available" },
   Capability: { rail: "sepa", status: "active", requirements: [], limit: "1000000.00" },
@@ -133,5 +138,6 @@ export const PAGINATED_RESPONSE_OPERATIONS = new Set([
   "getCardsIdTransactions", "getCardsIdStatements", "getAuthorisations", "getDisputes", "getVaults",
   "getCredit", "getPolicies", "getApprovals", "getOrgsIdMembers", "getLedger", "getLedgerBalances",
   "getSubscriptions", "getWebhooks", "getWebhooksIdDeliveries", "getEvents",
+  "getBuilderProjects",
 ]);
 export const RESPONSE_SCHEMA_OVERRIDES = Object.freeze({ ...SINGLE_SCHEMAS });

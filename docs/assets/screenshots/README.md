@@ -15,6 +15,8 @@ or evidence of a connected financial provider.
 | `products-mobile.png` | `/products` | 390 × 844 | `eccee5d` | Responsive product catalogue |
 | `fx-mobile.png` | `/fx` | 390 × 844 | `eccee5d` | Responsive FX simulation |
 | `developers-mobile.png` | `/developers` | 390 × 844 | `eccee5d` | Responsive API catalogue |
+| `sandbox-desktop.png` | `/sandbox?project=…` | 1440 × 1000 | local candidate | Provisioned tenant workspace and settled payment |
+| `sandbox-mobile.png` | `/sandbox?project=…` | 390 × 844 | local candidate | Responsive tenant workspace |
 
 Publication candidates must regenerate these captures after the last user-visible
 change and replace the source commit with the exact captured commit.

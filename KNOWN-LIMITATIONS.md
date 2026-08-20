@@ -36,12 +36,24 @@ maintained in [`spec/fx/KNOWN-LIMITATIONS.md`](spec/fx/KNOWN-LIMITATIONS.md).
 
 ## Banking and API boundary
 
-- The 174-operation API is a reference implementation. Routes, access classes,
+- The 180-operation API is a reference implementation. Routes, access classes,
   request contracts and key product journeys are tested, but external bank/rail
   semantics are not simulated as production integrations.
 - Rate limiting is process/runtime scoped and is not a substitute for an edge
   abuse platform, fraud engine or institution-grade identity controls.
 - The repository does not ship consumer iOS or Android apps.
+
+## Sandbox Builder boundary
+
+- The builder provisions tenant-isolated reference data, not a regulated bank,
+  a production environment or deployable consumer application.
+- Blueprint generation is currently deterministic and structured. It does not
+  call an AI provider, execute generated code or store a model credential.
+- The Launch stage does not connect sponsor banks, identity vendors, card
+  processors, wallets, production payment rails or compliance systems.
+- The Cloudflare reference keeps tenant ownership in Durable Object SQLite but
+  does not claim database-per-customer, Workers for Platforms dispatch,
+  jurisdictional data residency or institution-grade multi-region failover.
 
 ## FX and contract boundary
 

@@ -23,7 +23,7 @@ const FX_NODE_PATHS = [
  *  page and the home page's title, which reads as a real page to a crawler and
  *  to anyone who was sent the link. */
 const KNOWN_PAGES = new Set([
-  "/", "/products", "/fx", "/cards", "/ecosystem", "/developers", "/contact",
+  "/", "/products", "/fx", "/cards", "/ecosystem", "/sandbox", "/developers", "/contact",
 ]);
 
 const isFxNodePath = (pathname) =>

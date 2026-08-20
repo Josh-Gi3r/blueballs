@@ -153,7 +153,7 @@ step("Machine-readable contracts");
   const bank = readFileSync(new URL("../public/openapi.yaml", import.meta.url), "utf8");
   const ops = (bank.match(/^      operationId:/gm) || []).length;
   const requestBodies = (bank.match(/^      requestBody:/gm) || []).length;
-  record("banking OpenAPI describes the catalogue", ops === 174, `${ops} operations, ${requestBodies} typed request bodies`);
+  record("banking OpenAPI describes the catalogue", ops === 180, `${ops} operations, ${requestBodies} typed request bodies`);
 
   const requestContracts = run("node", ["scripts/check-openapi-requests.mjs"]);
   record(

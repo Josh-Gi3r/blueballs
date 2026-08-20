@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 720" role="img" aria-labelledby="title desc">
   <title id="title">Blueballs open-source neobank system map</title>
-  <desc id="desc">The demonstrator website connects to a 174-operation banking API and canonical FX engine. Both use replaceable operator-selected adapters; named providers are not connected by default.</desc>
+  <desc id="desc">The demonstrator website connects to a 180-operation banking API and canonical FX engine. Both use replaceable operator-selected adapters; named providers are not connected by default.</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#07101f"/>
@@ -44,7 +44,7 @@
     <rect x="500" y="178" width="360" height="8" rx="4" fill="url(#blue)"/>
     <text x="538" y="240" fill="#7ecbff" font-family="Inter,Arial,sans-serif" font-size="16" font-weight="700" letter-spacing="2">BANKING FOUNDATION</text>
     <text x="538" y="286" fill="#ffffff" font-family="Inter,Arial,sans-serif" font-size="30" font-weight="700">Banking API</text>
-    <text x="538" y="328" fill="#c8d8e9" font-family="Inter,Arial,sans-serif" font-size="19">174 operations</text>
+    <text x="538" y="328" fill="#c8d8e9" font-family="Inter,Arial,sans-serif" font-size="19">180 operations</text>
     <text x="538" y="360" fill="#a9bdd4" font-family="Inter,Arial,sans-serif" font-size="18">accounts · cards · transfers</text>
     <text x="538" y="390" fill="#a9bdd4" font-family="Inter,Arial,sans-serif" font-size="18">onboarding · credit · business</text>
     <text x="538" y="420" fill="#a9bdd4" font-family="Inter,Arial,sans-serif" font-size="18">ledger · events · webhooks</text>
@@ -92,4 +92,3 @@
   <circle cx="875" cy="621" r="8" fill="#4ed0c8"/>
   <text x="898" y="628" fill="#d9e7f5" font-family="Inter,Arial,sans-serif" font-size="17">Dakota + Bridge descriptors: no HTTP calls</text>
 </svg>
-

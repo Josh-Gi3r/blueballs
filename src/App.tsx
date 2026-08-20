@@ -172,6 +172,11 @@ export default function App() {
   const [path, go] = usePath();
   const page: Page = PATH_TO_PAGE[path] ?? "home";
   const setPage = (p: Page) => go(PAGE_TO_PATH[p]);
+  const openSandbox = () => {
+    window.history.pushState({}, "", "/sandbox");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    window.scrollTo(0, 0);
+  };
 
   const [screen, setScreen] = useState<Screen>("accounts");
   const [pinned, setPinned] = useState(false);
@@ -301,7 +306,7 @@ export default function App() {
               hover={{ color: "#07144F" }}>{t.label}</H>
           ))}
         </div>
-        <H as="button" onClick={() => setPage("dev")}
+        <H as="button" onClick={openSandbox}
           style={{ fontSize: 13.5, fontWeight: 500, padding: "10px 18px", cursor: "pointer", border: "1px solid #07144F", borderRadius: 10, background: "#07144F", color: "#FFFFFF" }}
           hover={{ background: "#0868FF", border: "1px solid #0868FF" }}>Try the sandbox</H>
       </div>
@@ -336,7 +341,7 @@ export default function App() {
                   Blueballs is free, MIT-licensed software for accounts, cards, transfers, onboarding, ledger and FX. Create a sandbox key yourself, run the code locally and connect the services your production deployment needs. The goal is to lower the cost of building financial products so more teams can serve people traditional banks overlook or exclude.
                 </p>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <H as="button" onClick={() => setPage("dev")} style={ink} hover={{ background: "#0868FF", border: "1px solid #0868FF" }}>Try the sandbox</H>
+                  <H as="button" onClick={openSandbox} style={ink} hover={{ background: "#0868FF", border: "1px solid #0868FF" }}>Try the sandbox</H>
                   <H as="button" onClick={() => setPage("dev")} style={{ ...ink, border: "1px solid #D7DBE4", background: "#FFFFFF", color: "#07144F" }} hover={{ boxShadow: "inset 0 0 0 1px #07144F" }}>Read the docs</H>
                 </div>
                 <div style={{ display: "flex", gap: 32, flexWrap: "wrap", paddingTop: 22, borderTop: "1px solid #E7EAF0", fontFamily: MONO, fontSize: 11, letterSpacing: "0.08em", color: "#7A8296" }}>
