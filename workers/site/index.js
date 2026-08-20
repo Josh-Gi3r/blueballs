@@ -29,6 +29,19 @@ const KNOWN_PAGES = new Set([
 const isFxNodePath = (pathname) =>
   FX_NODE_PATHS.some((base) => pathname === base || pathname.startsWith(base + "/"));
 
+export function canonicalRedirectUrl(input, requestHost = null, localDev = false) {
+  const url = input instanceof URL ? new URL(input) : new URL(input);
+  if (localDev) return null;
+  const hostHeader = String(requestHost ?? "").split(":")[0].toLowerCase();
+  if (hostHeader && hostHeader !== "blueballs.tech" && hostHeader !== "www.blueballs.tech") return null;
+  const isApex = url.hostname === "blueballs.tech";
+  const isWww = url.hostname === "www.blueballs.tech";
+  if (!isWww && !(isApex && url.protocol === "http:")) return null;
+  url.hostname = "blueballs.tech";
+  url.protocol = "https:";
+  return url.toString();
+}
+
 function internalRequest(request, headers) {
   const next = new Headers(request.headers);
   next.delete("origin");
@@ -78,11 +91,8 @@ async function handleRequest(request, env) {
     // Canonical origin: one hostname, always over TLS. The www redirect used to
     // rewrite only the hostname, so http://www → http:// apex and the request
     // stayed in the clear all the way through.
-    if (url.hostname === "www.blueballs.tech" || url.protocol === "http:") {
-      if (url.hostname === "www.blueballs.tech") url.hostname = "blueballs.tech";
-      url.protocol = "https:";
-      return Response.redirect(url.toString(), 301);
-    }
+    const canonicalTarget = canonicalRedirectUrl(url, request.headers.get("host"), env.LOCAL_DEV === "true");
+    if (canonicalTarget) return Response.redirect(canonicalTarget, 301);
 
     if (url.pathname === "/robots.txt") {
       return new Response(robotsText(), {

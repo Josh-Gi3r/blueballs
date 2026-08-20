@@ -2,8 +2,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { crawlerDocument, pageMetadata, sitemapXml } from "../workers/site/crawler-pages.js";
+import { canonicalRedirectUrl } from "../workers/site/index.js";
 
 const worker = readFileSync(new URL("../workers/site/index.js", import.meta.url), "utf8");
+const preview = readFileSync(new URL("./dev-cloudflare.mjs", import.meta.url), "utf8");
 assert.match(worker, /KNOWN_PAGES[\s\S]*"\/cards"/, "/cards must be an allowed HTML route");
 assert.match(worker, /KNOWN_PAGES[\s\S]*"\/sandbox"/, "/sandbox must be an allowed HTML route");
 assert.match(worker, /fonts\.googleapis\.com/, "CSP must allow the site's loaded webfonts");
@@ -19,4 +21,11 @@ assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/cards<\/loc>/);
 assert.equal(pageMetadata("/sandbox").title, "Build a fintech sandbox — Blueballs");
 assert.match(crawlerDocument("/sandbox"), /protected double-entry ledger/i);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/sandbox<\/loc>/);
+assert.equal(canonicalRedirectUrl("http://blueballs.tech/sandbox", "blueballs.tech", true), null, "local Wrangler preview must not redirect to itself");
+assert.equal(canonicalRedirectUrl("http://blueballs.tech/v2", "blueballs.tech", true), null, "loopback preview must remain reachable over HTTP");
+assert.equal(canonicalRedirectUrl("http://blueballs.tech/sandbox", "blueballs.tech"), "https://blueballs.tech/sandbox");
+assert.equal(canonicalRedirectUrl("https://www.blueballs.tech/sandbox", "www.blueballs.tech"), "https://blueballs.tech/sandbox");
+assert.match(preview, /wrangler\.api\.jsonc/);
+assert.match(preview, /wrangler\.fx\.jsonc/);
+assert.match(preview, /LOCAL_DEV:true/);
 console.log("site route contract: /cards and /sandbox are allowlisted, crawlable and present in the sitemap");

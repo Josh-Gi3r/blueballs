@@ -57,6 +57,18 @@ The three configurations are deliberately separate:
 - `wrangler.fx.jsonc`: FX Worker and `FX_API` Durable Object;
 - `wrangler.jsonc`: public site, assets, domain and service bindings.
 
+Run the entire Cloudflare topology locally with one command:
+
+```bash
+pnpm preview:cloudflare
+```
+
+This starts the site on `http://localhost:5380`, banking on `:5381` and FX on
+`:5382`. The site reports both service bindings as connected. The development
+orchestrator supplies `LOCAL_DEV=true` so production TLS canonicalisation does
+not redirect localhost to itself, and uses `bb_test_local_fx` unless a local
+`FX_API_KEY` is provided. No value is written to a tracked file.
+
 Validate bundles without deployment:
 
 ```bash

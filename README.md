@@ -193,6 +193,12 @@ The deployment requires an authenticated Wrangler session. Production and
 preview settings live in `wrangler.jsonc`, `wrangler.api.jsonc`, and
 `wrangler.fx.jsonc`.
 
+The local Cloudflare preview builds the candidate, then starts the site at
+`http://localhost:5380`, the banking Worker at `:5381` and the FX Worker at
+`:5382`. Wrangler's local service registry connects both site bindings and both
+APIs use local SQLite Durable Objects. Set `FX_API_KEY` to override the local
+`bb_test_local_fx` reference key; production still requires a Wrangler secret.
+
 ### Docker Compose
 
 ```bash

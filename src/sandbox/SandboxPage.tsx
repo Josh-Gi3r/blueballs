@@ -211,7 +211,7 @@ export default function SandboxPage() {
     <div className="sb-page">
       <header className="sb-header">
         <button className="sb-brand" onClick={() => navigate("/")}><BrandLockup /><span>BUILDER</span></button>
-        <div className="sb-env"><i /> SANDBOX · NO REAL MONEY</div>
+        <div className="sb-env"><i /> BUILDER SANDBOX</div>
         <div className="sb-header-actions">
           {project && <button className="sb-quiet" onClick={newProject}>New project</button>}
           <button className="sb-close" aria-label="Exit sandbox" onClick={() => navigate("/")}>×</button>
@@ -236,7 +236,7 @@ export default function SandboxPage() {
               <span className="sb-kicker">BLUEBALLS BUILDER</span>
               <h1>What financial product do you want to build?</h1>
               <p>Describe the people you serve. Blueballs will turn the idea into a structured product blueprint, provision test users and balances, then let you run the first transaction.</p>
-              <div className="sb-promise"><b>Free until 10,000 active users.</b><span>Bring your own AI. Third-party provider costs remain yours.</span></div>
+              <div className="sb-promise"><b>Design, build and test in one workspace.</b><span>Your product blueprint and test environment stay together.</span></div>
               {projects.length > 0 && (
                 <div className="sb-recent">
                   <div className="sb-section-label">RECENT PROJECTS</div>
@@ -291,8 +291,8 @@ export default function SandboxPage() {
               <article><span>WHO IT SERVES</span><h3>{project.blueprint.audience}</h3><p>{project.blueprint.markets.join(" · ")} market configuration</p></article>
               <article><span>MONEY</span><div className="sb-token-row">{project.blueprint.currencies.map((item) => <b key={item}>{item}</b>)}</div><p>{project.blueprint.rails.join(" · ") || "Sandbox ledger only"}</p></article>
               <article className="wide"><span>PRODUCT SURFACE</span><div className="sb-cap-grid">{project.blueprint.capabilities.map((item) => <b key={item}><i>✓</i>{item.replace("_", " ")}</b>)}</div></article>
-              <article><span>AI</span><h3>Bring your own model</h3><p>No model key is connected or stored by this browser sandbox.</p></article>
-              <article><span>PLATFORM PLAN</span><h3>Free to 10,000 MAU</h3><p>External KYC, banking, card and wallet costs are pass-through.</p></article>
+              <article><span>BUILD MODEL</span><h3>Configuration over generated banking code</h3><p>The blueprint assembles tested Blueballs products, APIs and FX components.</p></article>
+              <article><span>PLATFORM</span><h3>Open-source core</h3><p>Fork the stack, extend the product and choose the services behind it.</p></article>
               <article className="wide boundary"><span>TRUST BOUNDARY</span><div><p><b>Configurable</b>{project.blueprint.trust_boundary.configurable.join(" · ")}</p><i>→</i><p><b>Protected Blueballs core</b>{project.blueprint.trust_boundary.protected.join(" · ")}</p></div></article>
             </section>
           </div>
@@ -311,7 +311,7 @@ export default function SandboxPage() {
           <div className="sb-workspace">
             <section className="sb-workspace-head">
               <div><span className="sb-kicker">LIVE SANDBOX · {project.environment?.id.slice(-8).toUpperCase()}</span><h1>{project.blueprint.name}</h1><p>{project.blueprint.audience}</p></div>
-              <div className="sb-status-card"><span><i /> ENVIRONMENT READY</span><b>Sandbox</b><small>No real money · no live providers</small></div>
+              <div className="sb-status-card"><span><i /> ENVIRONMENT READY</span><b>Sandbox</b><small>Persistent project data</small></div>
             </section>
 
             <section className="sb-metrics">
@@ -348,8 +348,8 @@ export default function SandboxPage() {
             </section>
 
             <section className="sb-launch">
-              <div><span className="sb-kicker">NEXT · CONNECT REAL RAILS</span><h2>Your sandbox works. Production is a separate decision.</h2><p>Connect the regulated identity, banking, wallet and card providers your market requires. Blueballs keeps the application contract stable while adapters change underneath.</p></div>
-              <button disabled>Production onboarding <span>Coming later</span></button>
+              <div><span className="sb-kicker">NEXT · TAKE IT FURTHER</span><h2>Turn this blueprint into your product.</h2><p>Keep the Blueballs application contract, choose the services for your market and move from test journeys to your deployment.</p></div>
+              <button disabled>Launch workspace <span>Coming soon</span></button>
             </section>
           </div>
         )}

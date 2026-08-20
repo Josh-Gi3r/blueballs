@@ -12,7 +12,7 @@
     "dev:fx": "node apps/fx-node/src/cli.js",
     "build": "pnpm build:openapi && tsc -b && vite build",
     "preview": "vite preview",
-    "preview:cloudflare": "wrangler dev -c wrangler.jsonc",
+    "preview:cloudflare": "pnpm build && node scripts/dev-cloudflare.mjs",
     "deploy:api": "wrangler deploy -c wrangler.api.jsonc",
     "deploy:fx": "wrangler deploy -c wrangler.fx.jsonc",
     "deploy:site": "wrangler deploy -c wrangler.jsonc",
