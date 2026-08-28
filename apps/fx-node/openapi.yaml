@@ -1,0 +1,987 @@
+openapi: 3.1.0
+info:
+  title: Blueballs FX Node
+  version: 0.3.0-reference
+  description: |
+    Canonical REST contract for the self-hostable Blueballs FX reference runtime.
+
+    The `reference-sandbox` composes institution policy, signed private liquidity,
+    issuer and institutional inventory, reference pricing, principal risk,
+    multi-source reservation, fiat settlement state and the public BRL → EUR
+    reference trade and a sandbox Monetary Engine for reserve-backed issuance,
+    purpose-bound settlement receipts and transparent remittance pricing.
+    Preview endpoints do not reserve. A firm sandbox quote is returned only
+    after every selected source reserves capacity. Monetary instruments are
+    simulations, not production assets or claims on Blueballs.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:8788
+    description: Local reference sandbox
+security:
+  - bearerAuth: []
+tags:
+  - name: Runtime
+  - name: Public trade
+  - name: Monetary Engine
+  - name: Liquidity
+  - name: Quotes
+  - name: Orders
+  - name: Fiat
+  - name: Operations
+paths:
+  /health:
+    get:
+      tags: [Runtime]
+      security: []
+      summary: Check node availability
+      responses:
+        '200':
+          description: Node is available
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service]
+                properties:
+                  status: { type: string, const: ok }
+                  service: { type: string, const: blueballs-fx-node }
+                  runtime: { type: string }
+  /openapi.yaml:
+    get:
+      tags: [Runtime]
+      security: []
+      summary: Download this OpenAPI contract
+      responses:
+        '200':
+          description: OpenAPI YAML
+          content:
+            application/yaml:
+              schema: { type: string }
+  /v2/fx/reference/status:
+    get:
+      tags: [Runtime]
+      security: []
+      summary: Inspect the canonical reference composition
+      responses:
+        '200':
+          description: Runtime capabilities and evidence boundary
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/policy:
+    get:
+      tags: [Runtime]
+      security: []
+      summary: Inspect active institution policy
+      responses:
+        '200':
+          description: Policy summary
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/market:
+    get:
+      tags: [Runtime]
+      security: []
+      summary: Inspect the current public-reference market state
+      responses:
+        '200':
+          description: Current scenario, eligible sources and reference-price state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReferenceMarket' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/scenario:
+    get:
+      tags: [Runtime]
+      security: []
+      summary: List scenarios and inspect the active one
+      responses:
+        '200':
+          description: Scenario catalogue and current market state
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Runtime]
+      summary: Apply a deterministic backend market scenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                  enum: [balanced, lp_offline, issuer_policy_blocked, treasury_near_limit, principal_limit, reference_outage]
+      responses:
+        '200':
+          description: Updated market state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReferenceMarket' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/liquidity:
+    get:
+      tags: [Liquidity]
+      security: []
+      summary: Inspect currently policy-eligible source slices without reserving them
+      parameters:
+        - $ref: '#/components/parameters/InputAsset'
+        - $ref: '#/components/parameters/OutputAsset'
+        - name: exactOutput
+          in: query
+          schema: { $ref: '#/components/schemas/AtomicAmount' }
+      responses:
+        '200':
+          description: Eligible source slices
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, data]
+                properties:
+                  object: { type: string, const: list }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/LiquiditySlice' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/settlement-route:
+    get:
+      tags: [Runtime]
+      security: []
+      summary: Inspect the seeded BRL → internal deposit claim → EURC → EUR route
+      responses:
+        '200':
+          description: Mixed-finality settlement graph analysis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementRoute' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/health:
+    get:
+      tags: [Monetary Engine]
+      security: []
+      summary: Inspect reserve coverage and separated risk capital
+      responses:
+        '200':
+          description: Sandbox monetary balance-sheet health
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MonetaryHealth' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/instruments:
+    get:
+      tags: [Monetary Engine]
+      security: []
+      summary: List configured reference instruments
+      responses:
+        '200':
+          description: Stablecoin and tokenized-deposit reference instruments
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, data]
+                properties:
+                  object: { type: string, const: list }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/MonetaryInstrument' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/remittance/preview:
+    post:
+      tags: [Monetary Engine]
+      security: []
+      summary: Preview the canonical BRL to EUR monetary corridor
+      description: Compatibility endpoint that delegates to the canonical policy-approved liquidity pipeline. Reference observations are deterministic valuation fixtures, not external or executable oracle prices. It never reserves or moves value.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inputAmount]
+              properties:
+                inputAmount: { $ref: '#/components/schemas/AtomicAmount' }
+                inputCurrency: { type: string, const: BRL, default: BRL }
+                outputCurrency: { type: string, const: EUR, default: EUR }
+      responses:
+        '200':
+          description: Indicative unreserved BRL to EUR preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicTrade' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/reserves:
+    post:
+      tags: [Monetary Engine]
+      summary: Record an unsettled external reserve deposit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reserveCurrency, amount, providerRef]
+              properties:
+                reserveCurrency: { type: string }
+                amount: { $ref: '#/components/schemas/AtomicAmount' }
+                providerRef: { type: string, description: Idempotency reference from the reserve provider. }
+      responses:
+        '201':
+          description: Pending reserve deposit; it cannot support issuance yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReserveDeposit' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/reserves/{depositId}:
+    get:
+      tags: [Monetary Engine]
+      summary: Retrieve one reserve deposit
+      parameters:
+        - $ref: '#/components/parameters/DepositId'
+      responses:
+        '200':
+          description: Reserve deposit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReserveDeposit' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/reserves/{depositId}/settle:
+    post:
+      tags: [Monetary Engine]
+      summary: Mark external reserve funds as irrevocably settled
+      parameters:
+        - $ref: '#/components/parameters/DepositId'
+      responses:
+        '200':
+          description: Settled reserve deposit now eligible to support issuance or a receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReserveDeposit' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/risk-capital:
+    post:
+      tags: [Monetary Engine]
+      summary: Set separately funded FX risk capital
+      description: Risk capital is reported but never counted as issuance reserve.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reserveCurrency, amount]
+              properties:
+                reserveCurrency: { type: string }
+                amount: { type: string, pattern: '^\\d+$' }
+      responses:
+        '200': { description: Updated isolated risk-capital position }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/instruments/{instrumentCode}/mint:
+    post:
+      tags: [Monetary Engine]
+      summary: Mint a sandbox instrument against settled unallocated reserve
+      parameters:
+        - $ref: '#/components/parameters/InstrumentCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, beneficiaryRef]
+              properties:
+                amount: { $ref: '#/components/schemas/AtomicAmount' }
+                beneficiaryRef: { type: string }
+      responses:
+        '201': { description: Sandbox issuance event }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/instruments/{instrumentCode}/redeem:
+    post:
+      tags: [Monetary Engine]
+      summary: Burn sandbox supply and pay from settled reserve
+      parameters:
+        - $ref: '#/components/parameters/InstrumentCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, holderRef]
+              properties:
+                amount: { $ref: '#/components/schemas/AtomicAmount' }
+                holderRef: { type: string }
+      responses:
+        '200': { description: Sandbox redemption event }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/receipts:
+    post:
+      tags: [Monetary Engine]
+      summary: Create an expiring, purpose-bound settlement receipt
+      description: Receipts are non-transferable escrow claims, not money or stablecoins.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reserveCurrency, amount, beneficiaryRef, purpose, expiresAt]
+              properties:
+                reserveCurrency: { type: string }
+                amount: { $ref: '#/components/schemas/AtomicAmount' }
+                beneficiaryRef: { type: string }
+                purpose: { type: string }
+                expiresAt: { type: integer }
+      responses:
+        '201':
+          description: Active receipt with reserve locked until consume or expiry
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementReceipt' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/receipts/{receiptId}:
+    get:
+      tags: [Monetary Engine]
+      summary: Retrieve one settlement receipt
+      parameters:
+        - $ref: '#/components/parameters/ReceiptId'
+      responses:
+        '200':
+          description: Settlement receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementReceipt' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/receipts/{receiptId}/consume:
+    post:
+      tags: [Monetary Engine]
+      summary: Consume an active receipt once and disburse its locked reserve
+      parameters:
+        - $ref: '#/components/parameters/ReceiptId'
+      responses:
+        '200':
+          description: Consumed receipt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettlementReceipt' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/monetary/events:
+    get:
+      tags: [Monetary Engine]
+      summary: List monetary state-transition evidence
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200': { description: Monetary event list }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/trades/preview:
+    post:
+      tags: [Public trade]
+      security: []
+      summary: Preview one BRL → EUR trade without reserving liquidity
+      description: Uses the live policy-approved reference market. The response is indicative and explicitly unreserved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicTradeRequest' }
+      responses:
+        '200':
+          description: Unreserved live-node preview
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicTrade' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/trades:
+    post:
+      tags: [Public trade]
+      summary: Reserve the public BRL → EUR trade
+      description: Returns only after every selected token-liquidity source and principal risk capacity is reserved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublicTradeRequest' }
+      responses:
+        '201':
+          description: Firm reserved sandbox trade
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicTrade' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/trades/{tradeId}:
+    parameters:
+      - $ref: '#/components/parameters/TradeId'
+    get:
+      tags: [Public trade]
+      summary: Retrieve the trade and canonical quote lifecycle state
+      responses:
+        '200':
+          description: Public reference trade
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicTrade' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Public trade]
+      summary: Release a still-reserved trade
+      responses:
+        '200':
+          description: Released trade
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicTrade' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/reference/trades/{tradeId}/execute:
+    post:
+      tags: [Public trade]
+      summary: Submit the trade through the configured execution adapter
+      description: The default runtime fails closed with `EXECUTION_UNAVAILABLE`; it never invents a transaction hash.
+      parameters:
+        - $ref: '#/components/parameters/TradeId'
+      responses:
+        '202':
+          description: Submission accepted or outcome unknown
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/depth:
+    get:
+      tags: [Liquidity]
+      summary: Aggregate private-market depth
+      parameters:
+        - $ref: '#/components/parameters/InputAsset'
+        - $ref: '#/components/parameters/OutputAsset'
+      responses:
+        '200':
+          description: Aggregate levels without maker identity or signed payloads
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/orders:
+    post:
+      tags: [Orders]
+      summary: Submit a signed maker order for policy admission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: Admitted order
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+    get:
+      tags: [Orders]
+      summary: List one maker's orders
+      parameters:
+        - name: maker
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Maker-owned orders
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/orders/{orderHash}/cancel:
+    post:
+      tags: [Orders]
+      summary: Hide an order off-chain and record optional on-chain invalidation
+      parameters:
+        - name: orderHash
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                onChainInvalidated: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Cancellation result
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/quotes:
+    post:
+      tags: [Quotes]
+      summary: Reserve a policy-approved exact-output token route
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuoteRequest' }
+      responses:
+        '201':
+          description: Reserved firm sandbox quote
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/quotes/{quoteId}:
+    get:
+      tags: [Quotes]
+      summary: Retrieve quote and lifecycle state
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      responses:
+        '200':
+          description: Quote
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+        '404': { $ref: '#/components/responses/Error' }
+  /v2/fx/quotes/{quoteId}/execute:
+    post:
+      tags: [Quotes]
+      summary: Submit a reserved token quote through the configured execution adapter
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      responses:
+        '202':
+          description: Submission accepted or outcome unknown
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '503': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/routes/{routeId}:
+    get:
+      tags: [Quotes]
+      summary: Inspect public route and source allocation
+      parameters:
+        - $ref: '#/components/parameters/RouteId'
+      responses:
+        '200':
+          description: Route
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '404': { $ref: '#/components/responses/Error' }
+  /v2/fx/fiat/intents:
+    post:
+      tags: [Fiat]
+      summary: Create a typed fiat settlement intent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '201':
+          description: Created intent
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/fiat/intents/{intentId}:
+    get:
+      tags: [Fiat]
+      summary: Retrieve a fiat intent
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Fiat intent
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '404': { $ref: '#/components/responses/Error' }
+  /v2/fx/fiat/intents/{intentId}/reserve:
+    post:
+      tags: [Fiat]
+      summary: Reserve a fiat intent
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Reserved intent }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/fiat/intents/{intentId}/submit:
+    post:
+      tags: [Fiat]
+      summary: Record external fiat submission
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [submissionRef]
+              properties:
+                submissionRef: { type: string }
+      responses:
+        '202': { description: "Submitted, not settled" }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/fiat/attestations:
+    post:
+      tags: [Fiat]
+      summary: Verify and bind fiat payment evidence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Attestation result }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/fiat/intents/{intentId}/settle:
+    post:
+      tags: [Fiat]
+      summary: Settle a verified fiat intent
+      parameters:
+        - name: intentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Settlement result }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/ops/quotes/{quoteId}/confirmed:
+    post:
+      tags: [Operations]
+      summary: Reconcile a submitted quote as confirmed
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      responses:
+        '200': { description: Confirmation result }
+        default: { $ref: '#/components/responses/Error' }
+  /v2/fx/ops/quotes/{quoteId}/failed:
+    post:
+      tags: [Operations]
+      summary: Reconcile a submitted quote as failed
+      parameters:
+        - $ref: '#/components/parameters/QuoteId'
+      responses:
+        '200': { description: Failure result }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    InputAsset:
+      name: inputAsset
+      in: query
+      required: true
+      schema: { type: string }
+    OutputAsset:
+      name: outputAsset
+      in: query
+      required: true
+      schema: { type: string }
+    TradeId:
+      name: tradeId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^trade_' }
+    QuoteId:
+      name: quoteId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^quote_' }
+    RouteId:
+      name: routeId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^route_' }
+    DepositId:
+      name: depositId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^reserve_' }
+    InstrumentCode:
+      name: instrumentCode
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[A-Z0-9]{3,12}$' }
+    ReceiptId:
+      name: receiptId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^receipt_' }
+  schemas:
+    AtomicAmount:
+      type: string
+      pattern: '^\d+$'
+      description: Integer atomic units encoded as a decimal string.
+    MonetaryInstrument:
+      type: object
+      required: [code, name, kind, reserveCurrency, decimals, minCoverageBps, transferable, enabled]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        kind: { type: string, enum: [STABLECOIN, TOKENIZED_DEPOSIT] }
+        reserveCurrency: { type: string }
+        decimals: { type: integer }
+        minCoverageBps: { type: integer, minimum: 10000 }
+        transferable: { type: boolean }
+        enabled: { type: boolean }
+        createdAt: { type: integer }
+        supply: { type: string, pattern: '^\\d+$' }
+    ReserveDeposit:
+      type: object
+      required: [depositId, reserveCurrency, amount, state, providerRef, createdAt]
+      properties:
+        depositId: { type: string }
+        reserveCurrency: { type: string }
+        amount: { type: string, pattern: '^\\d+$' }
+        state: { type: string, enum: [PENDING, SETTLED, REDEEMED, DISBURSED] }
+        providerRef: { type: string }
+        createdAt: { type: integer }
+        settledAt: { type: [integer, 'null'] }
+    SettlementReceipt:
+      type: object
+      required: [receiptId, reserveCurrency, amount, beneficiaryRef, purpose, transferable, state, createdAt, expiresAt]
+      properties:
+        receiptId: { type: string }
+        reserveCurrency: { type: string }
+        amount: { type: string, pattern: '^\\d+$' }
+        beneficiaryRef: { type: string }
+        purpose: { type: string }
+        transferable: { type: boolean, const: false }
+        state: { type: string, enum: [ACTIVE, CONSUMED, EXPIRED] }
+        createdAt: { type: integer }
+        expiresAt: { type: integer }
+        consumedAt: { type: [integer, 'null'] }
+    MonetaryHealth:
+      type: object
+      required: [object, mode, reserveModel, instruments, reserves]
+      properties:
+        object: { type: string, const: monetary_health }
+        mode: { type: string, const: reference-sandbox }
+        reserveModel: { type: string, const: segregated }
+        instruments:
+          type: array
+          items: { $ref: '#/components/schemas/MonetaryInstrument' }
+        reserves:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    PublicTradeRequest:
+      type: object
+      required: [inputAmount]
+      properties:
+        inputAmount:
+          type: string
+          pattern: '^\d+(\.\d{1,2})?$'
+          examples: ['50000.00']
+        from: { type: string, const: BRL, default: BRL }
+        to: { type: string, const: EUR, default: EUR }
+        expiresInMs: { type: integer, minimum: 1, maximum: 120000, default: 30000 }
+        participantId: { type: string }
+        accountRef: { type: string }
+    PublicTrade:
+      type: object
+      required: [object, state, from, to, pricing, sources, settlement, evidence]
+      properties:
+        object: { type: string, enum: [fx_trade_preview, fx_trade] }
+        id: { type: string }
+        quoteId: { type: string }
+        routeId: { type: string }
+        state: { type: string, enum: [PREVIEW, RESERVED, SUBMITTED, CONFIRMED, RELEASED, EXPIRED, FAILED] }
+        createdAt: { type: integer }
+        expiresAt: { type: integer }
+        rate: { type: string }
+        pricing:
+          type: object
+          required: [reference, client]
+          properties:
+            reference:
+              type: object
+              required: [providerType, intendedUse, executable, available, sourceIds, confidence]
+              properties:
+                providerType: { type: string, const: REFERENCE_FIXTURE }
+                intendedUse: { type: string, const: VALUATION_CONTROL_ONLY }
+                executable: { type: boolean, const: false }
+                available: { type: boolean }
+                mid: { type: string }
+                midRational: { type: object, additionalProperties: true }
+                sourceIds: { type: array, items: { type: string } }
+                observedAt: { type: integer }
+                confidence: { type: string }
+                rejected: { type: array, items: { type: object, additionalProperties: true } }
+                reason: { type: string }
+            client:
+              type: object
+              required: [reserved, quoteType, executable, referenceSpreadBps]
+              properties:
+                reserved: { type: boolean }
+                quoteType: { type: string, enum: [INDICATIVE, FIRM_SANDBOX] }
+                executable: { type: boolean, const: false }
+                referenceSpreadBps: { type: [integer, 'null'] }
+        from: { $ref: '#/components/schemas/TradeAmount' }
+        to: { $ref: '#/components/schemas/TradeAmount' }
+        sources:
+          type: array
+          items: { $ref: '#/components/schemas/SourceAllocation' }
+        sourceStatus:
+          type: array
+          items: { $ref: '#/components/schemas/SourceStatus' }
+        tokenRoute: { type: object, additionalProperties: true }
+        settlement: { $ref: '#/components/schemas/SettlementRoute' }
+        evidence:
+          type: object
+          required: [reserved, label, note]
+          properties:
+            reserved: { type: boolean }
+            label: { type: string }
+            note: { type: string }
+    TradeAmount:
+      type: object
+      additionalProperties: true
+      properties:
+        asset: { type: string }
+        symbol: { type: string }
+        requested: { type: string }
+        charged: { type: string }
+        amount: { type: string }
+        atomic: { type: string }
+    SourceAllocation:
+      type: object
+      required: [type, sourceId]
+      properties:
+        type: { type: string, enum: [PRIVATE_MARKET, ISSUER, INSTITUTIONAL_LP, NEOBANK, BANK_TREASURY, BANK_PRINCIPAL] }
+        sourceId: { type: string }
+        input: { type: string }
+        output: { type: string }
+        inputAtomic: { type: string }
+        outputAtomic: { type: string }
+        inputAmount: { type: string }
+        outputAmount: { type: string }
+    SourceStatus:
+      type: object
+      required: [sourceType, sourceId, label, eligible, availableOutput, reason]
+      properties:
+        sourceType: { type: string }
+        sourceId: { type: string }
+        label: { type: string }
+        eligible: { type: boolean }
+        availableOutput: { type: string }
+        reason: { type: string }
+    ReferenceMarket:
+      type: object
+      required: [id, sources, reference]
+      properties:
+        id: { type: string }
+        sources:
+          type: array
+          items: { $ref: '#/components/schemas/SourceStatus' }
+        reference: { type: object, additionalProperties: true }
+    QuoteRequest:
+      type: object
+      required: [inputAsset, outputAsset, exactOutput]
+      properties:
+        inputAsset: { type: string }
+        outputAsset: { type: string }
+        exactOutput: { $ref: '#/components/schemas/AtomicAmount' }
+        expiresInMs: { type: integer, minimum: 1, maximum: 120000 }
+        participantId: { type: string }
+        accountRef: { type: string }
+    Quote:
+      type: object
+      required: [id, routeId, state, inputAsset, outputAsset, maxInput, output, expiresAt, sources]
+      properties:
+        id: { type: string }
+        routeId: { type: string }
+        state: { type: string }
+        inputAsset: { type: string }
+        outputAsset: { type: string }
+        maxInput: { $ref: '#/components/schemas/AtomicAmount' }
+        output: { $ref: '#/components/schemas/AtomicAmount' }
+        expiresAt: { type: integer }
+        sources:
+          type: array
+          items: { $ref: '#/components/schemas/SourceAllocation' }
+        finality: { type: object, additionalProperties: true }
+    LiquiditySlice:
+      type: object
+      required: [sourceType, sourceId, inputAsset, outputAsset, maxOutput, inputNumerator, inputDenominator, expiresAt]
+      properties:
+        sourceType: { type: string }
+        sourceId: { type: string }
+        inputAsset: { type: string }
+        outputAsset: { type: string }
+        maxOutput: { $ref: '#/components/schemas/AtomicAmount' }
+        inputNumerator: { $ref: '#/components/schemas/AtomicAmount' }
+        inputDenominator: { $ref: '#/components/schemas/AtomicAmount' }
+        expiresAt: { type: integer }
+    SettlementRoute:
+      type: object
+      required: [guarantee, edges]
+      properties:
+        fromAsset: { type: string }
+        toAsset: { type: string }
+        guarantee:
+          type: object
+          additionalProperties: true
+        edges:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+  responses:
+    Error:
+      description: Machine-readable FX node error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

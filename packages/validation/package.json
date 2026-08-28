@@ -1,0 +1,13 @@
+{
+  "name": "@blueballs/validation",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=24.15.0" },
+  "description": "Pure, dependency-free identifier validation and generation: IBAN mod-97, Luhn, US ABA routing checksum.",
+  "main": "src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "scripts": {
+    "test": "node src/self-test.js"
+  }
+}

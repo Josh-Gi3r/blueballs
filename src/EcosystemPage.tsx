@@ -1,0 +1,241 @@
+import { useMemo, useState, type ChangeEvent } from "react";
+import { CATEGORIES, CATEGORY_MAP, PROVIDERS } from "./ecosystem/data";
+import CategoryMap, { type FilterId } from "./ecosystem/CategoryMap";
+import ProviderCard from "./ecosystem/ProviderCard";
+import "./EcosystemPage.css";
+const MONO = "'IBM Plex Mono', monospace";
+type EcosystemPageProps = { onNavigate: (path: string) => void };
+const FILLER_COPY = [
+  ["DIRECTORY", "Provider candidates."],
+  ["OPEN SOURCE", "Free to fork and self-host."],
+  ["SOURCES", "Links to official websites."],
+] as const;
+function EcosystemFillers({
+  count,
+  columns,
+}: {
+  count: number;
+  columns: 2 | 3 | 4;
+}) {
+  const missing = (columns - (count % columns)) % columns;
+  return (
+    <>
+      {Array.from({ length: missing }, (_, index) => {
+        const [label, copy] = FILLER_COPY[index % FILLER_COPY.length];
+        return (
+          <div
+            aria-hidden="true"
+            className={`eco-provider-filler eco-fill-${columns}`}
+            key={`${columns}-${index}`}
+          >
+            <span>{label}</span>
+            <strong>{copy}</strong>
+            <small>BLUEBALLS · OPEN SOURCE</small>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
+  const [active, setActive] = useState<FilterId>("all");
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return PROVIDERS.filter((provider) => {
+      const categoryMatch =
+        active === "all" || provider.categories.includes(active);
+      if (!categoryMatch) return false;
+      if (!q) return true;
+      return [
+        provider.name,
+        provider.kind,
+        provider.provides,
+        provider.access,
+        provider.regions.join(" "),
+        provider.capabilities.join(" "),
+        provider.modules.join(" "),
+        provider.categories.map((id) => CATEGORY_MAP[id].label).join(" "),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [active, query]);
+  const selectedCategory = active === "all" ? null : CATEGORY_MAP[active];
+  return (
+    <div className="eco-page">
+      <section className="eco-hero">
+        <div className="eco-hero-copy">
+          <div className="eco-eyebrow">PROVIDER DIRECTORY</div>
+          <h1>
+            <span>Find the services</span>
+            <span>your product needs.</span>
+          </h1>
+          <p>
+            Compare companies that provide banking, identity, payments, cards,
+            custody, liquidity and other financial infrastructure. Blueballs is
+            the software layer; you choose the providers behind your product.
+          </p>
+          <div className="eco-hero-actions">
+            <button
+              type="button"
+              onClick={() =>
+                document
+                  .getElementById("eco-directory")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+            >
+              Browse the directory
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => onNavigate("/developers")}
+            >
+              See Blueballs APIs
+            </button>
+          </div>
+          <div className="eco-hero-guide">
+            <div>
+              <span>BLUEBALLS</span>
+              <strong>Run and change the open-source software yourself.</strong>
+            </div>
+            <div>
+              <span>BUILD</span>
+              <strong>Use the sandbox while you develop your product.</strong>
+            </div>
+            <div>
+              <span>PROVIDERS</span>
+              <strong>
+                Connect the banking and financial services you need.
+              </strong>
+            </div>
+          </div>
+        </div>
+        <CategoryMap active={active} setActive={setActive} />
+      </section>
+      <section id="eco-directory" className="eco-directory">
+        <div className="eco-directory-head">
+          <div>
+            <span>PROVIDER DIRECTORY</span>
+            <h2>
+              {selectedCategory ? selectedCategory.label : "Browse by service."}
+            </h2>
+            <p>
+              {selectedCategory
+                ? selectedCategory.description
+                : "Filter by service or region, then go directly to the provider to see whether it fits your product."}
+            </p>
+          </div>
+          <label className="eco-search">
+            <span>SEARCH</span>
+            <input
+              value={query}
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                setQuery(event.target.value)
+              }
+              placeholder="Provider, capability or region…"
+            />
+          </label>
+        </div>
+        <div className="eco-filter-row">
+          <button
+            type="button"
+            className={active === "all" ? "active" : ""}
+            onClick={() => setActive("all")}
+          >
+            <b>All providers</b>
+            <span>{PROVIDERS.length}</span>
+          </button>
+          {CATEGORIES.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              className={active === category.id ? "active" : ""}
+              onClick={() => setActive(category.id)}
+            >
+              <b>{category.label}</b>
+              <span>
+                {
+                  PROVIDERS.filter((provider) =>
+                    provider.categories.includes(category.id),
+                  ).length
+                }
+              </span>
+            </button>
+          ))}
+        </div>
+        {selectedCategory && (
+          <div className="eco-category-brief">
+            <div>
+              <span>{selectedCategory.eyebrow}</span>
+              <strong>{selectedCategory.description}</strong>
+            </div>
+            <div>
+              <span>RELATED BLUEBALLS MODULES</span>
+              <div>
+                {selectedCategory.blueballs.map((module) => (
+                  <b key={module}>{module}</b>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="eco-results-line">
+          <span>
+            {filtered.length} {filtered.length === 1 ? "listing" : "listings"}
+          </span>
+          <span>
+            Reviewed against official provider information · 12 Aug 2026
+          </span>
+        </div>
+        <div className="eco-provider-grid">
+          {filtered.map((provider) => (
+            <ProviderCard provider={provider} key={provider.id} />
+          ))}
+          <EcosystemFillers count={filtered.length} columns={3} />
+          <EcosystemFillers count={filtered.length} columns={2} />
+        </div>
+        {filtered.length === 0 && (
+          <div className="eco-empty">
+            No providers match “{query}” in this category.
+          </div>
+        )}
+      </section>
+      <section className="eco-bottom">
+        <div>
+          <span>CONNECT A PROVIDER</span>
+          <h2>
+            Keep your product API stable while the provider changes underneath.
+          </h2>
+          <p>
+            Blueballs adapters map external providers to the interfaces used by
+            your product. Build or change an adapter, test it in the sandbox,
+            then add credentials from the provider you choose.
+          </p>
+        </div>
+        <div className="eco-bottom-actions">
+          <button type="button" onClick={() => onNavigate("/developers")}>
+            View API reference
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => onNavigate("/fx")}
+          >
+            See Stablecoin FX
+          </button>
+        </div>
+      </section>
+      <div className="eco-disclaimer">
+        <span style={{ fontFamily: MONO }}>ABOUT THIS DIRECTORY</span>
+        <p>
+          Access and sandbox details were checked against official provider
+          information on 12 Aug 2026. Products and availability change, so check
+          the provider's current documentation before building.
+        </p>
+      </div>
+    </div>
+  );
+}

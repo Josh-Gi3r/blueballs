@@ -1,0 +1,153 @@
+const SITE = "https://blueballs.tech";
+const NAV = [
+  ["Cover", "/"],
+  ["Home", "/home"],
+  ["Products", "/products"],
+  ["Stablecoin FX", "/fx"],
+  ["Cards", "/cards"],
+  ["Providers", "/ecosystem"],
+  ["Sandbox", "/sandbox"],
+  ["Developers", "/developers"],
+];
+const PRODUCTS = [
+  "Accounts",
+  "Cards",
+  "Transfers",
+  "Exchange",
+  "Savings vaults",
+  "Credit lines",
+  "Business banking",
+  "Ledger and statements",
+  "Onboarding and KYC",
+  "QR and payment links",
+  "Wallets",
+  "Webhooks and events",
+  "Sandbox scenarios",
+  "Bills and subscriptions",
+  "Rails registry",
+];
+const API_FAMILIES = [
+  "Authentication",
+  "Customers",
+  "Onboarding",
+  "Accounts",
+  "Receiving details",
+  "Wallets",
+  "Recipients",
+  "Destinations",
+  "Quotes",
+  "Stablecoin FX",
+  "Transfers",
+  "Cards",
+  "Authorisations",
+  "Disputes",
+  "Vaults",
+  "Credit",
+  "Policies",
+  "Approvals",
+  "Organisations",
+  "Ledger",
+  "Fees",
+  "Rails",
+  "QR payments",
+  "Bills",
+  "Webhooks",
+  "Events",
+  "Sandbox",
+  "Reference data",
+];
+const PROVIDER_CATEGORIES = [
+  "Sponsor and safeguarding",
+  "KYC, KYB, AML and fraud",
+  "Accounts and virtual accounts",
+  "Fiat pay-ins and payouts",
+  "Stablecoins and on/off ramps",
+  "Wallets and custody",
+  "Card issuing",
+  "FX liquidity, data and treasury",
+  "Open banking and account verification",
+  "Reconciliation, operations and security",
+];
+function list(items) {
+  return `<ul>${items.map((item) => `<li>${item}</li>`).join("")}</ul>`;
+}
+const PAGES = {
+  "/": {
+    title: "Blueballs — build the financial institution your market needs",
+    description:
+      "Open-source financial infrastructure. Enter from the landing cover into accounts, cards, transfers, wallets, ledger and FX.",
+    body: `<h1>Build the financial institution your market needs.</h1><p>Accounts, cards, transfers, wallets and FX in one open-source stack. Connect the providers your product needs.</p><p><a href="/home">Open the homepage</a> or <a href="/sandbox">try the sandbox</a>.</p>`,
+  },
+  "/home": {
+    title: "Blueballs — open-source software for building a neobank",
+    description:
+      "Open-source software for building accounts, cards, transfers, onboarding, wallets, ledger and FX into your own financial product.",
+    body: `<h1>Open-source software for building a neobank.</h1><p>Blueballs gives you software for accounts, cards, transfers, onboarding, wallets, ledger, FX and other financial products. It is MIT licensed, self-hostable and built to be changed.</p><h2>Build the bank for your People.</h2><p>A company. A community. A city. An industry. A marketplace. Or something nobody has built yet.</p><h2>What is included</h2>${list(PRODUCTS)}<p><a href="/sandbox">Start with the hosted sandbox</a> or <a href="https://github.com/Josh-Gi3r/blueballs">view the source on GitHub</a>.</p>`,
+  },
+  "/products": {
+    title: "Products — Blueballs",
+    description:
+      "Accounts, cards, transfers, onboarding, wallets, ledger, FX and other financial-product software included in Blueballs.",
+    body: `<h1>Build the financial products your bank needs.</h1><p>Start with accounts, cards, transfers, onboarding, wallets, FX, business banking and more. Use the pieces you need, change them for your product and connect the providers your production deployment requires.</p><h2>See it in a product</h2><p>Walk through onboarding, funding, spending and payouts to see how Blueballs can sit behind a financial product. Each step pairs the customer experience with the API call behind it.</p>${list(PRODUCTS)}<p><a href="/developers">See the API</a></p>`,
+  },
+  "/fx": {
+    title: "Stablecoin FX — Blueballs",
+    description:
+      "Open-source FX software for customer quotes, pricing policy, liquidity routing, treasury limits and settlement tracking.",
+    body: `<h1>Build FX into your financial product.</h1><p>Quote customers in familiar currencies while stablecoins, liquidity providers and treasury inventory can sit underneath. Blueballs covers pricing policy, source selection, reservations and settlement records.</p><p>BRL to EUR is the interactive browser simulation, not the scope of the product and not a call to the FX node.</p><h2>Included components</h2>${list(["FX node and JavaScript SDK", "Participant and corridor policy", "Market and principal pricing", "Liquidity routing", "Fiat settlement intents", "Settlement contracts", "Failure simulator"])}<p>The FX node ships with the stack. The browser demo runs on deterministic data, so every number it shows is one you can reproduce from source: <a href=\"https://github.com/Josh-Gi3r/blueballs\">github.com/Josh-Gi3r/blueballs</a>.</p>`,
+  },
+  "/cards": {
+    title: "Card programme research — Blueballs",
+    description:
+      "A sourced research directory of stablecoin and crypto card programmes; not the Blueballs Cards API and not connected integrations.",
+    body: `<h1>Card programme research.</h1><p>Compare public card-programme models, funding patterns, custody boundaries, networks and disclosed infrastructure. This page is research for product design; it is not the Blueballs Cards API, a recommendation, or evidence of a working integration.</p><h2>Status</h2><p>Every programme must carry a source URL, source date, jurisdiction and confidence label. Named companies remain Not connected unless separately evidenced.</p><p><a href="/developers">Inspect the sandbox Cards API</a></p>`,
+  },
+  "/ecosystem": {
+    title: "Provider directory — Blueballs",
+    description:
+      "A directory of banking and financial-infrastructure providers, grouped by service and region.",
+    body: `<h1>Find the services your product needs.</h1><p>Compare companies that provide banking, identity, payments, cards, custody, liquidity and other financial infrastructure. Blueballs is the software layer; you choose the providers behind your product.</p>${list(PROVIDER_CATEGORIES)}<p>The directory is a research tool, not a ranking or recommendation. Listings do not imply a partnership or existing integration.</p>`,
+  },
+  "/sandbox": {
+    title: "Build a fintech sandbox — Blueballs",
+    description:
+      "Turn a financial-product brief into a structured blueprint, provision test users and balances, and run protected-ledger test payments.",
+    body: `<h1>Build a working fintech sandbox.</h1><p>Describe the people you serve, choose markets, currencies, capabilities and rails, then review a structured blueprint. Blueballs provisions isolated test customers, accounts and balances and lets you run a payment through the protected double-entry ledger.</p><h2>What the builder creates</h2>${list(["Structured product blueprint", "Tenant-isolated test environment", "Approved test customers", "Multi-currency sandbox accounts", "Seeded test balances", "Protected-ledger payment journeys"])}`,
+  },
+  "/developers": {
+    title: "Developers — Blueballs",
+    description: "Create a sandbox key and inspect the Blueballs API contract.",
+    body: `<h1>Build with Blueballs.</h1><p>Create a sandbox key without applying for access and inspect the contract now. Or run the whole stack yourself: <code>git clone https://github.com/Josh-Gi3r/blueballs.git &amp;&amp; pnpm install &amp;&amp; pnpm dev</code>.</p><p>The hosted sandbox creates development state. It does not move real money or call production providers.</p><h2>API families</h2>${list(API_FAMILIES)}<p><a href="/openapi.yaml">OpenAPI specification</a></p>`,
+  },
+  "/contact": {
+    title: "Contact — Blueballs",
+    description: "Source, issues and security contact for Blueballs.",
+    body: `<h1>Contact Blueballs</h1><p>The source, the issue tracker and private vulnerability reporting are all open at <a href=\"https://github.com/Josh-Gi3r/blueballs\">github.com/Josh-Gi3r/blueballs</a>. The hosted sandbox and the API contract are on the developer page.</p>`,
+  },
+};
+export const PUBLIC_PATHS = Object.keys(PAGES);
+export function crawlerDocument(pathname) {
+  const page = PAGES[pathname] ?? PAGES["/"];
+  const canonical = `${SITE}${pathname === "/" ? "" : pathname}`;
+  return `<div id="root" data-server-content="true"><header><a href="/">Blueballs</a><nav>${NAV.map(([label, path]) => `<a href="${path}">${label}</a>`).join(" ")}</nav></header><main>${page.body}</main><footer><p>Blueballs is MIT-licensed open-source software.</p></footer></div><script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": pathname === "/" ? "SoftwareApplication" : "WebPage", name: page.title, description: page.description, url: canonical, isPartOf: { "@type": "WebSite", name: "Blueballs", url: SITE } })}</script>`;
+}
+export function pageMetadata(pathname) {
+  return PAGES[pathname] ?? PAGES["/"];
+}
+export function robotsText() {
+  return `# Blueballs is public and may be indexed, quoted and used by search and AI systems.\nUser-agent: *\nAllow: /\n\nContent-Signal: search=yes, ai-input=yes, ai-train=yes, use=full\nSitemap: ${SITE}/sitemap.xml\n`;
+}
+export function sitemapXml() {
+  const entries = PUBLIC_PATHS.map(
+    (path) => `<url><loc>${SITE}${path === "/" ? "" : path}</loc></url>`,
+  ).join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries}</urlset>`;
+}
+export function llmsText(full = false) {
+  const intro = `# Blueballs\n\nBlueballs is free, MIT-licensed, self-hostable software for building neobanks and financial products. It includes software and sandbox APIs for accounts, cards, transfers, onboarding, ledger, wallets and FX. Production deployments connect the regulated providers they need.\n\n## Public pages\n${NAV.map(([label, path]) => `- [${label}](${SITE}${path})`).join("\n")}\n\n## Contract and source status\n- [OpenAPI specification](${SITE}/openapi.yaml)\n- [Source](https://github.com/Josh-Gi3r/blueballs) — MIT, clone and run it.\n`;
+  if (!full) return intro;
+  return `${intro}\n## Page summaries\n${PUBLIC_PATHS.map((path) => {
+    const page = PAGES[path];
+    return `\n### ${page.title}\n${page.description}\nURL: ${SITE}${path}`;
+  }).join("\n")}\n`;
+}

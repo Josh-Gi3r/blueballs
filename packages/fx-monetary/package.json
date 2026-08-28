@@ -1,0 +1,14 @@
+{
+  "name": "@blueballs/fx-monetary",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Exact-accounting monetary issuance and remittance reference engine",
+  "license": "MIT",
+  "engines": { "node": ">=24.15.0" },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:ci": "node --test --test-reporter=spec test/*.test.js",
+    "check": "node --check src/index.js"
+  }
+}

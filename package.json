@@ -1,0 +1,58 @@
+{
+  "name": "blueballs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "description": "Blueballs - an open-source, self-hostable neobank stack (site + API + FX reference runtime)",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:site": "vite",
+    "dev:api": "node apps/api/src/server.js",
+    "dev:fx": "node apps/fx-node/src/cli.js",
+    "build": "pnpm build:openapi && tsc -b && vite build",
+    "preview": "vite preview",
+    "preview:cloudflare": "pnpm build && node scripts/dev-cloudflare.mjs",
+    "deploy:api": "node scripts/deploy-cloudflare.mjs api",
+    "deploy:fx": "node scripts/deploy-cloudflare.mjs fx",
+    "deploy:site": "node scripts/deploy-cloudflare.mjs site",
+    "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs all",
+    "preview:upload": "pnpm build && wrangler versions upload -c wrangler.jsonc",
+    "test:api": "pnpm --dir apps/api test:ci",
+    "test:fx": "node scripts/test-fx.mjs",
+    "test:workers": "vitest run --config vitest.config.mts && vitest run --config vitest.api.config.mts && vitest run --config vitest.fx.config.mts",
+    "verify": "node scripts/verify.mjs",
+    "sbom": "node scripts/dependency-inventory.mjs",
+    "sdk:pack": "pnpm --dir packages/fx-sdk pack:check",
+    "build:openapi": "node scripts/build-openapi.mjs && node scripts/build-bank-openapi.mjs",
+    "format": "prettier --write \"{apps,packages,scripts,spec,src,workers}/**/*.{css,js,mjs,ts,tsx}\" index.html vite.config.ts \"vitest*.mts\"",
+    "format:check": "prettier --check \"{apps,packages,scripts,spec,src,workers}/**/*.{css,js,mjs,ts,tsx}\" index.html vite.config.ts \"vitest*.mts\"",
+    "lint": "eslint .",
+    "lint:openapi": "redocly lint public/openapi.yaml"
+  },
+  "dependencies": {
+    "agents": "^0.21.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@redocly/cli": "2.46.2",
+    "@types/node": "^24.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "10.8.0",
+    "globals": "17.10.0",
+    "openapi-typescript": "7.13.0",
+    "prettier": "3.9.6",
+    "typescript": "^5.6.3",
+    "vite": "^6.4.3",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.120.1"
+  },
+  "engines": {
+    "node": ">=24.15.0",
+    "pnpm": ">=11.21.0"
+  }
+}

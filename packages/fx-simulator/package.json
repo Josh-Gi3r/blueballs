@@ -1,0 +1,13 @@
+{
+  "name": "@blueballs/fx-simulator",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic economic and liquidity stress simulator for Blueballs FX",
+  "engines": { "node": ">=24.15.0" },
+  "exports": "./src/index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "test:ci": "node --test --test-reporter=spec test/*.test.js"
+  }
+}

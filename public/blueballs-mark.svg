@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 256" role="img" aria-labelledby="title description">
+  <title id="title">Blueballs</title>
+  <desc id="description">Two blue circles touching vertically.</desc>
+  <defs>
+    <linearGradient id="top" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#0738e8"/>
+      <stop offset="0.54" stop-color="#0876ff"/>
+      <stop offset="1" stop-color="#0ba8ff"/>
+    </linearGradient>
+    <linearGradient id="bottom" x1="0" y1="0.8" x2="1" y2="0.2">
+      <stop offset="0" stop-color="#071368"/>
+      <stop offset="0.48" stop-color="#083fd8"/>
+      <stop offset="1" stop-color="#0876ff"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="64" fill="url(#top)"/>
+  <circle cx="64" cy="192" r="64" fill="url(#bottom)"/>
+</svg>

@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "blueballs-storage-runtime-test",
+  "main": "./storage-worker.js",
+  "compatibility_date": "2026-08-20",
+  "durable_objects": {
+    "bindings": [
+      { "name": "TRANSACTION_PROBE", "class_name": "TransactionProbe" },
+      { "name": "BUILDER_BUDGET", "class_name": "BuilderBudget" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["TransactionProbe"] },
+    { "tag": "v2", "new_sqlite_classes": ["BuilderBudget"] }
+  ]
+}

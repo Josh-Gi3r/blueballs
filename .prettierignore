@@ -1,0 +1,7 @@
+apps/fx-node/src/openapi.generated.js
+public/openapi.yaml
+pnpm-lock.yaml
+worker-configuration.d.ts
+workers/site/openapi.generated.js
+docs/assets/
+packages/fx-contracts/lib/

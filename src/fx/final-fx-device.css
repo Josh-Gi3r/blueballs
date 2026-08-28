@@ -1,0 +1,219 @@
+.bbfx .hero-device-holder {
+  width: 307px;
+  flex: none;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.bbfx .hero-machine {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  grid-template-columns: 307px minmax(0, 1fr);
+  min-height: 650px;
+  gap: 28px;
+  padding: 26px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.bbfx .hero-device-content {
+  min-height: 0;
+}
+.bbfx .machine-side {
+  min-width: 0;
+  width: 100%;
+}
+.bbfx .machine-card {
+  min-width: 0;
+  width: 100%;
+}
+.bbfx .machine-route-row {
+  min-width: 0;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+}
+.bbfx .machine-route-row span {
+  min-width: 0;
+}
+.bbfx .machine-route-row b {
+  white-space: nowrap;
+}
+.bbfx .machine-note {
+  width: 100%;
+}
+
+.bbfx .fx-market-device {
+  width: 272px;
+  height: 532px;
+  position: relative;
+  z-index: 3;
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+.bbfx .market-stage {
+  min-height: 600px;
+  grid-template-columns: 272px minmax(390px, 1fr) 272px;
+  gap: 24px;
+  padding: 28px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.bbfx .fx-device-market-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 14px 20px 20px;
+}
+
+.bbfx .fx-device-market-kicker {
+  margin-top: 3px;
+  color: #7a8296;
+  font: 700 8px/1.25 var(--mono);
+  letter-spacing: 0.13em;
+}
+
+.bbfx .fx-device-market-content .fx-device-title {
+  margin-top: 9px;
+}
+
+.bbfx .fx-device-market-stat {
+  margin-top: 16px;
+  padding: 13px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #e3e6ee;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.bbfx .fx-device-market-stat span {
+  color: #7a8296;
+  font-size: 11px;
+}
+.bbfx .fx-device-market-stat b {
+  max-width: 150px;
+  text-align: right;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.bbfx .fx-device-order-card {
+  margin-bottom: 10px;
+  padding: 15px 16px;
+  border: 1px solid #e3e6ee;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.bbfx .fx-device-order-card span {
+  display: block;
+  color: #7a8296;
+  font: 700 8px/1.2 var(--mono);
+  letter-spacing: 0.12em;
+}
+
+.bbfx .fx-device-order-card b {
+  display: block;
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.bbfx .fx-device-market-content > button {
+  width: 100%;
+  min-height: 46px;
+  margin-top: auto;
+  border: 0;
+  border-radius: 12px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bbfx .fx-device-market-content > button.secondary-state {
+  border: 1px solid #ccd4e2;
+  background: #fff;
+  color: var(--ink);
+}
+
+.bbfx .hero-machine .phone,
+.bbfx .market-stage .market-phone {
+  display: none;
+}
+
+/* Keep the editorial hero side-by-side only when there is genuinely enough room.
+   Below this width the product machine becomes a full-width second row instead of
+   squeezing the copy or clipping its allocation panel. */
+@media (max-width: 1380px) {
+  .bbfx .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 42px;
+    align-items: start;
+  }
+  .bbfx .hero-copy {
+    max-width: 900px;
+  }
+  .bbfx .hero-machine {
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 1240px) {
+  .bbfx .market-stage {
+    grid-template-columns: 272px minmax(360px, 1fr);
+  }
+  .bbfx .fx-market-device:last-child {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+}
+
+@media (max-width: 1000px) {
+  .bbfx .hero-machine {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .bbfx .hero-machine .machine-side {
+    width: min(100%, 620px);
+  }
+}
+
+@media (max-width: 900px) {
+  .bbfx .market-stage {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .bbfx .market-core {
+    width: min(100%, 620px);
+    order: -1;
+  }
+  .bbfx .fx-market-device:last-child {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .bbfx .hero-device-holder,
+  .bbfx .fx-market-device,
+  .bbfx .fx-device-holder {
+    transform: scale(0.92);
+    transform-origin: top center;
+  }
+  .bbfx .hero-device-holder {
+    margin-bottom: -48px;
+  }
+  .bbfx .fx-market-device {
+    margin-bottom: -43px;
+  }
+}

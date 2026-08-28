@@ -1,0 +1,13 @@
+{
+  "provider": "bridge",
+  "asOf": "2026-08-20",
+  "relationship": "none-claimed",
+  "technicalMaturity": "included-not-connected",
+  "implemented": false,
+  "networkCalls": 0,
+  "blueballsModules": ["customers", "applications", "accounts", "receiving-details", "destinations", "quotes", "transfers", "events", "webhooks"],
+  "sources": [
+    "https://apidocs.bridge.xyz/get-started/introduction/quick-start/setting-up-sandbox",
+    "https://apidocs.bridge.xyz/api-reference/introduction/introduction"
+  ]
+}
