@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "../../../packages/sqlite-compat/src/index.js";
 import { migrate } from "../../../packages/sqlite-compat/src/migrations.js";
+import { bankingEnv, bankingFlag } from "./runtime-env.js";
 
 const V1_COLLECTION_TABLES = Object.freeze([
   "tenants",
@@ -49,6 +50,7 @@ const V5_PROVIDER_COLLECTION_TABLES = Object.freeze([
   "providerAttempts",
   "reconciliationCases",
 ]);
+const V6_PROVIDER_INBOUND_TABLES = Object.freeze(["providerInboundEvents"]);
 
 export const BANKING_COLLECTION_TABLES = Object.freeze([
   ...V1_COLLECTION_TABLES,
@@ -56,6 +58,7 @@ export const BANKING_COLLECTION_TABLES = Object.freeze([
   "auditRecords",
   ...V4_FX_COLLECTION_TABLES,
   ...V5_PROVIDER_COLLECTION_TABLES,
+  ...V6_PROVIDER_INBOUND_TABLES,
 ]);
 
 export const BANKING_COLLECTION_TABLE_SET = new Set(BANKING_COLLECTION_TABLES);
@@ -152,12 +155,21 @@ export const BANKING_SCHEMA_MIGRATIONS = Object.freeze([
       }
     },
   },
+  {
+    version: 6,
+    name: "durable-provider-inbound-evidence",
+    up(database) {
+      for (const table of V6_PROVIDER_INBOUND_TABLES) {
+        createJsonCollection(database, table);
+      }
+    },
+  },
 ]);
 
 function databasePath() {
   return (
-    process.env.DB_PATH ||
-    (process.env.CLOUDFLARE_WORKER === "true"
+    bankingEnv("DB_PATH") ||
+    (bankingFlag("CLOUDFLARE_WORKER", false)
       ? ":memory:"
       : join(dirname(fileURLToPath(import.meta.url)), "..", "blueballs.sqlite"))
   );
