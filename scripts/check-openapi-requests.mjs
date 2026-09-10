@@ -2,7 +2,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { BODYLESS_OPERATIONS } from "../spec/banking/openapi/contracts.mjs";
-import { REQUEST_BODIES } from "../spec/banking/openapi/request-contracts.mjs";
+import { REQUEST_BODIES } from "../spec/banking/openapi/production-request-contracts.mjs";
 
 const routeDir = "apps/api/src/routes";
 const opId = (verb, path) =>
