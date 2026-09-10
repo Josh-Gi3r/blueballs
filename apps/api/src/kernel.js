@@ -24,6 +24,7 @@ import {
   setCommandContext,
   subscribeToEvents,
   subscribeToEventsBeforeCommit,
+  hashKey,
 } from "./lib.js";
 import { BANKING_COLLECTION_TABLE_SET } from "./schema.js";
 import {
@@ -36,6 +37,14 @@ import {
   childPermissions,
   publicKeyPermissions,
 } from "./key-permissions.js";
+import {
+  bankingApiMode,
+  isSandboxOnlyOperation,
+} from "../../../spec/banking/operation-modes.mjs";
+import { ensureProductionBootstrap } from "./production-bootstrap.js";
+
+export const BANK_API_MODE = bankingApiMode();
+ensureProductionBootstrap({ db, hashKey, ksuid, mode: BANK_API_MODE });
 
 export function collection(name) {
   if (!BANKING_COLLECTION_TABLE_SET.has(name)) {
@@ -157,11 +166,32 @@ function persistedKeyById(id, tenantId) {
   );
 }
 
+function assertRuntimeMode(method, pattern, body) {
+  if (BANK_API_MODE !== "production") return;
+  if (isSandboxOnlyOperation(method, pattern)) {
+    throw new ApiError(
+      "forbidden",
+      403,
+      `${method} ${pattern} is a sandbox-only operation and is disabled in production mode`,
+    );
+  }
+  if (
+    method === "POST" &&
+    pattern === "/v2/applications/:id/edd" &&
+    body?.decision !== undefined
+  ) {
+    throw new ApiError(
+      "forbidden",
+      403,
+      "Sandbox shortcut decisions on EDD are disabled in production mode; record provider/compliance outcomes through the production integration path",
+    );
+  }
+}
+
 /**
- * Register a route.
- * Request validation, public serialization, command audit metadata and tenant
- * authorization are centralized here so 181 handlers cannot drift into
- * different transport/security rules.
+ * Register a route. Request validation, runtime-mode enforcement, public
+ * serialization, command audit metadata and tenant authorization are centralized
+ * here so 181 handlers cannot drift into different transport/security rules.
  */
 export const route = (method, pattern, handler, opts = {}) => {
   const key = `${method} ${pattern}`;
@@ -190,6 +220,8 @@ export const route = (method, pattern, handler, opts = {}) => {
         audit: access !== "PUBLIC" || method !== "GET",
       });
     }
+
+    assertRuntimeMode(method, pattern, ctx.body ?? {});
 
     if (ctx.key && access !== "PUBLIC" && access !== "OPERATOR") {
       assertKeyPermission(ctx.key, method, pattern);
