@@ -191,12 +191,35 @@ function normalizeResult(value, fallback = {}) {
   };
 }
 
+function ambiguousResult(envelope, errorCode, fallback = {}) {
+  return {
+    outcome: "ambiguous",
+    provider_reference: envelope.provider_reference ?? null,
+    provider_state: null,
+    funds_state: null,
+    retry_after_ms: null,
+    error_code: errorCode,
+    result: null,
+    ...fallback,
+  };
+}
+
 /** Send one provider operation. `job_id` is the provider idempotency key for the
  * lifetime of the operation, across submission and reconciliation attempts. */
 export async function sendProviderOperation(envelope) {
   if (injectedTransport) {
-    const result = await injectedTransport(structuredClone(envelope));
-    return normalizeResult(result, { transport: "injected", status_code: null });
+    try {
+      const result = await injectedTransport(structuredClone(envelope));
+      return normalizeResult(result, {
+        transport: "injected",
+        status_code: null,
+      });
+    } catch {
+      return ambiguousResult(envelope, "custom_transport_ambiguous", {
+        transport: "injected",
+        status_code: null,
+      });
+    }
   }
 
   const config = activeConfig();
@@ -225,52 +248,29 @@ export async function sendProviderOperation(envelope) {
       },
       body,
     });
-  } catch (error) {
-    // The request may have reached the provider. Never classify a network
-    // exception as safe-to-resubmit.
-    return {
-      outcome: "ambiguous",
-      provider_reference: envelope.provider_reference ?? null,
-      provider_state: null,
-      funds_state: null,
-      retry_after_ms: null,
-      error_code: "transport_ambiguous",
-      result: null,
+  } catch {
+    return ambiguousResult(envelope, "transport_ambiguous", {
       transport: "http",
       status_code: null,
-    };
+    });
   }
 
   if (response.status >= 300 && response.status < 400) {
     await response.body?.cancel();
-    return {
-      outcome: "ambiguous",
-      provider_reference: envelope.provider_reference ?? null,
-      provider_state: null,
-      funds_state: null,
-      retry_after_ms: null,
-      error_code: "provider_redirect_rejected",
-      result: null,
+    return ambiguousResult(envelope, "provider_redirect_rejected", {
       transport: "http",
       status_code: response.status,
-    };
+    });
   }
 
   let parsed = {};
   try {
     parsed = await readLimitedJson(response);
   } catch {
-    return {
-      outcome: response.ok ? "ambiguous" : "ambiguous",
-      provider_reference: envelope.provider_reference ?? null,
-      provider_state: null,
-      funds_state: null,
-      retry_after_ms: null,
-      error_code: "provider_protocol_error",
-      result: null,
+    return ambiguousResult(envelope, "provider_protocol_error", {
       transport: "http",
       status_code: response.status,
-    };
+    });
   }
 
   if (response.ok) {
@@ -280,17 +280,10 @@ export async function sendProviderOperation(envelope) {
         status_code: response.status,
       });
     } catch {
-      return {
-        outcome: "ambiguous",
-        provider_reference: envelope.provider_reference ?? null,
-        provider_state: null,
-        funds_state: null,
-        retry_after_ms: null,
-        error_code: "provider_protocol_error",
-        result: null,
+      return ambiguousResult(envelope, "provider_protocol_error", {
         transport: "http",
         status_code: response.status,
-      };
+      });
     }
   }
 
@@ -319,9 +312,10 @@ export async function sendProviderOperation(envelope) {
   }
 
   return {
-    outcome: response.status >= 500 || response.status === 408
-      ? "ambiguous"
-      : "failed",
+    outcome:
+      response.status >= 500 || response.status === 408
+        ? "ambiguous"
+        : "failed",
     provider_reference: parsed.provider_reference ?? null,
     provider_state: parsed.provider_state ?? null,
     funds_state: parsed.funds_state ?? null,
