@@ -30,13 +30,14 @@ function inspect(path) {
   }
 }
 
-test("banking startup applies one versioned complete schema and restart is idempotent", async (t) => {
+test("banking startup applies the complete versioned schema and restart is idempotent", async (t) => {
   const api = await createApiFixture();
   t.after(() => api.close());
 
   const first = inspect(api.databasePath);
   assert.deepEqual(first.migrations, [
     { component: "banking", version: 1, name: "initial-banking-schema" },
+    { component: "banking", version: 2, name: "durable-webhook-outbox" },
   ]);
 
   for (const name of BANKING_COLLECTION_TABLES) {
