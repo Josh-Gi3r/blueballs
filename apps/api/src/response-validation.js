@@ -4,6 +4,7 @@ import { ADAPTER_REQUIRED_OPERATIONS } from "../../../spec/banking/openapi/contr
 import { PRODUCTION_SCHEMAS } from "../../../spec/banking/openapi/production-contracts.mjs";
 import { responseContractFor } from "../../../spec/banking/openapi/production-response-contracts.mjs";
 import { schemaErrors } from "./json-schema-lite.js";
+import { publicShape } from "./public-shape.js";
 
 const operationId = (verb, path) =>
   verb.toLowerCase() +
@@ -23,19 +24,11 @@ for (const family of FAMILIES) {
   }
 }
 
-export function publicResponse(value) {
-  if (Array.isArray(value)) return value.map(publicResponse);
-  if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([key]) => key !== "owner")
-      .map(([key, child]) => [key, publicResponse(child)]),
-  );
-}
+export const publicResponse = publicShape;
 
 export function validateSuccessfulResponse(method, pattern, value) {
   const endpoint = catalogue.get(`${method} ${pattern}`);
-  const clean = publicResponse(value);
+  const clean = publicShape(value);
   if (!endpoint || ADAPTER_REQUIRED_OPERATIONS.has(endpoint.operationId)) return clean;
   const contract = responseContractFor({
     operationId: endpoint.operationId,
