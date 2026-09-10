@@ -43,6 +43,7 @@ import {
 import { ensureProductionBootstrap } from "./production-bootstrap.js";
 import { queueProviderOperation } from "./provider-outbox.js";
 import { prepareProductionProviderIntent } from "./production-provider-intents.js";
+import { applyProviderInboundEvent } from "./provider-inbound.js";
 import {
   bankingFlag,
   bankingRuntimeEnvironment,
@@ -336,6 +337,23 @@ export const route = (method, pattern, handler, opts = {}) => {
     successStatus,
   });
 };
+
+// Private provider callback surface. It is intentionally outside /v2 and the
+// public OpenAPI catalogue. Deployments expose it only to their trusted provider
+// gateway/service network and authenticate it with the operator credential.
+const providerInboundEvents = collection("providerInboundEvents");
+route(
+  "POST",
+  "/internal/provider/events",
+  ({ body }) =>
+    applyProviderInboundEvent({
+      body,
+      db,
+      inboundEvents: providerInboundEvents,
+      mode: BANK_API_MODE,
+    }),
+  { access: "OPERATOR" },
+);
 
 export const isRegistered = (method, pattern) =>
   routes.some(
