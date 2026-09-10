@@ -200,8 +200,28 @@ function checked(envelope, result) {
   return enforceProviderResultContract(envelope, result);
 }
 
+function responseEvidence(envelope, parsed, response, outcome, errorCode) {
+  return checked(envelope, {
+    outcome,
+    provider_reference: parsed.provider_reference ?? envelope.provider_reference ?? null,
+    provider_state: parsed.provider_state ?? null,
+    funds_state: parsed.funds_state ?? null,
+    retry_after_ms: retryAfterMs(response),
+    error_code: parsed.error_code ?? errorCode,
+    result: null,
+    transport: "http",
+    status_code: response.status,
+  });
+}
+
 /** Send one provider operation. `job_id` is the provider idempotency key for the
- * lifetime of the operation, across submission and reconciliation attempts. */
+ * lifetime of the operation, across submission and reconciliation attempts.
+ *
+ * HTTP status is part of the financial evidence. A non-2xx response can never
+ * declare success merely because its JSON body says `outcome: succeeded`.
+ * 408/425/5xx are ambiguous; 429 is retryable; other 4xx responses may be
+ * terminal only when they do not contradict the capability-specific funds
+ * state contract. */
 export async function sendProviderOperation(envelope) {
   if (injectedTransport) {
     try {
@@ -302,41 +322,56 @@ export async function sendProviderOperation(envelope) {
   }
 
   if (response.status === 429) {
-    return checked(envelope, {
-      outcome: "retry",
-      provider_reference: parsed.provider_reference ?? null,
-      provider_state: parsed.provider_state ?? null,
-      funds_state: parsed.funds_state ?? null,
-      retry_after_ms: retryAfterMs(response),
-      error_code: parsed.error_code ?? "provider_rate_limited",
-      result: null,
-      transport: "http",
-      status_code: response.status,
-    });
-  }
-
-  if (OUTCOMES.has(parsed.outcome)) {
-    return checked(
+    return responseEvidence(
       envelope,
-      normalizeResult(parsed, {
-        transport: "http",
-        status_code: response.status,
-      }),
+      parsed,
+      response,
+      "retry",
+      "provider_rate_limited",
     );
   }
 
-  return checked(envelope, {
-    outcome:
-      response.status >= 500 || response.status === 408
-        ? "ambiguous"
-        : "failed",
-    provider_reference: parsed.provider_reference ?? null,
-    provider_state: parsed.provider_state ?? null,
-    funds_state: parsed.funds_state ?? null,
-    retry_after_ms: retryAfterMs(response),
-    error_code: parsed.error_code ?? `provider_http_${response.status}`,
-    result: null,
-    transport: "http",
-    status_code: response.status,
-  });
+  if (
+    response.status >= 500 ||
+    response.status === 408 ||
+    response.status === 425
+  ) {
+    return responseEvidence(
+      envelope,
+      parsed,
+      response,
+      "ambiguous",
+      `provider_http_${response.status}`,
+    );
+  }
+
+  // A 4xx HTTP response and a body claiming success are contradictory evidence.
+  // Never finalize money from that combination; reconcile instead.
+  if (parsed.outcome === "succeeded" || parsed.outcome === "pending") {
+    return responseEvidence(
+      envelope,
+      parsed,
+      response,
+      "ambiguous",
+      "provider_http_outcome_conflict",
+    );
+  }
+
+  if (parsed.outcome === "ambiguous") {
+    return responseEvidence(
+      envelope,
+      parsed,
+      response,
+      "ambiguous",
+      parsed.error_code ?? `provider_http_${response.status}`,
+    );
+  }
+
+  return responseEvidence(
+    envelope,
+    parsed,
+    response,
+    "failed",
+    `provider_http_${response.status}`,
+  );
 }
