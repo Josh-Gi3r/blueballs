@@ -46,6 +46,27 @@ export const PRODUCTION_SCHEMAS = {
     ["id", "tenant_id", "key", "scope", "permissions", "created_at", "expires"],
   ),
 
+  Account: open(
+    {
+      id: ref("Identifier"),
+      customer: ref("Identifier"),
+      currency: ref("CurrencyCode"),
+      type: { type: "string" },
+      status: { type: "string" },
+      details: {
+        anyOf: [
+          { type: "object", additionalProperties: true },
+          { type: "null" },
+        ],
+        description:
+          "Sandbox-generated reference details or null in production until a provider-backed receiving instrument is issued.",
+      },
+      balance: ref("Money"),
+      created_at: ref("Timestamp"),
+    },
+    ["id", "customer", "currency", "status", "balance", "created_at"],
+  ),
+
   ReceivingDetail: open(
     {
       id: ref("Identifier"),
