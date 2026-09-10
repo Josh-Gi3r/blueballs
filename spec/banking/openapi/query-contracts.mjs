@@ -6,6 +6,7 @@
  */
 import { PAGINATED_RESPONSE_OPERATIONS } from "./production-response-contracts.mjs";
 
+const parameter = (schema, required = false) => ({ schema, required });
 const string = (description, extra = {}) => ({
   type: "string",
   description,
@@ -18,105 +19,133 @@ const integer = (description, extra = {}) => ({
 });
 
 export const PAGINATION_PARAMETERS = Object.freeze({
-  limit: integer("Maximum number of rows", {
-    minimum: 1,
-    maximum: 100,
-    default: 25,
-  }),
-  starting_after: string("Return rows after this resource id"),
-  ending_before: string("Return rows immediately before this resource id"),
+  limit: parameter(
+    integer("Maximum number of rows", {
+      minimum: 1,
+      maximum: 100,
+      default: 25,
+    }),
+  ),
+  starting_after: parameter(string("Return rows after this resource id")),
+  ending_before: parameter(string("Return rows immediately before this resource id")),
 });
 
 const CUSTOM = Object.freeze({
   getCards: {
-    customer: string("Filter cards by customer id"),
-    account: string("Filter cards by funding account id"),
-    status: string("Filter cards by lifecycle status"),
+    customer: parameter(string("Filter cards by customer id")),
+    account: parameter(string("Filter cards by funding account id")),
+    status: parameter(string("Filter cards by lifecycle status")),
   },
   getAuthorisations: {
-    card: string("Filter authorisations by card id"),
-    status: string("Filter authorisations by decision/settlement state"),
+    card: parameter(string("Filter authorisations by card id")),
+    status: parameter(string("Filter authorisations by decision/settlement state")),
   },
   getDisputes: {
-    card: string("Filter disputes by card id"),
-    status: string("Filter disputes by dispute state"),
+    card: parameter(string("Filter disputes by card id")),
+    status: parameter(string("Filter disputes by dispute state")),
   },
   getApprovals: {
-    status: string("Approval status; use all to include terminal records"),
+    status: parameter(string("Approval status; use all to include terminal records")),
   },
   getLedger: {
-    account: string("Filter ledger rows by account id"),
+    account: parameter(string("Filter ledger rows by account id")),
   },
   getLedgerBalances: {
-    account: string("Filter balance rows by account id"),
+    account: parameter(string("Filter balance rows by account id")),
   },
   getRailsIdCalendar: {
-    days: integer("Number of calendar days to return", {
-      minimum: 1,
-      maximum: 90,
-      default: 30,
-    }),
+    days: parameter(
+      integer("Number of calendar days to return", {
+        minimum: 1,
+        maximum: 90,
+        default: 30,
+      }),
+    ),
   },
   getRates: {
-    from: string("Optional source currency filter", {
-      pattern: "^[A-Za-z0-9]{3,12}$",
-    }),
-    to: string("Optional destination currency filter", {
-      pattern: "^[A-Za-z0-9]{3,12}$",
-    }),
+    from: parameter(
+      string("Source currency filter. Must be supplied together with to.", {
+        pattern: "^[A-Za-z0-9]{3,12}$",
+      }),
+    ),
+    to: parameter(
+      string("Destination currency filter. Must be supplied together with from.", {
+        pattern: "^[A-Za-z0-9]{3,12}$",
+      }),
+    ),
   },
   getFxDepth: {
-    pair: string("Optional exact stablecoin pair", {
-      pattern: "^[A-Za-z0-9]{3,12}/[A-Za-z0-9]{3,12}$",
-    }),
+    pair: parameter(
+      string("Optional exact stablecoin pair", {
+        pattern: "^[A-Za-z0-9]{3,12}/[A-Za-z0-9]{3,12}$",
+      }),
+    ),
   },
   getFxPrice: {
-    from: string("Source stablecoin", {
-      pattern: "^[A-Za-z0-9]{3,12}$",
-    }),
-    to: string("Destination stablecoin", {
-      pattern: "^[A-Za-z0-9]{3,12}$",
-    }),
-    size: string("Optional quote size as an exact decimal string", {
-      pattern: "^[0-9]+(?:\\.[0-9]+)?$",
-    }),
+    from: parameter(
+      string("Source stablecoin", {
+        pattern: "^[A-Za-z0-9]{3,12}$",
+      }),
+      true,
+    ),
+    to: parameter(
+      string("Destination stablecoin", {
+        pattern: "^[A-Za-z0-9]{3,12}$",
+      }),
+      true,
+    ),
+    size: parameter(
+      string("Optional quote size as an exact decimal string", {
+        pattern: "^[0-9]+(?:\\.[0-9]+)?$",
+      }),
+    ),
   },
   // These compatibility collections predate cursor pagination. Their limit is
   // still documented and validated rather than pretending it is a cursor API.
   getRamps: {
-    limit: integer("Maximum number of rows", {
-      minimum: 1,
-      maximum: 100,
-      default: 25,
-    }),
+    limit: parameter(
+      integer("Maximum number of rows", {
+        minimum: 1,
+        maximum: 100,
+        default: 25,
+      }),
+    ),
   },
   getFxRfq: {
-    limit: integer("Maximum number of rows", {
-      minimum: 1,
-      maximum: 100,
-      default: 25,
-    }),
+    limit: parameter(
+      integer("Maximum number of rows", {
+        minimum: 1,
+        maximum: 100,
+        default: 25,
+      }),
+    ),
   },
   getFxIntents: {
-    limit: integer("Maximum number of rows", {
-      minimum: 1,
-      maximum: 100,
-      default: 25,
-    }),
+    limit: parameter(
+      integer("Maximum number of rows", {
+        minimum: 1,
+        maximum: 100,
+        default: 25,
+      }),
+    ),
   },
   getFxFills: {
-    limit: integer("Maximum number of rows", {
-      minimum: 1,
-      maximum: 100,
-      default: 25,
-    }),
+    limit: parameter(
+      integer("Maximum number of rows", {
+        minimum: 1,
+        maximum: 100,
+        default: 25,
+      }),
+    ),
   },
   getFxLpEarnings: {
-    limit: integer("Maximum number of rows", {
-      minimum: 1,
-      maximum: 100,
-      default: 25,
-    }),
+    limit: parameter(
+      integer("Maximum number of rows", {
+        minimum: 1,
+        maximum: 100,
+        default: 25,
+      }),
+    ),
   },
 });
 
