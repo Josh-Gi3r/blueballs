@@ -35,7 +35,7 @@ const opId = (verb, path) =>
 const byPath = new Map();
 for (const family of families) {
   for (const ep of family.endpoints) {
-    const oaPath = ep.path.replace(/:([a-zA-Z_]+)/g, "{$1}");
+    const oaPath = ep.path.replace(/:([a-zA-Z_]+)/g, "{$1");
     if (!byPath.has(oaPath)) byPath.set(oaPath, []);
     byPath.get(oaPath).push({ ...ep, family: family.name });
   }
@@ -126,6 +126,9 @@ for (const [path, ops] of byPath) {
       lines.push(`              example: ${inline(response.example)}`);
     }
 
+    // Only advertise error classes the banking HTTP boundary can actually
+    // produce synchronously. Provider-side failures after an accepted command
+    // are durable resource/reconciliation state, not a fabricated 502 response.
     for (const [status, title] of [
       ["400", "Invalid request"],
       ["401", "Missing or invalid API key"],
@@ -135,7 +138,6 @@ for (const [path, ops] of byPath) {
       ["413", "Request body too large"],
       ["422", "Policy, compliance or rail rejection"],
       ["429", "Rate limit exceeded"],
-      ["502", "Provider failure"],
       ["503", "Dependency or adapter unavailable"],
     ]) {
       if (op.access === "PUBLIC" && ["401", "403"].includes(status)) continue;
