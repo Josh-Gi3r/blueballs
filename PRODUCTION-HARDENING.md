@@ -47,19 +47,24 @@ reconciliation state.
 - [ ] Complete Durable Object crash/eviction probes for each financial family,
   not only the shared transaction layer.
 
-### Local release verification
+### Release verification and CI
 
-Blueballs deliberately does not depend on hosted GitHub Actions. The release
-authority is the repository itself.
+The repository-local `pnpm verify` command is the canonical release test, and
+GitHub Actions must run equivalent production gates on every pull request and
+push to `main`. Hosted CI is not a substitute for a clean-checkout release proof;
+both are required.
 
 - [x] Keep the complete cross-surface gate in `pnpm verify`.
 - [x] Make targeted production deploy commands run the same release verification
   before publishing.
 - [x] Keep build-time drift gates for persistence schema, API contracts, runtime
   ownership, key permissions and public examples.
+- [x] Define `.github/workflows/production-gate.yml` for build/contracts, banking
+  API proof, Workers parity, FX/SDK, Solidity fuzz/invariants and container checks.
+- [ ] Require the `Production gate` status check on protected `main`.
 - [ ] Produce a clean-checkout verification report for the release commit.
-- [ ] Require maintainer review for changes to ledger, authentication, policy,
-  FX execution, migrations and public contracts.
+- [ ] Require maintainer/CODEOWNERS review for changes to ledger,
+  authentication, policy, FX execution, migrations and public contracts.
 
 ### Executable API contract
 
@@ -79,7 +84,7 @@ authority is the repository itself.
 
 - [ ] `pnpm install --frozen-lockfile` succeeds on the pinned Node 24 runtime.
 - [ ] `pnpm verify` succeeds from a clean checkout.
-- [ ] Both reference Docker images build.
+- [ ] Reference container builds.
 - [ ] Compose topology validates.
 - [ ] Foundry unit, fuzz and invariant suites pass.
 - [ ] Generated contracts and SDK artifacts have no source drift.
@@ -178,6 +183,7 @@ all adapter-required operations proven fail-closed without an adapter
 0 OpenAPI request/response drift
 0 generated SDK drift
 0 unreviewed failing security or invariant tests
+Production gate is green and required on protected main
 pnpm verify passes on the exact release checkout
 release-machine Docker / Foundry / Compose proof retained
 ```
@@ -190,12 +196,13 @@ configured, but that behavior itself must be contract-tested and documented.
 Every release should publish or retain:
 
 - commit SHA;
+- GitHub `Production gate` result for that exact commit;
 - local `pnpm verify` report/output for that exact checkout;
 - API operation coverage report;
 - OpenAPI artifacts;
 - SDK package proof;
 - contract test summary;
-- container image digests;
+- container image digest;
 - dependency inventory/SBOM;
 - migration version;
 - known production limitations and required external adapters.
