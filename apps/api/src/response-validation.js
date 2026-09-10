@@ -1,8 +1,8 @@
 /** Runtime success-response contract validation used by the release/test gate. */
 import { FAMILIES } from "../../../src/endpoints.ts";
 import { ADAPTER_REQUIRED_OPERATIONS } from "../../../spec/banking/openapi/contracts.mjs";
-import { EFFECTIVE_SCHEMAS } from "../../../spec/banking/openapi/effective-contracts.mjs";
-import { responseContractFor } from "../../../spec/banking/openapi/effective-response-contracts.mjs";
+import { PRODUCTION_SCHEMAS } from "../../../spec/banking/openapi/production-contracts.mjs";
+import { responseContractFor } from "../../../spec/banking/openapi/production-response-contracts.mjs";
 
 const operationId = (verb, path) =>
   verb.toLowerCase() +
@@ -47,7 +47,7 @@ function dereference(schema) {
   const prefix = "#/components/schemas/";
   if (!schema.$ref.startsWith(prefix)) throw new Error(`Unsupported response schema ref ${schema.$ref}`);
   const name = schema.$ref.slice(prefix.length);
-  const resolved = EFFECTIVE_SCHEMAS[name];
+  const resolved = PRODUCTION_SCHEMAS[name];
   if (!resolved) throw new Error(`Unknown response schema ${name}`);
   return resolved;
 }
@@ -119,17 +119,15 @@ export function publicResponse(value) {
   );
 }
 
-/** Validate a catalogued successful response. Adapter-required operations have
- * no success contract until their adapter is configured and are skipped. */
 export function validateSuccessfulResponse(method, pattern, value) {
   const endpoint = catalogue.get(`${method} ${pattern}`);
-  if (!endpoint || ADAPTER_REQUIRED_OPERATIONS.has(endpoint.operationId)) return value;
+  const clean = publicResponse(value);
+  if (!endpoint || ADAPTER_REQUIRED_OPERATIONS.has(endpoint.operationId)) return clean;
   const contract = responseContractFor({
     operationId: endpoint.operationId,
     verb: endpoint.verb,
     family: endpoint.family,
   });
-  const clean = publicResponse(value);
   const errors = errorsFor(clean, contract.schema);
   if (errors.length) {
     const error = new Error(
