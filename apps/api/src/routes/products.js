@@ -34,17 +34,52 @@ const creditLines = collection("creditLines");
 
 /* ======================= Savings vaults ======================= */
 
+const YEAR_MS = 365n * 24n * 60n * 60n * 1000n;
+
+/** Public `rate` remains a decimal annual rate for API compatibility, but the
+ * financial calculation stores and uses integer basis points. Rates with more
+ * precision than one basis point are rejected rather than rounded silently. */
+function vaultRateBasisPoints(value) {
+  if (value === undefined) return 300; // 3.00%
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      "rate must be a finite non-negative annual decimal rate",
+    );
+  }
+  const scaled = value * 10_000;
+  const basisPoints = Math.round(scaled);
+  if (!Number.isSafeInteger(basisPoints) || Math.abs(scaled - basisPoints) > 1e-9) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      "rate supports basis-point precision (0.0001) and must not be silently rounded",
+    );
+  }
+  return basisPoints;
+}
+
 function vaultView(v) {
   const balance = balanceOf(v.id, v.currency);
-  const days = Math.max(0, (Date.now() - Date.parse(v.created_at)) / 86400000);
-  const accrued =
+  const createdMs = Date.parse(v.created_at);
+  const elapsedMs = Number.isFinite(createdMs)
+    ? BigInt(Math.max(0, Date.now() - createdMs))
+    : 0n;
+  const rateBps = v.rate_bps ?? vaultRateBasisPoints(v.rate);
+  const accruedMinor =
     v.status === "active"
-      ? (Number(fromMinor(balance)) * v.rate * days) / 365
-      : 0;
+      ? (balance * BigInt(rateBps) * elapsedMs) / (10_000n * YEAR_MS)
+      : 0n;
+  const { rate_bps: _rateBasisPoints, ...publicVault } = v;
   return {
-    ...v,
+    ...publicVault,
+    rate: rateBps / 10_000,
     balance: { amount: fromMinor(balance), currency: v.currency },
-    accrued_interest: { amount: accrued.toFixed(2), currency: v.currency },
+    accrued_interest: {
+      amount: fromMinor(accruedMinor),
+      currency: v.currency,
+    },
   };
 }
 
@@ -54,12 +89,14 @@ route(
   ({ body, key }) => {
     need(body, ["account"]);
     const acc = must(db.accounts, body.account, "account", key);
+    const rateBps = vaultRateBasisPoints(body.rate);
     const v = {
       id: ksuid("vlt"),
       account: acc.id,
       currency: acc.currency,
       name: body.name ?? "Savings vault",
-      rate: typeof body.rate === "number" ? body.rate : 0.03,
+      rate: rateBps / 10_000,
+      rate_bps: rateBps,
       status: "active",
       client_reference_id: body.client_reference_id ?? null,
       created_at: now(),
