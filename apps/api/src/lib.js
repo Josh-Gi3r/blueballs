@@ -6,6 +6,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { DatabaseSync } from "../../../packages/sqlite-compat/src/index.js";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { migrateBankingSchema } from "./schema.js";
 
 /* ---------------- identifiers: type-prefixed KSUID-style ---------------- */
 const B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -127,20 +128,20 @@ const DB_PATH =
   (process.env.CLOUDFLARE_WORKER === "true"
     ? ":memory:"
     : join(dirname(fileURLToPath(import.meta.url)), "..", "blueballs.sqlite"));
+
+// Schema migration is the authority for persistent structure. It must complete
+// before any collection object opens/caches its table.
+migrateBankingSchema();
 const sqlite = new DatabaseSync(DB_PATH);
 sqlite.exec("PRAGMA journal_mode = WAL");
 
 const RAW = Symbol("blueballs.raw");
 const MISSING = Symbol("blueballs.missing");
-
-/** Per-request unit of work. All local durable financial state is staged until
- * the handler succeeds, then committed together. */
 const requestScope = new AsyncLocalStorage();
 const proxies = new WeakMap();
 
-/** The single-database reference runtime serializes complete request units of
- * work. This prevents overlapping debits from validating against the same
- * pre-commit balance. */
+/** One SQLite database + one in-memory cache means complete request units are
+ * serialized until the storage layer moves to MVCC/sharded ownership. */
 let requestSerial = Promise.resolve();
 function serializeRequest(run) {
   const current = requestSerial.then(run, run);
@@ -206,23 +207,18 @@ function track(value, map, id, root) {
 const eventBeforeCommitSubscribers = new Set();
 const eventSubscribers = new Set();
 
-/** Register local event work that must be staged before the financial database
- * commit. Subscribers must perform local deterministic writes only; they must
- * never make network calls. A failure aborts the entire request unit of work. */
 export function subscribeToEventsBeforeCommit(subscriber) {
   eventBeforeCommitSubscribers.add(subscriber);
   return () => eventBeforeCommitSubscribers.delete(subscriber);
 }
 
-/** Register post-commit side effects. Failures here cannot roll back committed
- * money; durable work should already have been captured by a before-commit
- * subscriber (for example the webhook outbox). */
 export function subscribeToEvents(subscriber) {
   eventSubscribers.add(subscriber);
   return () => eventSubscribers.delete(subscriber);
 }
 
-/** Run one API request as a serializable financial unit of work. */
+/** Serializable request/background unit of work. Resource state, ledger,
+ * events/outbox and idempotency commit together or not at all. */
 export async function inRequestScope(run) {
   return serializeRequest(() => {
     const store = createRequestStore();
@@ -230,8 +226,6 @@ export async function inRequestScope(run) {
       try {
         const result = await run();
 
-        // Local outbox/audit enrichers run before the database transaction so
-        // their staged rows are committed atomically with money and domain state.
         for (const evt of store.events) {
           for (const subscriber of eventBeforeCommitSubscribers) subscriber(evt);
         }
@@ -540,8 +534,6 @@ export function emit(type, data, { tenantId } = {}) {
     return evt;
   }
 
-  // Standalone emitters still get event + durable before-commit side work in one
-  // SQLite transaction. Post-commit side effects run only after it succeeds.
   sqlite.transactionSync(() => {
     for (const subscriber of eventBeforeCommitSubscribers) subscriber(evt);
     db.events.push(evt);
