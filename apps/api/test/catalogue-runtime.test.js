@@ -21,9 +21,9 @@ test("all 181 catalogued banking operations are reachable and respect their runt
 
   const api = await createApiFixture();
   t.after(() => api.close());
-  const tenant = await api.signup("catalogue-runtime@example.test");
 
-  for (const operation of operations) {
+  for (let index = 0; index < operations.length; index++) {
+    const operation = operations[index];
     const path = concretePath(operation.path);
     const request = {
       ...(hasBody(operation.verb) ? { body: {} } : {}),
@@ -38,8 +38,6 @@ test("all 181 catalogued banking operations are reachable and respect their runt
       continue;
     }
 
-    // Every non-public operation must reject an anonymous caller before domain
-    // behavior is allowed to reveal tenant/operator state.
     const anonymous = await api.request(operation.verb, path, request);
     assert.equal(anonymous.status, 401, `${label(operation)} did not reject an anonymous caller`);
     assert.match(
@@ -52,11 +50,10 @@ test("all 181 catalogued banking operations are reachable and respect their runt
 
     if (operation.access === "OPERATOR") continue;
 
-    // TENANT and GLOBAL_READ operations are then exercised with a real sandbox
-    // principal. Placeholder resource IDs and empty action bodies are expected
-    // to produce domain validation/not-found outcomes for many operations; the
-    // important contract here is that routing/auth succeeds and the handler
-    // never falls through to a stub or an internal error.
+    // Use a fresh tenant for every operation. Some valid operations revoke keys,
+    // delete resources or mutate global-looking sandbox state; no probe is
+    // allowed to influence the next operation's authentication result.
+    const tenant = await api.signup(`catalogue-runtime-${index}@example.test`);
     const authenticated = await api.request(operation.verb, path, {
       ...request,
       key: tenant.key,
