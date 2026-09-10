@@ -1,13 +1,8 @@
 /** PLATFORM family — Webhooks, Sandbox, Events, Ledger & statements, Fees,
  *  Rails registry (calendar), Reference data.
- *
- *  Owns exactly this file. Resources that don't live in the shared `db`
- *  (webhooks, deliveries, simulations, statements, fee config) get their own
- *  durable `collection(name)` here — kernel's `db` object is a frozen shared
- *  surface (see kernel.js header) and isn't extended by family files.
  */
 
-import { randomBytes, createHmac, createHash } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 import {
   route,
   db,
@@ -27,104 +22,24 @@ import {
   collection,
   visibleTo,
   principalId,
-  subscribeToEvents,
 } from "../kernel.js";
 import {
   WEBHOOK_DELIVERY_MODE,
   validateWebhookUrl,
-  fetchWebhook,
 } from "../webhook-egress.js";
-
-const API_VERSION = "2026-08-06";
+import {
+  webhooks,
+  deliveries,
+  withoutSecret,
+  queueWebhookDelivery,
+} from "../webhook-outbox.js";
 
 /* =========================================================================
- * WEBHOOKS — real signed HTTP delivery, delivery log, replay.
+ * WEBHOOKS — durable outbox, signed delivery log, replay.
  * ====================================================================== */
 
-const webhooks = collection("webhooks"); // whk_id -> target
-const deliveries = collection("deliveries"); // whd_id -> delivery record
-
-/** Sign `${timestamp}.${body}` with the target's secret and POST it.
- *  Never throws — failures land in the delivery log, not the caller's face. */
-async function deliver(wh, evt, opts = {}) {
-  const deliveryId = ksuid("whd");
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const payload = {
-    id: evt.id,
-    type: evt.type,
-    created: evt.created_at,
-    api_version: API_VERSION,
-    delivery_id: deliveryId,
-    data: evt.data,
-  };
-  const body = JSON.stringify(payload);
-  const signature = createHmac("sha256", wh.secret)
-    .update(`${timestamp}.${body}`)
-    .digest("hex");
-
-  const record = {
-    id: deliveryId,
-    object: "webhook_delivery",
-    webhook: wh.id,
-    event_id: evt.id,
-    event_type: evt.type,
-    data: evt.data,
-    url: wh.url,
-    replay: !!opts.replay,
-    replayed_from: opts.replayedFrom ?? null,
-    owner: wh.owner,
-    status: "pending",
-    response_code: null,
-    error: null,
-    attempted_at: now(),
-  };
-  deliveries.set(record.id, record);
-
-  try {
-    const headers = {
-      "content-type": "application/json",
-      "x-webhook-id": wh.id,
-      "x-webhook-event": evt.type,
-      "x-webhook-signature": `t=${timestamp},v1=${signature}`,
-    };
-    if (opts.replay) headers["x-webhook-replay"] = "true";
-    const res = await fetchWebhook(wh.url, {
-      method: "POST",
-      headers,
-      body,
-      signal: AbortSignal.timeout(5000),
-    });
-    record.status = res.ok ? "succeeded" : "failed";
-    record.response_code = res.status;
-  } catch (e) {
-    record.status = "failed";
-    record.error = e.message;
-  }
-  deliveries.set(record.id, record);
-  return record;
-}
-
-function dispatchToWebhooks(evt) {
-  for (const wh of webhooks.values()) {
-    if (wh.owner !== evt.tenant_id) continue;
-    if (wh.status !== "enabled") continue;
-    if (!(wh.events.includes("*") || wh.events.includes(evt.type))) continue;
-    deliver(wh, evt).catch(() => {}); // fire-and-forget — never blocks the caller
-  }
-}
-
-/** Emit a platform event AND deliver it to matching webhooks right away. */
 function notify(type, data, tenantId) {
   return emit(type, data, { tenantId });
-}
-
-subscribeToEvents((evt) => {
-  if (webhooks.size) dispatchToWebhooks(evt);
-});
-
-function withoutSecret(wh) {
-  const { secret: _secret, ...publicTarget } = wh;
-  return publicTarget;
 }
 
 route(
@@ -155,6 +70,7 @@ route(
       created_at: now(),
     };
     webhooks.set(wh.id, wh);
+    // Creation is the only time the secret is returned. All reads strip it.
     return wh;
   },
   { created: true },
@@ -214,40 +130,41 @@ route("GET", "/v2/webhooks/:id/deliveries", ({ params, url, key }) => {
   must(webhooks, params.id, "webhook target", key);
   const rows = [...deliveries.values()]
     .filter((d) => d.webhook === params.id && d.owner === principalId(key))
-    .sort((a, b) => a.attempted_at.localeCompare(b.attempted_at));
+    .sort((a, b) =>
+      String(a.created_at ?? a.attempted_at ?? "").localeCompare(
+        String(b.created_at ?? b.attempted_at ?? ""),
+      ),
+    );
   return paginate(rows, url);
 });
 
-route(
-  "POST",
-  "/v2/webhooks/deliveries/:did/replay",
-  async ({ params, key }) => {
-    if (WEBHOOK_DELIVERY_MODE !== "allowlist") {
-      throw new ApiError(
-        "service-unavailable",
-        503,
-        "Webhook delivery is disabled on this host",
-      );
-    }
-    const original = must(deliveries, params.did, "delivery", key);
-    const wh = must(webhooks, original.webhook, "webhook target", key);
-    const evtLike = {
-      id: original.event_id,
-      type: original.event_type,
-      created_at: original.attempted_at,
-      data: original.data,
-    };
-    return deliver(wh, evtLike, { replay: true, replayedFrom: original.id });
-  },
-);
+route("POST", "/v2/webhooks/deliveries/:did/replay", ({ params, key }) => {
+  if (WEBHOOK_DELIVERY_MODE !== "allowlist") {
+    throw new ApiError(
+      "service-unavailable",
+      503,
+      "Webhook delivery is disabled on this host",
+    );
+  }
+  const original = must(deliveries, params.did, "delivery", key);
+  const wh = must(webhooks, original.webhook, "webhook target", key);
+  const evtLike = {
+    id: original.event_id,
+    type: original.event_type,
+    created_at: original.created_at ?? original.attempted_at ?? now(),
+    data: original.data,
+  };
+  return queueWebhookDelivery(wh, evtLike, {
+    replay: true,
+    replayedFrom: original.id,
+  });
+});
 
 /* =========================================================================
- * SANDBOX — scenario catalogue, stateful payment/onboarding simulations,
- * pause with awaiting_advance, then advance past it. Idempotent on
- * `simulation_id`. Wired to real webhook delivery via notify() above.
+ * SANDBOX — scenario catalogue, stateful payment/onboarding simulations.
  * ====================================================================== */
 
-const simulations = collection("simulations"); // sim_id -> record
+const simulations = collection("simulations");
 
 const PAYMENT_SCENARIOS = {
   "payment.success": {
@@ -312,7 +229,6 @@ route("GET", "/v2/sandbox/scenarios", () => ({
   ],
 }));
 
-/** Move real money into `account` for a settled sandbox payment, if one was given. */
 function creditSandboxAccount(sim) {
   if (!sim.account) return;
   const acc = db.accounts.get(sim.account);
@@ -349,14 +265,9 @@ route(
     }
     const simId = body.simulation_id || ksuid("sim");
     const existing = simulations.get(simId);
-    // Idempotent on simulation_id — but only for the tenant that owns the row.
-    // Without ownedBy this create path is a read of anyone's simulation, while
-    // GET and advance are both correctly scoped.
     if (existing) return ownedBy(existing, key, "simulation", simId);
 
     if (body.account) {
-      // a simulation settles real ledger movement into this account, so it must
-      // be the caller's own
       const acc = must(db.accounts, body.account, "account", key);
       if (acc.currency !== String(body.currency).toUpperCase()) {
         throw new ApiError(
@@ -435,10 +346,8 @@ route(
     }
     const simId = body.simulation_id || ksuid("sim");
     const existing = simulations.get(simId);
-    // Idempotent on simulation_id — but only for the tenant that owns the row.
     if (existing) return ownedBy(existing, key, "simulation", simId);
 
-    // a simulation may only touch the caller's own customer
     if (body.customer) must(db.customers, body.customer, "customer", key);
 
     const nowStamp = now();
@@ -572,7 +481,7 @@ route("GET", "/v2/sandbox/:id", ({ params, key }) => {
 });
 
 /* =========================================================================
- * EVENTS — the one remaining stub: fetch a single event.
+ * EVENTS
  * ====================================================================== */
 
 route("GET", "/v2/events/:id", ({ params, key }) => {
@@ -590,8 +499,6 @@ route("GET", "/v2/events/:id", ({ params, key }) => {
 
 route("GET", "/v2/ledger/balances", ({ url, key }) => {
   const acctFilter = url.searchParams.get("account");
-  // balances are derived from postings, which carry no owner — scope them to the
-  // accounts this key holds, or any key could read any account's balance
   const mine = new Set(
     visibleTo([...db.accounts.values()], key).map((a) => a.id),
   );
@@ -609,13 +516,13 @@ route("GET", "/v2/ledger/balances", ({ url, key }) => {
       id: `bal_${p.account}_${p.currency}`,
       account: p.account,
       currency: p.currency,
-      balance: fromMinor(balanceOf(p.account, p.currency)), // always derived, never stored
+      balance: fromMinor(balanceOf(p.account, p.currency)),
     }))
     .sort((a, b) => a.id.localeCompare(b.id));
   return paginate(rows, url);
 });
 
-const statements = collection("statements"); // stm_id -> statement
+const statements = collection("statements");
 
 route(
   "POST",
@@ -641,9 +548,6 @@ route(
       );
     }
 
-    // Pull every full transaction (both legs) that touches this account in
-    // range — including the counter-leg guarantees debits == credits by
-    // construction, since post() already enforces each txn sums to zero.
     const allRows = [...db.ledger];
     const txnIds = new Set(
       allRows
@@ -761,7 +665,7 @@ const FEE_SCHEDULE = {
   wire: { flat: "15.00", bps: 0 },
   paynow: { flat: "0.05", bps: 3 },
 };
-const feeConfigs = collection("feeConfigs"); // tenant_id -> { payout_account, updated_at }
+const feeConfigs = collection("feeConfigs");
 
 route("GET", "/v2/fees/config", ({ key }) => {
   const cfg = feeConfigs.get(principalId(key)) ?? {
@@ -788,7 +692,6 @@ route("PUT", "/v2/fees/config", ({ key, body }) => {
  * RAILS REGISTRY — calendar
  * ====================================================================== */
 
-// Fixed 2026 holiday sets, keyed by the currency each rail settles in.
 const HOLIDAYS = {
   EUR: [
     "2026-01-01",
