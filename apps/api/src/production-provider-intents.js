@@ -53,6 +53,28 @@ export function prepareProductionProviderIntent({
 }) {
   if (mode !== "production" || !result) return result;
 
+  // Core accounts are valid internal ledger containers in production, but the
+  // account handler also creates deterministic sandbox IBAN/ABA/PayNow details.
+  // Those coordinates are teaching fixtures, never provider-issued instruments.
+  // Production accounts therefore start without receiving coordinates and use
+  // POST /v2/accounts/:id/details to provision a real provider-backed instrument.
+  if (method === "POST" && pattern === "/v2/accounts") {
+    const account = db.accounts.get(result.id);
+    if (!account) throw new Error(`Account ${result.id} vanished before production normalization`);
+    account.details = null;
+    rewriteCurrentEvent(
+      db,
+      commandId,
+      "account.opened",
+      "account.opened",
+      account,
+    );
+    return {
+      ...account,
+      balance: result.balance,
+    };
+  }
+
   if (method === "POST" && pattern === "/v2/transfers") {
     const transfer = db.transfers.get(result.id);
     if (!transfer) throw new Error(`Transfer ${result.id} vanished before provider queue`);
