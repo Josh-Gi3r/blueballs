@@ -3,11 +3,12 @@ import { mkdtemp, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promis
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { FAMILIES } from "../../../src/endpoints.ts";
 import { ADAPTER_REQUIRED_OPERATIONS } from "../../../spec/banking/openapi/contracts.mjs";
 
-const root = resolve(new URL("..", import.meta.url).pathname, "..");
-const workspaceRoot = resolve(root, "../..");
+const apiRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const workspaceRoot = resolve(apiRoot, "../..");
 const temp = await mkdtemp(join(tmpdir(), "blueballs-operation-coverage-"));
 const coverageFile = join(temp, "success.ndjson");
 
@@ -29,7 +30,7 @@ const catalogue = FAMILIES.flatMap(({ name: family, endpoints }) =>
 function run(command, args, options = {}) {
   return new Promise((resolveRun) => {
     const child = spawn(command, args, {
-      cwd: root,
+      cwd: apiRoot,
       env: {
         ...process.env,
         OPERATION_COVERAGE_FILE: coverageFile,
@@ -42,7 +43,7 @@ function run(command, args, options = {}) {
 }
 
 try {
-  const files = (await readdir(join(root, "test")))
+  const files = (await readdir(join(apiRoot, "test")))
     .filter((name) => name.endsWith(".test.js"))
     .sort()
     .map((name) => join("test", name));
@@ -70,9 +71,6 @@ try {
     ({ operationId }) => !successes.has(operationId),
   );
 
-  // Adapter-required operations are proven by the dedicated catalogue/runtime
-  // and product tests returning 503, not by fabricating a successful card-vault
-  // response. Their explicit classification is part of the report.
   const report = {
     generated_at: new Date().toISOString(),
     catalogue_operations: catalogue.length,
