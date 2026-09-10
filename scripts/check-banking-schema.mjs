@@ -20,6 +20,13 @@ for (const file of files) {
   for (const match of source.matchAll(/\bnew\s+PersistentMap\(\s*["']([^"']+)["']\s*\)/g)) {
     referenced.add(match[1]);
   }
+
+  // auditRecords is intentionally not a PersistentMap: the runtime exposes an
+  // append-only adapter with no update/delete API. Still treat that dedicated
+  // adapter as a concrete schema reference so the registry gate remains exact.
+  if (/\bnew\s+PersistentAuditLog\(\s*\)/.test(source)) {
+    referenced.add("auditRecords");
+  }
 }
 
 const declared = new Set(BANKING_COLLECTION_TABLES);
