@@ -53,6 +53,7 @@ test("banking startup applies the complete versioned schema and restart is idemp
     { component: "banking", version: 2, name: "durable-webhook-outbox" },
     { component: "banking", version: 3, name: "command-audit-correlation" },
     { component: "banking", version: 4, name: "complete-legacy-fx-durable-schema" },
+    { component: "banking", version: 5, name: "durable-provider-operations" },
   ]);
 
   for (const name of BANKING_COLLECTION_TABLES) {
