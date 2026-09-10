@@ -72,4 +72,15 @@ export const REQUEST_BODIES = {
       ["account", "currency", "amount", "pair"],
     ),
   },
+
+  postOrgsIdMembers: {
+    required: true,
+    schema: obj(
+      {
+        email: { type: "string", format: "email" },
+        role: { type: "string", enum: ["owner", "admin", "member"] },
+      },
+      ["email", "role"],
+    ),
+  },
 };
