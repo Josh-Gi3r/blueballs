@@ -5,8 +5,10 @@
  * the same local transaction. Provider payloads are sealed before they enter the
  * durable outbox so identity/account/card data is not stored as plaintext job JSON.
  */
+import { ApiError } from "./lib.js";
 import { publicShape } from "./public-shape.js";
 import { sealProviderPayload } from "./provider-payload-crypto.js";
+import { providerTransportAvailable } from "./provider-transport.js";
 
 const RECEIVING_INSTRUMENT_FIELDS = [
   "type",
@@ -20,7 +22,26 @@ const RECEIVING_INSTRUMENT_FIELDS = [
   "network",
 ];
 
-const protectedPayload = (value) => sealProviderPayload(publicShape(value ?? {}));
+function protectedPayload(value) {
+  if (!providerTransportAvailable()) {
+    throw new ApiError(
+      "service-unavailable",
+      503,
+      "No production provider adapter is configured for this operation",
+    );
+  }
+  try {
+    return sealProviderPayload(publicShape(value ?? {}));
+  } catch (error) {
+    throw new ApiError(
+      "service-unavailable",
+      503,
+      error?.code === "PROVIDER_PAYLOAD_TOO_LARGE"
+        ? "Provider payload exceeds the configured secure outbox limit"
+        : "Production provider payload encryption is not configured correctly",
+    );
+  }
+}
 
 function rewriteCurrentEvent(db, commandId, oldType, newType, data) {
   for (const event of db.events) {
