@@ -8,12 +8,12 @@ import {
   BODYLESS_OPERATIONS,
   CREATED_OPERATIONS,
 } from "../spec/banking/openapi/contracts.mjs";
-import { EFFECTIVE_SCHEMAS as SCHEMAS } from "../spec/banking/openapi/effective-contracts.mjs";
+import { PRODUCTION_SCHEMAS as SCHEMAS } from "../spec/banking/openapi/production-contracts.mjs";
 import { REQUEST_BODIES } from "../spec/banking/openapi/request-contracts.mjs";
 import {
   PAGINATED_RESPONSE_OPERATIONS,
   responseContractFor,
-} from "../spec/banking/openapi/effective-response-contracts.mjs";
+} from "../spec/banking/openapi/production-response-contracts.mjs";
 
 const root = new URL("..", import.meta.url);
 const families = FAMILIES;
