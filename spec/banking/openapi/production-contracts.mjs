@@ -14,6 +14,7 @@ const permissionArray = {
   items: { type: "string", enum: ["*", ...KEY_PERMISSIONS] },
   minItems: 1,
 };
+const nullableTimestamp = { anyOf: [ref("Timestamp"), { type: "null" }] };
 
 export const PRODUCTION_SCHEMAS = {
   ...EFFECTIVE_SCHEMAS,
@@ -26,7 +27,7 @@ export const PRODUCTION_SCHEMAS = {
       scope: { type: "string" },
       permissions: permissionArray,
       created_at: ref("Timestamp"),
-      expires: ref("Timestamp"),
+      expires: nullableTimestamp,
     },
     ["id", "tenant_id", "scope", "permissions", "created_at"],
   ),
@@ -39,7 +40,7 @@ export const PRODUCTION_SCHEMAS = {
       scope: { type: "string" },
       permissions: permissionArray,
       created_at: ref("Timestamp"),
-      expires: ref("Timestamp"),
+      expires: nullableTimestamp,
       note: { type: "string" },
     },
     ["id", "tenant_id", "key", "scope", "permissions", "created_at", "expires"],
