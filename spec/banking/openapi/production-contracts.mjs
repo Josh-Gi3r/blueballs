@@ -95,6 +95,32 @@ export const PRODUCTION_SCHEMAS = {
     ["id", "account", "rail", "currency", "status", "created_at"],
   ),
 
+  Wallet: open(
+    {
+      id: ref("Identifier"),
+      customer: ref("Identifier"),
+      currency: ref("CurrencyCode"),
+      network: { type: "string" },
+      address: {
+        type: ["string", "null"],
+        description:
+          "Sandbox address or provider-backed production address; null while custody provisioning is pending.",
+      },
+      status: { type: "string" },
+      status_reason: { type: ["string", "null"] },
+      balance: ref("Money"),
+      approval_chain: { type: ["string", "null"] },
+      provider_operation_id: { type: "string" },
+      provider_reference: { type: ["string", "null"] },
+      provider_state: { type: ["string", "null"] },
+      provider_status: { type: "string" },
+      reconciliation_required: { type: "boolean" },
+      provisioned_at: nullableTimestamp,
+      created_at: ref("Timestamp"),
+    },
+    ["id", "customer", "currency", "network", "address", "created_at"],
+  ),
+
   Card: open(
     {
       id: ref("Identifier"),
