@@ -7,6 +7,6 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "test:ci": "node --test test/*.test.js"
+    "test:ci": "node test/run-ci.mjs"
   }
 }
