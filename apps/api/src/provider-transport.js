@@ -1,13 +1,10 @@
 /** Provider-neutral production transport.
  *
  * Blueballs core speaks one small protocol to a deployment-owned provider
- * gateway. The gateway is where an institution maps these envelopes to its
- * actual bank, card processor, KYC vendor, custody system or payment rail.
- *
- * A submission timeout is ambiguous, not a retryable failure: the provider may
- * have received the request. Reconciliation therefore uses the same stable job
- * id rather than sending a fresh financial instruction.
+ * gateway. The gateway maps canonical operations to the institution's actual
+ * bank, card processor, KYC vendor, custody system or payment rail.
  */
+import { enforceProviderResultContract } from "./provider-result-contract.js";
 
 const PROTOCOL_VERSION = "2026-09-11";
 const MAX_RESPONSE_BYTES = 64 * 1024;
@@ -77,15 +74,15 @@ function environmentConfig(env = process.env) {
 }
 
 /** Cloudflare passes secrets/vars through the Worker env object. Configure that
- * exact object before serving requests rather than relying on process.env
- * population behavior. Node callers normally use process.env lazily. */
+ * exact object before route modules load rather than relying on process.env
+ * population behavior. */
 export function configureProviderEnvironment(env) {
   configuredEnvironment = environmentConfig(env);
   return !!configuredEnvironment;
 }
 
 /** Test/self-host extension point. The transport receives one canonical
- * envelope and must return the normalized provider result documented below. */
+ * envelope and returns the same normalized result contract as the HTTP gateway. */
 export function setProviderTransport(transport) {
   if (transport !== null && typeof transport !== "function") {
     throw new TypeError("provider transport must be a function or null");
@@ -125,12 +122,7 @@ async function readLimitedJson(response) {
     reader.releaseLock();
   }
   if (!text.trim()) return {};
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error("Provider gateway returned invalid JSON");
-  }
+  const parsed = JSON.parse(text);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("Provider gateway response must be a JSON object");
   }
@@ -204,21 +196,28 @@ function ambiguousResult(envelope, errorCode, fallback = {}) {
   };
 }
 
+function checked(envelope, result) {
+  return enforceProviderResultContract(envelope, result);
+}
+
 /** Send one provider operation. `job_id` is the provider idempotency key for the
  * lifetime of the operation, across submission and reconciliation attempts. */
 export async function sendProviderOperation(envelope) {
   if (injectedTransport) {
     try {
       const result = await injectedTransport(structuredClone(envelope));
-      return normalizeResult(result, {
-        transport: "injected",
-        status_code: null,
-      });
+      return checked(
+        envelope,
+        normalizeResult(result, { transport: "injected", status_code: null }),
+      );
     } catch {
-      return ambiguousResult(envelope, "custom_transport_ambiguous", {
-        transport: "injected",
-        status_code: null,
-      });
+      return checked(
+        envelope,
+        ambiguousResult(envelope, "custom_transport_ambiguous", {
+          transport: "injected",
+          status_code: null,
+        }),
+      );
     }
   }
 
@@ -249,46 +248,61 @@ export async function sendProviderOperation(envelope) {
       body,
     });
   } catch {
-    return ambiguousResult(envelope, "transport_ambiguous", {
-      transport: "http",
-      status_code: null,
-    });
+    return checked(
+      envelope,
+      ambiguousResult(envelope, "transport_ambiguous", {
+        transport: "http",
+        status_code: null,
+      }),
+    );
   }
 
   if (response.status >= 300 && response.status < 400) {
     await response.body?.cancel();
-    return ambiguousResult(envelope, "provider_redirect_rejected", {
-      transport: "http",
-      status_code: response.status,
-    });
+    return checked(
+      envelope,
+      ambiguousResult(envelope, "provider_redirect_rejected", {
+        transport: "http",
+        status_code: response.status,
+      }),
+    );
   }
 
   let parsed = {};
   try {
     parsed = await readLimitedJson(response);
   } catch {
-    return ambiguousResult(envelope, "provider_protocol_error", {
-      transport: "http",
-      status_code: response.status,
-    });
+    return checked(
+      envelope,
+      ambiguousResult(envelope, "provider_protocol_error", {
+        transport: "http",
+        status_code: response.status,
+      }),
+    );
   }
 
   if (response.ok) {
     try {
-      return normalizeResult(parsed, {
-        transport: "http",
-        status_code: response.status,
-      });
+      return checked(
+        envelope,
+        normalizeResult(parsed, {
+          transport: "http",
+          status_code: response.status,
+        }),
+      );
     } catch {
-      return ambiguousResult(envelope, "provider_protocol_error", {
-        transport: "http",
-        status_code: response.status,
-      });
+      return checked(
+        envelope,
+        ambiguousResult(envelope, "provider_protocol_error", {
+          transport: "http",
+          status_code: response.status,
+        }),
+      );
     }
   }
 
   if (response.status === 429) {
-    return {
+    return checked(envelope, {
       outcome: "retry",
       provider_reference: parsed.provider_reference ?? null,
       provider_state: parsed.provider_state ?? null,
@@ -298,20 +312,20 @@ export async function sendProviderOperation(envelope) {
       result: null,
       transport: "http",
       status_code: response.status,
-    };
-  }
-
-  // A structured provider may explicitly tell us what happened even on a
-  // non-2xx response. Preserve that evidence. Otherwise do not infer that a
-  // financial instruction was not submitted merely from an HTTP status.
-  if (OUTCOMES.has(parsed.outcome)) {
-    return normalizeResult(parsed, {
-      transport: "http",
-      status_code: response.status,
     });
   }
 
-  return {
+  if (OUTCOMES.has(parsed.outcome)) {
+    return checked(
+      envelope,
+      normalizeResult(parsed, {
+        transport: "http",
+        status_code: response.status,
+      }),
+    );
+  }
+
+  return checked(envelope, {
     outcome:
       response.status >= 500 || response.status === 408
         ? "ambiguous"
@@ -324,5 +338,5 @@ export async function sendProviderOperation(envelope) {
     result: null,
     transport: "http",
     status_code: response.status,
-  };
+  });
 }
