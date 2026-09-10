@@ -8,7 +8,67 @@ import {
 const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
 const T = "2026-09-10T00:00:00.000Z";
 
+const keyPrincipal = {
+  id: "key_example",
+  tenant_id: "ten_example",
+  email: "builder@example.test",
+  scope: "sandbox",
+  permissions: ["*"],
+  created_at: T,
+  expires: "2026-09-11T00:00:00.000Z",
+};
+
 const OVERRIDES = {
+  postAuthSignup: {
+    description: "Sandbox key issued once",
+    schema: ref("KeySecret"),
+    example: {
+      ...keyPrincipal,
+      key: "bb_sandbox_returned_once",
+      note: "This is the only time the key is shown.",
+    },
+  },
+  postKeys: {
+    description: "API key issued once",
+    schema: ref("KeySecret"),
+    example: {
+      ...keyPrincipal,
+      permissions: ["customers:read"],
+      key: "bb_sandbox_returned_once",
+      note: "This is the only time the key is shown.",
+    },
+  },
+  getKeys: {
+    description: "Paginated auth & api keys collection",
+    schema: {
+      type: "object",
+      additionalProperties: true,
+      required: ["data"],
+      properties: {
+        object: { type: "string", const: "list" },
+        data: { type: "array", items: ref("KeyPrincipal") },
+        has_more: { type: "boolean" },
+        next_cursor: { type: ["string", "null"] },
+      },
+    },
+    example: {
+      object: "list",
+      data: [keyPrincipal],
+      current: {
+        key_id: keyPrincipal.id,
+        tenant_id: keyPrincipal.tenant_id,
+        scope: keyPrincipal.scope,
+        permissions: ["*"],
+      },
+      has_more: false,
+      next_cursor: null,
+    },
+  },
+  getKeysId: {
+    description: "API key principal",
+    schema: ref("KeyPrincipal"),
+    example: keyPrincipal,
+  },
   postApplicationsIdAttestation: {
     description: "Application attestation",
     schema: ref("Attestation"),
