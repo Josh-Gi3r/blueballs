@@ -17,15 +17,17 @@ work:
 ```text
 request
   -> authenticated principal
+  -> authorization decision
   -> domain state transition
   -> ledger postings
   -> durable event/outbox record
   -> idempotency result
+  -> audit/correlation evidence
   -> provider submission evidence, when applicable
 ```
 
-A command either commits the complete state transition or commits none of it.
-External side effects are never treated as rolled back merely because local
+A command either commits the complete local state transition or commits none of
+it. External side effects are never treated as rolled back merely because local
 state rolled back; ambiguous provider submission remains an explicit
 reconciliation state.
 
@@ -38,60 +40,81 @@ reconciliation state.
 - [x] Commit staged database state inside one SQLite transaction.
 - [x] Trigger event subscribers only after commit.
 - [x] Add regression coverage for a failure after money and event staging.
-- [ ] Prove the same invariant under Durable Object SQLite.
-- [ ] Prove concurrent requests cannot observe uncommitted state or lose a
-  committed update.
-- [ ] Add crash probes at every money-moving lifecycle boundary.
+- [x] Serialize request units while the shared in-memory cache remains the
+  storage view, preventing overlapping writes and dirty reads.
+- [x] Add a concurrent double-spend regression case.
+- [ ] Complete crash probes at every money-moving lifecycle boundary.
+- [ ] Complete Durable Object crash/eviction probes for each financial family,
+  not only the shared transaction layer.
 
-### Continuous integration
+### Local release verification
 
-- [x] Add GitHub Actions jobs for banking/OpenAPI, Workers, FX, Solidity and
-  container builds.
-- [ ] Confirm Actions are enabled and runs are being created for `main` and pull
-  requests.
-- [ ] Protect `main` and require the aggregate Production gate.
-- [ ] Require review for changes to ledger, authentication, policy, FX execution
-  and public contracts.
+Blueballs deliberately does not depend on hosted GitHub Actions. The release
+authority is the repository itself.
+
+- [x] Keep the complete cross-surface gate in `pnpm verify`.
+- [x] Make targeted production deploy commands run the same release verification
+  before publishing.
+- [x] Keep build-time drift gates for persistence schema, API contracts, runtime
+  ownership, key permissions and public examples.
+- [ ] Produce a clean-checkout verification report for the release commit.
+- [ ] Require maintainer review for changes to ledger, authentication, policy,
+  FX execution, migrations and public contracts.
 
 ### Executable API contract
 
-- [ ] Exercise all 181 catalogued banking operations against a clean runtime.
-- [ ] Validate every successful response against the generated OpenAPI schema.
-- [ ] Validate representative 400, 401, 403, 404, 409, 422, 429 and 503 problem
-  responses.
-- [ ] Fail CI for a documented operation that is not executable in its declared
-  mode, except explicitly adapter-required fail-closed operations.
-- [ ] Generate a machine-readable coverage artefact naming every operation and
-  its proof.
+- [x] Exercise all 181 catalogued banking operations for route/access/runtime
+  reachability.
+- [x] Validate successful responses against the same production schemas used by
+  generated OpenAPI during API integration tests.
+- [x] Validate request bodies against the same production request contracts at
+  the HTTP boundary.
+- [x] Validate documented success examples against their schemas during builds.
+- [x] Generate an operation-success coverage artifact from real HTTP test calls.
+- [ ] Complete successful lifecycle coverage for every success-capable operation.
+- [ ] Complete representative 400, 401, 403, 404, 409, 413, 422, 429, 502 and 503
+  problem-response conformance tests.
 
-### Clean-clone release proof
+### Clean-checkout release proof
 
 - [ ] `pnpm install --frozen-lockfile` succeeds on the pinned Node 24 runtime.
 - [ ] `pnpm verify` succeeds from a clean checkout.
 - [ ] Both reference Docker images build.
 - [ ] Compose topology validates.
 - [ ] Foundry unit, fuzz and invariant suites pass.
-- [ ] Generated contracts and SDK artefacts have no source drift.
+- [ ] Generated contracts and SDK artifacts have no source drift.
 
 ## P1 — production core hardening
 
 ### Concurrency and persistence
 
-- [ ] Define and implement the banking concurrency model explicitly.
-- [ ] Eliminate shared mutable cache visibility between overlapping requests.
-- [ ] Prevent lost updates with serialization or optimistic concurrency control.
-- [ ] Introduce versioned schema migrations for every persistent table/resource.
-- [ ] Test forward migration, restart during migration and rollback procedure.
+- [x] Define the current banking concurrency model explicitly: one serialized
+  unit of work per SQLite-backed banking runtime while the mutable cache exists.
+- [x] Prevent concurrent requests from observing another command's staged cache
+  mutations.
+- [x] Introduce append-only versioned application-data migrations.
+- [x] Fail closed when an older binary encounters a newer schema.
+- [x] Gate durable collection names against the versioned schema registry.
+- [ ] Add migration restart/interruption tests for every future data-transforming
+  migration.
+- [ ] Define the scale-out path from serialized single-runtime execution to
+  tenant sharding or optimistic concurrency without weakening invariants.
 
 ### Authentication and authorization
 
-- [ ] Add explicit authenticated principal introspection for trusted internal
-  service bindings.
-- [ ] Replace API-key-as-actor assumptions with named actors, roles and scoped
-  permissions while preserving machine credentials.
-- [ ] Record actor, credential, tenant and authorization decision in the audit
-  trail for sensitive operations.
-- [ ] Define step-up and dual-control requirements for privileged operations.
+- [x] Expose the authenticated key/tenant context to trusted internal consumers
+  through the normal authenticated key response rather than deriving tenancy
+  from an arbitrary list row.
+- [x] Add domain-scoped read/write permissions for secondary API keys.
+- [x] Prevent restricted credentials from granting permissions they do not hold.
+- [x] Gate every TENANT/GLOBAL_READ catalogue route to exactly one permission
+  domain.
+- [x] Record actor, credential, tenant, authorization context and command
+  correlation in structured audit evidence.
+- [ ] Add named human actors/session authentication for dashboard/operator use;
+  API keys remain machine credentials.
+- [ ] Define step-up and dual-control requirements for privileged operator and
+  treasury actions.
 
 ### Provider and adapter standard
 
@@ -104,16 +127,23 @@ reconciliation state.
 
 ### Edge routing
 
-- [ ] Generate Banking-vs-FX runtime ownership from machine-readable API
-  metadata instead of a handwritten path list.
+- [x] Define Banking-vs-FX runtime ownership in machine-readable metadata.
+- [x] Fail builds when the edge routing list and runtime ownership metadata drift.
+- [ ] Generate the edge routing table directly from the ownership contract so
+  the Worker contains no duplicated list.
 - [ ] Test every public `/v2` path through the production edge router.
-- [ ] Fail CI when an operation routes to a runtime that does not own it.
 
 ### Operational correctness
 
-- [ ] Introduce stable correlation IDs across request, command, ledger
-  transaction, event, provider attempt and reconciliation case.
-- [ ] Add structured audit records separate from customer-facing events.
+- [x] Introduce stable command correlation across request, ledger transaction and
+  event records.
+- [x] Add structured audit records separate from customer-facing events.
+- [x] Strip persistence-only ownership metadata from public responses and stored
+  event/webhook payloads.
+- [x] Persist webhook delivery intent in the financial transaction and retry it
+  from a durable outbox with stable delivery IDs.
+- [ ] Extend correlation through every external provider attempt and
+  reconciliation case.
 - [ ] Add health, readiness and dependency status suitable for orchestration.
 - [ ] Add production metrics for balances, posting failures, stale workflows,
   provider latency, reconciliation backlog and idempotency replays.
@@ -124,8 +154,10 @@ reconciliation state.
 - [ ] Backup and point-in-time recovery procedures with restore tests.
 - [ ] Disaster-recovery exercise and documented RPO/RTO targets.
 - [ ] Secret rotation and signing-key rotation runbooks.
-- [ ] Dependency and container vulnerability scanning.
-- [ ] SAST and secret scanning.
+- [ ] Dependency and container vulnerability scanning procedure that can run
+  locally/on a release machine.
+- [ ] SAST and secret scanning procedure that can run locally/on a release
+  machine.
 - [ ] Load, soak and chaos testing for payment and FX workflows.
 - [ ] External application and smart-contract security review before a 1.0
   production certification claim.
@@ -133,18 +165,21 @@ reconciliation state.
 ## Definition of done for 1.0
 
 Blueballs 1.0 may be described as production-grade only when the release commit
-has machine-verifiable evidence for all of the following:
+has retained machine-verifiable evidence for all of the following:
 
 ```text
-181 / 181 banking operations contract-tested
+181 / 181 banking operations classified and contract-tested
+all success-capable operations exercised successfully
+all adapter-required operations proven fail-closed without an adapter
 0 cross-tenant data leaks in the isolation suite
 0 partial local commits across tested financial commands
 0 undocumented runtime routes
 0 documented-but-missing routes
-0 OpenAPI drift
+0 OpenAPI request/response drift
 0 generated SDK drift
 0 unreviewed failing security or invariant tests
-all required CI checks green on the release commit
+pnpm verify passes on the exact release checkout
+release-machine Docker / Foundry / Compose proof retained
 ```
 
 Adapter-required operations may fail closed by design when no provider is
@@ -155,9 +190,9 @@ configured, but that behavior itself must be contract-tested and documented.
 Every release should publish or retain:
 
 - commit SHA;
-- CI run URL / check results;
+- local `pnpm verify` report/output for that exact checkout;
 - API operation coverage report;
-- OpenAPI artefacts;
+- OpenAPI artifacts;
 - SDK package proof;
 - contract test summary;
 - container image digests;
@@ -165,5 +200,5 @@ Every release should publish or retain:
 - migration version;
 - known production limitations and required external adapters.
 
-A screenshot, successful frontend build or static OpenAPI file is never evidence
-that a financial workflow works.
+A screenshot, successful frontend build, hosted status badge or static OpenAPI
+file is never evidence that a financial workflow works.
