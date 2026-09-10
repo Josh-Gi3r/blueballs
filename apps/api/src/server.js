@@ -26,6 +26,8 @@ import {
   visibleTo,
   positiveMinor,
   principalId,
+  setCommandContext,
+  BANK_API_MODE,
 } from "./kernel.js";
 import {
   ibanGenerate,
@@ -85,28 +87,28 @@ if (!["true", "false"].includes(trustProxyRaw)) {
   throw new Error("TRUST_PROXY must be true or false");
 }
 const TRUST_PROXY = trustProxyRaw === "true";
-
 const BODY_METHODS = new Set(["POST", "PATCH", "PUT"]);
 const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const WINDOW_MS = 60_000;
 const buckets = new Map();
 
-/* ---------------- helpers ---------------- */
+/* ---------------- transport helpers ---------------- */
 const json = (res, status, body, extra = {}) => {
   const payload = JSON.stringify(
     body,
-    (_, v) => (typeof v === "bigint" ? v.toString() : v),
+    (_, value) => (typeof value === "bigint" ? value.toString() : value),
     2,
   );
   res.writeHead(status, {
     "content-type":
-      status >= 400 && body.type
+      status >= 400 && body?.type
         ? "application/problem+json"
         : "application/json",
     "x-api-version": VERSION,
     "x-blueballs-source-commit": SOURCE_COMMIT,
     "x-ratelimit-limit": String(RATE_LIMIT),
-    "access-control-allow-headers": "content-type,x-api-key,x-idempotency-key",
+    "access-control-allow-headers":
+      "content-type,x-api-key,x-idempotency-key",
     "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
     ...extra,
   });
@@ -122,7 +124,9 @@ function rateLimit(id, limit) {
   }
   bucket.count += 1;
   if (buckets.size > 10_000) {
-    for (const [k, b] of buckets) if (b.resetAt <= nowMs) buckets.delete(k);
+    for (const [key, value] of buckets) {
+      if (value.resetAt <= nowMs) buckets.delete(key);
+    }
   }
   return {
     remaining: Math.max(0, limit - bucket.count),
@@ -136,9 +140,9 @@ const readBody = (req) =>
     let raw = "";
     let bytes = 0;
     let settled = false;
-    req.on("data", (c) => {
+    req.on("data", (chunk) => {
       if (settled) return;
-      bytes += Buffer.byteLength(c);
+      bytes += Buffer.byteLength(chunk);
       if (bytes > BODY_LIMIT_BYTES) {
         settled = true;
         req.pause();
@@ -152,7 +156,7 @@ const readBody = (req) =>
         );
         return;
       }
-      raw += c;
+      raw += chunk;
     });
     req.on("end", () => {
       if (settled) return;
@@ -174,7 +178,7 @@ const readBody = (req) =>
 const CORS_ORIGINS = new Set(
   String(process.env.CORS_ORIGINS || "")
     .split(",")
-    .map((v) => v.trim())
+    .map((value) => value.trim())
     .filter(Boolean),
 );
 for (const origin of CORS_ORIGINS) {
@@ -193,6 +197,7 @@ for (const origin of CORS_ORIGINS) {
     throw new Error(`CORS_ORIGINS must contain exact http(s) origins: ${origin}`);
   }
 }
+
 function corsHeaders(req) {
   const origin = req.headers.origin;
   return origin && CORS_ORIGINS.has(origin)
@@ -207,34 +212,34 @@ function sourceAddress(req) {
   return req.socket.remoteAddress || "unknown";
 }
 
+/* ---------------- authentication ---------------- */
 function auth(req) {
-  const key = req.headers["x-api-key"];
-  if (!key || Array.isArray(key))
+  const secret = req.headers["x-api-key"];
+  if (!secret || Array.isArray(secret)) {
     throw new ApiError(
       "authentication-error",
       401,
       "Send your key in the x-api-key header",
     );
-  const rec = db.keys.get(hashKey(key));
-  if (!rec)
+  }
+  const record = db.keys.get(hashKey(secret));
+  if (!record)
     throw new ApiError("authentication-error", 401, "That key is not valid");
-  if (rec.expires && Date.parse(rec.expires) <= Date.now()) {
-    // Rejection is enough; cleanup is deliberately not performed inside a
-    // failed auth request because the request unit of work rolls failures back.
+  if (record.expires && Date.parse(record.expires) <= Date.now()) {
     throw new ApiError(
       "authentication-error",
       401,
       "That sandbox key has expired; create a new one",
     );
   }
-  if (!rec.tenant_id || !db.tenants.has(rec.tenant_id)) {
+  if (!record.tenant_id || !db.tenants.has(record.tenant_id)) {
     throw new ApiError(
       "authentication-error",
       401,
       "That key belongs to an unsupported pre-release schema",
     );
   }
-  return rec;
+  return record;
 }
 
 function equalHexHash(actualHex, expectedHex) {
@@ -246,19 +251,21 @@ function equalHexHash(actualHex, expectedHex) {
 
 function operatorAuth(req) {
   const supplied = req.headers["x-api-key"];
-  if (!supplied || Array.isArray(supplied))
+  if (!supplied || Array.isArray(supplied)) {
     throw new ApiError(
       "authentication-error",
       401,
       "Send the operator key in the x-api-key header",
     );
+  }
   const expectedHash = process.env.OPERATOR_API_KEY_HASH;
-  if (!expectedHash)
+  if (!expectedHash) {
     throw new ApiError(
       "service-unavailable",
       503,
       "Operator API access is not configured",
     );
+  }
   if (!/^[0-9a-f]{64}$/i.test(expectedHash)) {
     throw new ApiError(
       "service-unavailable",
@@ -270,12 +277,13 @@ function operatorAuth(req) {
     throw new ApiError(
       "forbidden",
       403,
-      "A self-serve sandbox key cannot access operator state",
+      "A tenant key cannot access operator state",
     );
   }
   return { id: "operator", tenant_id: "operator", scope: "operator" };
 }
 
+/* ---------------- idempotency ---------------- */
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
   if (value && typeof value === "object") {
@@ -288,7 +296,6 @@ function canonical(value) {
   return value;
 }
 
-/** Cache authenticated mutations by stable tenant, operation and caller key. */
 async function idempotent(
   { req, body, url, route: matchedRoute, key: principal },
   fn,
@@ -310,6 +317,10 @@ async function idempotent(
       "x-idempotency-key must not be empty",
     );
   }
+
+  const idempotencyKeyHash = createHash("sha256").update(headerKey).digest("hex");
+  setCommandContext({ idempotency_key_hash: idempotencyKeyHash });
+
   const operation = `${req.method} ${matchedRoute.pattern}`;
   const storageKey = createHash("sha256")
     .update(`${principalId(principal)}\0${operation}\0${headerKey}`)
@@ -321,6 +332,7 @@ async function idempotent(
       ),
     )
     .digest("hex");
+
   const seen = db.idempotency.get(storageKey);
   if (seen) {
     if (Date.parse(seen.expires_at) <= Date.now()) {
@@ -333,9 +345,11 @@ async function idempotent(
           "This idempotency key was used with different parameters",
         );
       }
+      setCommandContext({ idempotent_replay: true });
       return { ...seen.result, replayed: true };
     }
   }
+
   const result = await fn();
   db.idempotency.set(storageKey, {
     tenant_id: principalId(principal),
@@ -347,22 +361,24 @@ async function idempotent(
   return result;
 }
 
-/* ---- discovery ---- */
+/* ---------------- discovery / auth ---------------- */
 route(
   "GET",
   "/v2",
   () => ({
     name: "Blueballs API",
     version: VERSION,
+    mode: BANK_API_MODE,
     source_commit: SOURCE_COMMIT,
     docs: `${process.env.PUBLIC_SITE_URL || "http://localhost:5280"}/developers`,
     signup:
-      "POST /v2/auth/signup — issues a sandbox key instantly, no approval",
+      BANK_API_MODE === "sandbox"
+        ? "POST /v2/auth/signup — issues a sandbox key instantly"
+        : "disabled in production; bootstrap through deployment secret/IAM",
   }),
   { public: true },
 );
 
-/* ---- auth: SELF-SERVE SANDBOX ---- */
 route(
   "POST",
   "/v2/auth/signup",
@@ -371,13 +387,14 @@ route(
     const tenant = {
       id: ksuid("ten"),
       email: body.email,
+      mode: "sandbox",
       created_at: new Date().toISOString(),
     };
     const secret = "bb_sandbox_" + randomBytes(18).toString("base64url");
     const expires = new Date(
       Date.now() + SANDBOX_KEY_LIFETIME_HOURS * 60 * 60 * 1000,
     ).toISOString();
-    const rec = {
+    const record = {
       id: ksuid("key"),
       tenant_id: tenant.id,
       email: body.email,
@@ -386,14 +403,14 @@ route(
       expires,
     };
     db.tenants.set(tenant.id, tenant);
-    db.keys.set(hashKey(secret), rec);
+    db.keys.set(hashKey(secret), record);
     emit(
       "key.issued",
-      { id: rec.id, scope: rec.scope },
-      { tenantId: rec.tenant_id },
+      { id: record.id, scope: record.scope },
+      { tenantId: record.tenant_id },
     );
     return {
-      ...rec,
+      ...record,
       key: secret,
       note: `This sandbox key expires at ${expires}. This is the only time the key is shown.`,
     };
@@ -404,11 +421,11 @@ route(
 route("GET", "/v2/keys", ({ key }) => ({
   object: "list",
   data: [...db.keys.values()]
-    .filter((k) => k.tenant_id === key.tenant_id)
-    .map(({ ...k }) => k),
+    .filter((candidate) => candidate.tenant_id === key.tenant_id)
+    .map((candidate) => ({ ...candidate })),
 }));
 
-/* ---- customers ---- */
+/* ---------------- customers ---------------- */
 route(
   "POST",
   "/v2/customers",
@@ -421,7 +438,7 @@ route(
         "type must be individual or business",
       );
     }
-    const c = {
+    const customer = {
       id: ksuid("cus"),
       type: body.type,
       name: body.name,
@@ -433,9 +450,9 @@ route(
       created_at: new Date().toISOString(),
       owner: principalId(key),
     };
-    db.customers.set(c.id, c);
-    emit("customer.created", c, { tenantId: c.owner });
-    return c;
+    db.customers.set(customer.id, customer);
+    emit("customer.created", customer, { tenantId: customer.owner });
+    return customer;
   },
   { created: true },
 );
@@ -449,60 +466,71 @@ route("GET", "/v2/customers/:id", ({ params, key }) =>
 );
 
 route("GET", "/v2/customers/:id/capabilities", ({ params, key }) => {
-  const c = must(db.customers, params.id, "customer", key);
-  const verified = c.status === "completed" && c.decision === "approved";
+  const customer = must(db.customers, params.id, "customer", key);
+  const verified =
+    customer.status === "completed" && customer.decision === "approved";
   return {
     object: "list",
-    data: Object.values(RAILS).map((r) => ({
-      rail: r.id,
+    data: Object.values(RAILS).map((rail) => ({
+      rail: rail.id,
       status: verified ? "active" : "inactive",
       requirements: verified ? [] : ["identity_verification"],
-      limit: verified ? r.max : "1000.00",
+      limit: verified ? rail.max : "1000.00",
     })),
   };
 });
 
 route("POST", "/v2/customers/:id/verify", ({ params, body, key }) => {
-  const c = must(db.customers, params.id, "customer", key);
-  c.status = "completed";
-  c.decision = body.decision ?? "approved";
-  c.tier = c.decision === "approved" ? 3 : 1;
+  const customer = must(db.customers, params.id, "customer", key);
+  customer.status = "completed";
+  customer.decision = body.decision ?? "approved";
+  customer.tier = customer.decision === "approved" ? 3 : 1;
   emit(
     "customer.status_changed",
-    { id: c.id, status: c.status, decision: c.decision },
-    { tenantId: c.owner },
+    {
+      id: customer.id,
+      status: customer.status,
+      decision: customer.decision,
+    },
+    { tenantId: customer.owner },
   );
-  return c;
+  return customer;
 });
 
-/* ---- accounts ---- */
+/* ---------------- accounts ---------------- */
 route(
   "POST",
   "/v2/accounts",
   async ({ body, key }) => {
     need(body, ["customer", "currency"]);
-    const c = must(db.customers, body.customer, "customer", key);
-    const cur = String(body.currency).toUpperCase();
-    if (!RATES[cur])
+    const customer = must(db.customers, body.customer, "customer", key);
+    const currency = String(body.currency).toUpperCase();
+    if (!RATES[currency]) {
       throw new ApiError(
         "validation-error",
         400,
-        `${cur} is not a supported currency`,
+        `${currency} is not a supported currency`,
       );
+    }
 
-    const a = {
+    const account = {
       id: ksuid("acc"),
-      customer: c.id,
-      currency: cur,
+      customer: customer.id,
+      currency,
       type: body.type ?? "holding",
       status: "open",
       created_at: new Date().toISOString(),
-      details: detailsFor(cur),
+      // Production receiving details must come from a connected bank/payment
+      // provider, never from the fictional sandbox generator below.
+      details: BANK_API_MODE === "sandbox" ? detailsFor(currency) : null,
       owner: principalId(key),
     };
-    db.accounts.set(a.id, a);
-    emit("account.opened", a, { tenantId: a.owner });
-    return { ...a, balance: { amount: "0.00", currency: cur } };
+    db.accounts.set(account.id, account);
+    emit("account.opened", account, { tenantId: account.owner });
+    return {
+      ...account,
+      balance: { amount: "0.00", currency },
+    };
   },
   { created: true },
 );
@@ -510,34 +538,36 @@ route(
 const EUR_BANK_CODE = "50000888";
 const USD_ROUTING_PREFIX = "05000088";
 
-const randomDigits = (n) => {
+const randomDigits = (length) => {
   let out = "";
-  while (out.length < n)
+  while (out.length < length) {
     out += randomBytes(4).readUInt32BE(0).toString().padStart(10, "0");
-  return out.slice(0, n);
+  }
+  return out.slice(0, length);
 };
 
-function detailsFor(cur) {
-  if (cur === "EUR") {
+function detailsFor(currency) {
+  if (currency === "EUR") {
     const bban = EUR_BANK_CODE + randomDigits(10);
     return { type: "iban", iban: ibanGenerate("DE", bban), bic: "BLBLDEB2" };
   }
-  if (cur === "GBP") {
-    const sortCode = `${randomDigits(2)}-${randomDigits(2)}-${randomDigits(2)}`;
+  if (currency === "GBP") {
     return {
       type: "sort_code",
       account_number: randomDigits(8),
-      sort_code: sortCode,
+      sort_code: `${randomDigits(2)}-${randomDigits(2)}-${randomDigits(2)}`,
     };
   }
-  if (cur === "USD") {
+  if (currency === "USD") {
     return {
       type: "aba",
       account_number: randomDigits(10),
       routing_number: abaGenerate(USD_ROUTING_PREFIX),
     };
   }
-  if (cur === "SGD") return { type: "paynow", proxy: "+65" + randomDigits(8) };
+  if (currency === "SGD") {
+    return { type: "paynow", proxy: "+65" + randomDigits(8) };
+  }
   return {
     type: "onchain",
     address: "0x" + randomBytes(20).toString("hex"),
@@ -550,48 +580,56 @@ route("GET", "/v2/accounts", ({ url, key }) =>
 );
 
 route("GET", "/v2/accounts/:id", ({ params, key }) => {
-  const a = must(db.accounts, params.id, "account", key);
+  const account = must(db.accounts, params.id, "account", key);
   return {
-    ...a,
+    ...account,
     balance: {
-      amount: fromMinor(balanceOf(a.id, a.currency)),
-      currency: a.currency,
+      amount: fromMinor(balanceOf(account.id, account.currency)),
+      currency: account.currency,
     },
   };
 });
 
 route("POST", "/v2/accounts/:id/credit", ({ params, body, key }) => {
-  const a = must(db.accounts, params.id, "account", key);
+  const account = must(db.accounts, params.id, "account", key);
   need(body, ["amount"]);
-  const minor = positiveMinor(body.amount);
+  const amount = positiveMinor(body.amount);
   post(
     [
-      { account: a.id, currency: a.currency, amount: minor },
-      { account: "external:funding", currency: a.currency, amount: -minor },
+      { account: account.id, currency: account.currency, amount },
+      {
+        account: "external:funding",
+        currency: account.currency,
+        amount: -amount,
+      },
     ],
     "sandbox funding",
   );
   emit(
     "account.credited",
-    { account: a.id, amount: body.amount, currency: a.currency },
-    { tenantId: a.owner },
+    {
+      account: account.id,
+      amount: body.amount,
+      currency: account.currency,
+    },
+    { tenantId: account.owner },
   );
   return {
-    ...a,
+    ...account,
     balance: {
-      amount: fromMinor(balanceOf(a.id, a.currency)),
-      currency: a.currency,
+      amount: fromMinor(balanceOf(account.id, account.currency)),
+      currency: account.currency,
     },
   };
 });
 
-/* ---- recipients ---- */
+/* ---------------- recipients ---------------- */
 route(
   "POST",
   "/v2/recipients",
   ({ body, key }) => {
     need(body, ["name"]);
-    const r = {
+    const recipient = {
       id: ksuid("rcp"),
       name: body.name,
       destinations: [],
@@ -599,71 +637,72 @@ route(
       owner: principalId(key),
     };
     if (body.destination) {
-      r.destinations.push({
+      recipient.destinations.push({
         id: ksuid("dst"),
         ...body.destination,
         name_check: "unchecked",
       });
     }
-    db.recipients.set(r.id, r);
-    return r;
+    db.recipients.set(recipient.id, recipient);
+    return recipient;
   },
   { created: true },
 );
+
 route("GET", "/v2/recipients", ({ url, key }) =>
   paginate(visibleTo([...db.recipients.values()], key), url),
 );
 
-/* ---- quotes ---- */
+/* ---------------- quotes ---------------- */
 route(
   "POST",
   "/v2/quotes",
   ({ body, key }) => {
     need(body, ["from", "to", "amount"]);
-    const from = body.from.toUpperCase();
-    const to = body.to.toUpperCase();
-    if (!RATES[from] || !RATES[to])
+    const from = String(body.from).toUpperCase();
+    const to = String(body.to).toUpperCase();
+    if (!RATES[from] || !RATES[to]) {
       throw new ApiError("validation-error", 400, "Unsupported currency pair");
+    }
     const thin = THIN.has(from) || THIN.has(to);
-    const bps = thin ? 85 : 4;
-    const minor = positiveMinor(body.amount);
-    const outMinor = convertMinor(minor, from, to, bps);
-
-    const q = {
+    const spreadBps = thin ? 85 : 4;
+    const amount = positiveMinor(body.amount);
+    const output = convertMinor(amount, from, to, spreadBps);
+    const quote = {
       id: ksuid("quo"),
       owner: principalId(key),
       from,
       to,
       amount: { amount: body.amount, currency: from },
-      receives: { amount: fromMinor(outMinor), currency: to },
+      receives: { amount: fromMinor(output), currency: to },
       rate: rateString(from, to),
-      spread_bps: bps,
+      spread_bps: spreadBps,
       lockable: true,
       settlement: thin ? "when_matched" : "instant",
       liquidity: thin ? "thin" : "deep",
-      expires_at: new Date(Date.now() + 30000).toISOString(),
+      expires_at: new Date(Date.now() + 30_000).toISOString(),
       created_at: new Date().toISOString(),
     };
-    db.quotes.set(q.id, q);
-    return q;
+    db.quotes.set(quote.id, quote);
+    return quote;
   },
   { created: true },
 );
 
 route("GET", "/v2/quotes/:id", ({ params, key }) => {
-  const q = must(db.quotes, params.id, "quote", key);
-  return { ...q, expired: Date.parse(q.expires_at) < Date.now() };
+  const quote = must(db.quotes, params.id, "quote", key);
+  return { ...quote, expired: Date.parse(quote.expires_at) < Date.now() };
 });
 
-/* ---- transfers ---- */
+/* ---------------- transfers ---------------- */
 route(
   "POST",
   "/v2/transfers",
   async ({ body, key }) => {
     need(body, ["from", "amount", "rail"]);
-    const acc = must(db.accounts, body.from, "account", key);
+    const account = must(db.accounts, body.from, "account", key);
     const rail = RAILS[body.rail];
-    if (!rail)
+    if (!rail) {
       throw new ApiError("validation-error", 400, `Unknown rail ${body.rail}`, [
         {
           field: "rail",
@@ -671,11 +710,22 @@ route(
           code: "unknown_rail",
         },
       ]);
-    if (rail.currency !== acc.currency) {
+    }
+    if (rail.currency !== account.currency) {
       throw new ApiError(
         "validation-error",
         400,
-        `${rail.id} settles in ${rail.currency}, not ${acc.currency}`,
+        `${rail.id} settles in ${rail.currency}, not ${account.currency}`,
+      );
+    }
+    if (
+      body.currency !== undefined &&
+      String(body.currency).toUpperCase() !== account.currency
+    ) {
+      throw new ApiError(
+        "validation-error",
+        400,
+        `Transfer currency must match source account currency ${account.currency}`,
       );
     }
 
@@ -689,24 +739,24 @@ route(
         const found = candidate.destinations.find(
           (item) => item.id === body.destination,
         );
-        if (found) {
-          destination = found;
-          if (recipient && candidate.id !== recipient.id) {
-            throw new ApiError(
-              "validation-error",
-              400,
-              `Destination ${found.id} does not belong to recipient ${recipient.id}`,
-            );
-          }
-          break;
+        if (!found) continue;
+        destination = found;
+        if (recipient && candidate.id !== recipient.id) {
+          throw new ApiError(
+            "validation-error",
+            400,
+            `Destination ${found.id} does not belong to recipient ${recipient.id}`,
+          );
         }
+        break;
       }
-      if (!destination)
+      if (!destination) {
         throw new ApiError(
           "not-found",
           404,
           `No destination ${body.destination}`,
         );
+      }
       if (destination.rail && destination.rail !== rail.id) {
         throw new ApiError(
           "validation-error",
@@ -714,43 +764,50 @@ route(
           `Destination ${destination.id} uses ${destination.rail}, not ${rail.id}`,
         );
       }
-      if (destination.currency && destination.currency !== acc.currency) {
+      if (
+        destination.currency &&
+        destination.currency !== account.currency
+      ) {
         throw new ApiError(
           "validation-error",
           400,
-          `Destination ${destination.id} settles in ${destination.currency}, not ${acc.currency}`,
+          `Destination ${destination.id} settles in ${destination.currency}, not ${account.currency}`,
         );
       }
     }
 
-    const minor = positiveMinor(body.amount);
-    if (minor < toMinor(rail.min))
+    const amount = positiveMinor(body.amount);
+    if (amount < toMinor(rail.min)) {
       throw new ApiError(
         "below-minimum",
         400,
         `${rail.id} minimum is ${rail.min} ${rail.currency}`,
       );
-    if (minor > toMinor(rail.max))
+    }
+    if (amount > toMinor(rail.max)) {
       throw new ApiError(
         "limit-exceeded",
         400,
         `${rail.id} maximum is ${rail.max} ${rail.currency}`,
       );
-    if (balanceOf(acc.id, acc.currency) < minor) {
+    }
+    const available = balanceOf(account.id, account.currency);
+    if (available < amount) {
       throw new ApiError(
         "insufficient-balance",
         400,
-        `Account holds ${fromMinor(balanceOf(acc.id, acc.currency))} ${acc.currency}`,
+        `Account holds ${fromMinor(available)} ${account.currency}`,
       );
     }
-    const nowStamp = new Date().toISOString();
-    const t = {
+
+    const createdAt = new Date().toISOString();
+    const transfer = {
       id: ksuid("trf"),
       status: "created",
-      from: acc.id,
+      from: account.id,
       recipient: recipient?.id ?? null,
       destination: destination?.id ?? null,
-      amount: { amount: body.amount, currency: acc.currency },
+      amount: { amount: body.amount, currency: account.currency },
       rail: rail.id,
       legs: [
         {
@@ -758,40 +815,51 @@ route(
           rail: rail.id,
           status: "created",
           amount: body.amount,
-          currency: acc.currency,
+          currency: account.currency,
         },
       ],
       client_reference_id: body.client_reference_id ?? null,
-      created_at: nowStamp,
+      created_at: createdAt,
       owner: principalId(key),
     };
 
     post(
       [
-        { account: acc.id, currency: acc.currency, amount: -minor },
+        { account: account.id, currency: account.currency, amount: -amount },
         {
           account: "clearing:" + rail.id,
-          currency: acc.currency,
-          amount: minor,
+          currency: account.currency,
+          amount,
         },
       ],
-      `transfer ${t.id}`,
+      `transfer ${transfer.id}`,
     );
 
-    db.transfers.set(t.id, t);
-    emit("transfer.created", t, { tenantId: t.owner });
-    advance(t, "funds_received");
-    if (rail.speed === "seconds") {
-      advance(t, "submitted");
-      advance(t, "settled");
+    db.transfers.set(transfer.id, transfer);
+    emit("transfer.created", transfer, { tenantId: transfer.owner });
+    advance(transfer, "funds_received");
+
+    if (BANK_API_MODE === "sandbox" && rail.speed === "seconds") {
+      advance(transfer, "submitted");
+      advance(transfer, "settled");
+    } else if (BANK_API_MODE === "production") {
+      emit(
+        "transfer.awaiting_provider_submission",
+        {
+          id: transfer.id,
+          rail: transfer.rail,
+          current_status: "funds_received",
+        },
+        { tenantId: transfer.owner },
+      );
     }
-    return db.transfers.get(t.id);
+    return db.transfers.get(transfer.id);
   },
   { created: true },
 );
 
-function advance(t, status) {
-  const stored = db.transfers.get(t.id);
+function advance(transfer, status) {
+  const stored = db.transfers.get(transfer.id);
   if (!stored) return;
   const previous = stored.status;
   stored.status = status;
@@ -805,15 +873,15 @@ function advance(t, status) {
 }
 
 route("POST", "/v2/transfers/:id/settle", ({ params, key }) => {
-  const t = must(db.transfers, params.id, "transfer", key);
-  if (t.status !== "funds_received") {
+  const transfer = must(db.transfers, params.id, "transfer", key);
+  if (transfer.status !== "funds_received") {
     throw new ApiError(
       "conflict",
       409,
-      `Transfer ${t.id} is ${t.status}, not waiting for a rail window`,
+      `Transfer ${transfer.id} is ${transfer.status}, not waiting for a rail window`,
     );
   }
-  const rail = RAILS[t.rail];
+  const rail = RAILS[transfer.rail];
   if (!rail.weekend && [0, 6].includes(new Date().getUTCDay())) {
     throw new ApiError(
       "rail-unavailable",
@@ -821,10 +889,10 @@ route("POST", "/v2/transfers/:id/settle", ({ params, key }) => {
       `${rail.id} does not run at weekends. Next window is Monday.`,
     );
   }
-  advance(t, "submitted");
-  advance(t, "confirming");
-  advance(t, "settled");
-  return db.transfers.get(t.id);
+  advance(transfer, "submitted");
+  advance(transfer, "confirming");
+  advance(transfer, "settled");
+  return db.transfers.get(transfer.id);
 });
 
 route("GET", "/v2/transfers", ({ url, key }) =>
@@ -834,20 +902,23 @@ route("GET", "/v2/transfers/:id", ({ params, key }) =>
   must(db.transfers, params.id, "transfer", key),
 );
 
-/* ---- ledger ---- */
+/* ---------------- ledger / rails / events / reference ---------------- */
 route("GET", "/v2/ledger", ({ url, key }) => {
-  const acct = url.searchParams.get("account");
+  const accountFilter = url.searchParams.get("account");
   const mine = new Set(
-    visibleTo([...db.accounts.values()], key).map((a) => a.id),
+    visibleTo([...db.accounts.values()], key).map((account) => account.id),
   );
   const rows = db.ledger
-    .map((r, i) => ({ id: `led_${i}`, ...r, amount: fromMinor(r.amount) }))
-    .filter((r) => mine.has(r.account))
-    .filter((r) => !acct || r.account === acct);
+    .map((row, index) => ({
+      id: `led_${index}`,
+      ...row,
+      amount: fromMinor(row.amount),
+    }))
+    .filter((row) => mine.has(row.account))
+    .filter((row) => !accountFilter || row.account === accountFilter);
   return paginate(rows, url);
 });
 
-/* ---- rails registry ---- */
 route(
   "GET",
   "/v2/rails",
@@ -858,14 +929,13 @@ route(
   "GET",
   "/v2/rails/:id",
   ({ params }) => {
-    const r = RAILS[params.id];
-    if (!r) throw new ApiError("not-found", 404, `No rail ${params.id}`);
-    return r;
+    const rail = RAILS[params.id];
+    if (!rail) throw new ApiError("not-found", 404, `No rail ${params.id}`);
+    return rail;
   },
   { public: true },
 );
 
-/* ---- events ---- */
 route("GET", "/v2/events", ({ url, key }) =>
   paginate(
     [...db.events]
@@ -876,21 +946,20 @@ route("GET", "/v2/events", ({ url, key }) =>
   ),
 );
 
-/* ---- reference data ---- */
 route(
   "GET",
   "/v2/currencies",
   () => ({
     object: "list",
-    data: Object.keys(RATES).map((c) => ({
-      code: c,
-      thin_liquidity: THIN.has(c),
+    data: Object.keys(RATES).map((code) => ({
+      code,
+      thin_liquidity: THIN.has(code),
     })),
   }),
   { public: true },
 );
 
-/* ---------------- M2 family fan-out ---------------- */
+/* ---------------- family fan-out ---------------- */
 const FAMILY_MODULES = [
   ["builder.js", () => import("./routes/builder.js")],
   ["business.js", () => import("./routes/business.js")],
@@ -908,7 +977,7 @@ console.log(
   `  loaded ${FAMILY_MODULES.length} family module(s): ${FAMILY_MODULES.map(([file]) => file).join(", ")}`,
 );
 
-/* ---------------- deliberate catalogue 501s ---------------- */
+/* ---------------- catalogue reconciliation ---------------- */
 let stubbed = 0;
 let cataloguedCount = 0;
 export function registerCatalogue(endpoints) {
@@ -937,7 +1006,7 @@ export function registerCatalogue(endpoints) {
       },
       { access },
     );
-    added++;
+    added += 1;
   }
   cataloguedCount = endpoints.length;
   stubbed += added;
@@ -963,6 +1032,7 @@ route(
 /* ---------------- request pipeline ---------------- */
 const server = createServer(async (req, res) => {
   const requestId = ksuid("req");
+  const commandId = ksuid("cmd");
   const url = new URL(req.url, `http://${req.headers.host}`);
   const cors = corsHeaders(req);
   if (req.method === "OPTIONS") return json(res, 204, {}, cors);
@@ -978,106 +1048,124 @@ const server = createServer(async (req, res) => {
     ...cors,
   };
   if (sourceQuota.exceeded) {
-    const err = new ApiError(
+    const error = new ApiError(
       "rate-limited",
       429,
       `Over ${SOURCE_RATE_LIMIT} requests per minute from this source. Try again shortly.`,
     );
-    return json(res, 429, err.toProblem(url.pathname, requestId), {
+    return json(res, 429, error.toProblem(url.pathname, requestId), {
       ...quotaHeaders,
       "retry-after": String(
         Math.max(1, sourceQuota.reset - Math.floor(Date.now() / 1000)),
       ),
       "x-request-id": requestId,
+      "x-command-id": commandId,
     });
   }
 
   try {
     const hit = match(req.method, url.pathname);
-    if (!hit)
+    if (!hit) {
       throw new ApiError(
         "not-found",
         404,
         `No route for ${req.method} ${url.pathname}`,
       );
-
-    // Parse the body before entering the serialized state boundary so a slow
-    // client upload cannot block unrelated banking operations.
+    }
     const body = BODY_METHODS.has(req.method) ? await readBody(req) : {};
 
-    // Auth, authorization-visible state and route execution all run inside the
-    // same serialized scope. This prevents any request, including a GET, from
-    // observing a key/resource row that another request has staged but not yet
-    // committed. A future MVCC store can relax this without changing API rules.
-    const result = await inRequestScope(async () => {
-      const key =
-        hit.r.access === "PUBLIC"
-          ? null
-          : hit.r.access === "OPERATOR"
-            ? operatorAuth(req)
-            : auth(req);
+    const result = await inRequestScope(
+      async () => {
+        // Set command metadata before auth so authentication/authorization
+        // failures are durable security audit events without recording secrets.
+        setCommandContext({
+          request_id: requestId,
+          operation: `${req.method} ${hit.r.pattern}`,
+          method: req.method,
+          path: url.pathname,
+          access: hit.r.access,
+          audit: hit.r.access !== "PUBLIC" || req.method !== "GET",
+        });
 
-      if (key && hit.r.access !== "OPERATOR") {
-        const tenantQuota = rateLimit(
-          `tenant:${principalId(key)}`,
-          TENANT_RATE_LIMIT,
-        );
-        quotaHeaders = {
-          ...quotaHeaders,
-          "x-ratelimit-limit": String(
-            Math.min(SOURCE_RATE_LIMIT, TENANT_RATE_LIMIT),
-          ),
-          "x-ratelimit-remaining": String(
-            Math.min(sourceQuota.remaining, tenantQuota.remaining),
-          ),
-          "x-ratelimit-reset": String(
-            Math.min(sourceQuota.reset, tenantQuota.reset),
-          ),
-        };
-        if (tenantQuota.exceeded) {
-          throw new ApiError(
-            "rate-limited",
-            429,
-            `Over ${TENANT_RATE_LIMIT} requests per minute for this tenant. Try again shortly.`,
-          );
+        const key =
+          hit.r.access === "PUBLIC"
+            ? null
+            : hit.r.access === "OPERATOR"
+              ? operatorAuth(req)
+              : auth(req);
+
+        if (key) {
+          setCommandContext({
+            tenant_id: key.tenant_id ?? null,
+            actor_id: key.id ?? null,
+            actor_scope: key.scope ?? null,
+          });
         }
-      }
 
-      const ctx = { params: hit.params, body, url, key, req };
-      return MUTATION_METHODS.has(req.method)
-        ? idempotent({ req, body, url, route: hit.r, key }, () =>
-            hit.r.handler(ctx),
-          )
-        : hit.r.handler(ctx);
-    });
+        if (key && hit.r.access !== "OPERATOR") {
+          const tenantQuota = rateLimit(
+            `tenant:${principalId(key)}`,
+            TENANT_RATE_LIMIT,
+          );
+          quotaHeaders = {
+            ...quotaHeaders,
+            "x-ratelimit-limit": String(
+              Math.min(SOURCE_RATE_LIMIT, TENANT_RATE_LIMIT),
+            ),
+            "x-ratelimit-remaining": String(
+              Math.min(sourceQuota.remaining, tenantQuota.remaining),
+            ),
+            "x-ratelimit-reset": String(
+              Math.min(sourceQuota.reset, tenantQuota.reset),
+            ),
+          };
+          if (tenantQuota.exceeded) {
+            throw new ApiError(
+              "rate-limited",
+              429,
+              `Over ${TENANT_RATE_LIMIT} requests per minute for this tenant. Try again shortly.`,
+            );
+          }
+        }
+
+        const ctx = { params: hit.params, body, url, key, req };
+        return MUTATION_METHODS.has(req.method)
+          ? idempotent({ req, body, url, route: hit.r, key }, () =>
+              hit.r.handler(ctx),
+            )
+          : hit.r.handler(ctx);
+      },
+      { command_id: commandId, request_id: requestId },
+    );
 
     json(res, hit.r.successStatus, result, {
       ...quotaHeaders,
       "x-request-id": requestId,
+      "x-command-id": commandId,
     });
-  } catch (err) {
-    const e =
-      err instanceof ApiError
-        ? err
-        : new ApiError("internal-error", 500, err.message);
-    if (!(err instanceof ApiError)) console.error(err);
-    json(res, e.status, e.toProblem(url.pathname, requestId), {
+  } catch (error) {
+    const apiError =
+      error instanceof ApiError
+        ? error
+        : new ApiError("internal-error", 500, error.message);
+    if (!(error instanceof ApiError)) console.error(error);
+    json(res, apiError.status, apiError.toProblem(url.pathname, requestId), {
       ...quotaHeaders,
       "x-request-id": requestId,
+      "x-command-id": error?.command_id ?? commandId,
     });
   }
 });
 
 server.listen(API_PORT, () => {
   console.log(
-    `  ${cataloguedCount - stubbed} implemented · ${stubbed} deliberate 501s · ${cataloguedCount} catalogued`,
+    `  mode ${BANK_API_MODE} · ${cataloguedCount - stubbed} implemented · ${stubbed} deliberate 501s · ${cataloguedCount} catalogued`,
   );
   console.log(`
 ╔════════════════════════════════════════════════════════╗
 ║  Blueballs API                                         ║
 ╠════════════════════════════════════════════════════════╣
 ║  http://localhost:${API_PORT}/v2                              ║
-║  Get a key:  POST /v2/auth/signup {"email":"you@x.io"} ║
 ║  Docs:       http://localhost:5280/developers          ║
 ╚════════════════════════════════════════════════════════╝`);
 });
