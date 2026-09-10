@@ -28,6 +28,7 @@ import {
   publicResponse,
   validateSuccessfulResponse,
 } from "./response-validation.js";
+import { normalizePublicOperationResponse } from "./response-normalization.js";
 import { validateRequestBody } from "./request-validation.js";
 import { validateQueryParameters } from "./query-validation.js";
 import {
@@ -245,6 +246,8 @@ export const route = (method, pattern, handler, opts = {}) => {
       commandId: currentCommandId(),
       queue: queueProviderOperation,
     });
+
+    result = normalizePublicOperationResponse(method, pattern, result);
 
     if (method === "POST" && pattern === "/v2/auth/signup" && result?.id) {
       const stored = persistedKeyById(result.id, result.tenant_id);
