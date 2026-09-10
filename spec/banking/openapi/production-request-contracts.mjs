@@ -17,6 +17,15 @@ const obj = (properties = {}, required = [], additionalProperties = false) => ({
   ...(required.length ? { required } : {}),
 });
 
+const fxSettlementAccounts = {
+  account: ref("Identifier"),
+  receive_account: {
+    ...ref("Identifier"),
+    description:
+      "Target-currency account owned by the same customer. May be omitted only when exactly one eligible target-currency account can be resolved.",
+  },
+};
+
 export const REQUEST_BODIES = {
   ...LEGACY_REQUEST_BODIES,
 
@@ -70,6 +79,60 @@ export const REQUEST_BODIES = {
         },
       },
       ["account", "currency", "amount", "pair"],
+    ),
+  },
+
+  postFxIntents: {
+    required: true,
+    schema: obj(
+      {
+        ...fxSettlementAccounts,
+        from: ref("CurrencyCode"),
+        to: ref("CurrencyCode"),
+        amount: ref("DecimalAmount"),
+        min_receive: ref("DecimalAmount"),
+        mode: { type: "string", enum: ["maker", "taker"], default: "taker" },
+        signature: string("Optional signed-intent evidence"),
+        ttl_seconds: integer("Intent lifetime", {
+          minimum: 1,
+          maximum: 86400,
+          default: 300,
+        }),
+      },
+      ["account", "from", "to", "amount", "min_receive"],
+    ),
+  },
+
+  postFxRfq: {
+    required: true,
+    schema: obj(
+      {
+        ...fxSettlementAccounts,
+        from: ref("CurrencyCode"),
+        to: ref("CurrencyCode"),
+        amount: ref("DecimalAmount"),
+      },
+      ["account", "from", "to", "amount"],
+    ),
+  },
+
+  putFxAppetite: {
+    required: true,
+    schema: obj(
+      {
+        pair: string("Directional stablecoin pair", {
+          pattern: "^[A-Z0-9]{3,12}/[A-Z0-9]{3,12}$",
+        }),
+        enabled: { type: "boolean" },
+        max_position: ref("DecimalAmount"),
+        markup_bps: {
+          type: "number",
+          minimum: 0,
+          maximum: 10000,
+          description: "Principal markup over the imbalance price",
+        },
+      },
+      ["pair"],
     ),
   },
 
