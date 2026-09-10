@@ -55,6 +55,8 @@ function gatewayResponse(envelope) {
           expires: "12/29",
           processor_token: "card_tok_provider_1",
           status: "active",
+          // A malicious/misconfigured provider returning PCI data must not make
+          // it into Blueballs persistent card state.
           pan: "5555000000004242",
           cvv: "123",
         },
@@ -118,6 +120,12 @@ test("production cards, receiving details, onboarding and transfers execute thro
     const envelope = await bodyOf(req);
     assert.equal(req.headers["x-idempotency-key"], envelope.job_id);
     assert.equal(envelope.phase, "submit");
+    assert.ok(envelope.payload && typeof envelope.payload === "object");
+    assert.equal(
+      envelope.payload.format,
+      undefined,
+      "the provider gateway must receive decrypted payload data, not the durable ciphertext envelope",
+    );
     seen.push(envelope);
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify(gatewayResponse(envelope)));
@@ -125,6 +133,7 @@ test("production cards, receiving details, onboarding and transfers execute thro
   t.after(() => gateway.close());
   const api = await productionApi(t, gateway);
 
+  // Production mode has no self-serve sandbox signup.
   const signup = await api.request("POST", "/v2/auth/signup", {
     body: { email: "should-not-work@example.test" },
   });
@@ -141,24 +150,29 @@ test("production cards, receiving details, onboarding and transfers execute thro
     body: { customer: customer.body.id, currency: "SGD" },
   });
   assert.equal(account.status, 201);
-  assert.equal(account.body.details, null, "production accounts must not expose sandbox receiving coordinates");
+  assert.equal(account.body.details, null, "production must not invent bank details");
 
   const details = await api.request(
     "POST",
     `/v2/accounts/${account.body.id}/details`,
-    { key: BOOTSTRAP_KEY, body: { rail: "paynow" } },
+    {
+      key: BOOTSTRAP_KEY,
+      body: { rail: "paynow" },
+    },
   );
   assert.equal(details.status, 201);
   assert.equal(details.body.status, "pending_provisioning");
   assert.equal(details.body.proxy, undefined);
 
-  const provisionedDetails = await waitFor(async () => {
+  const issuedDetails = await waitFor(async () => {
     const response = await api.request("GET", `/v2/details/${details.body.id}`, {
       key: BOOTSTRAP_KEY,
     });
-    return response.body.status === "active" ? response : null;
+    return response.status === 200 && response.body.status === "active"
+      ? response.body
+      : null;
   }, "provider-backed receiving details");
-  assert.equal(provisionedDetails.body.proxy, "+6591112222");
+  assert.equal(issuedDetails.proxy, "+6591112222");
 
   const card = await api.request("POST", "/v2/cards", {
     key: BOOTSTRAP_KEY,
@@ -170,42 +184,59 @@ test("production cards, receiving details, onboarding and transfers execute thro
   });
   assert.equal(card.status, 201);
   assert.equal(card.body.status, "pending_issuance");
-  assert.equal(card.body.last4, null);
+  assert.equal(card.body.last4, null, "production must not return sandbox card digits");
+  assert.equal(card.body.bin, null);
+  assert.equal(card.body.expires, null);
 
   const issuedCard = await waitFor(async () => {
     const response = await api.request("GET", `/v2/cards/${card.body.id}`, {
       key: BOOTSTRAP_KEY,
     });
-    return response.body.status === "active" ? response : null;
+    return response.status === 200 && response.body.status === "active"
+      ? response.body
+      : null;
   }, "provider-backed card issuance");
-  assert.equal(issuedCard.body.last4, "4242");
-  assert.equal(issuedCard.body.pan, undefined);
-  assert.equal(issuedCard.body.cvv, undefined);
+  assert.equal(issuedCard.last4, "4242");
+  assert.equal(issuedCard.processor_token, "card_tok_provider_1");
+  assert.equal(issuedCard.pan, undefined);
+  assert.equal(issuedCard.cvv, undefined);
 
   const application = await api.request("POST", "/v2/applications", {
     key: BOOTSTRAP_KEY,
     body: { type: "individual", customer: customer.body.id },
   });
   assert.equal(application.status, 201);
+  const individual = await api.request(
+    "PATCH",
+    `/v2/applications/${application.body.id}/individual`,
+    {
+      key: BOOTSTRAP_KEY,
+      body: { name: "Production Customer", country: "SG" },
+    },
+  );
+  assert.equal(individual.status, 200);
   const submitted = await api.request(
     "POST",
     `/v2/applications/${application.body.id}/submit`,
     { key: BOOTSTRAP_KEY },
   );
   assert.equal(submitted.status, 200);
+  assert.equal(submitted.body.provider_status, "queued");
 
-  const verifiedApplication = await waitFor(async () => {
+  const completed = await waitFor(async () => {
     const response = await api.request(
       "GET",
       `/v2/applications/${application.body.id}`,
       { key: BOOTSTRAP_KEY },
     );
-    return response.body.status === "completed" ? response : null;
-  }, "provider-backed identity decision");
-  assert.equal(verifiedApplication.body.decision, "approved");
+    return response.status === 200 && response.body.status === "completed"
+      ? response.body
+      : null;
+  }, "provider-backed onboarding decision");
+  assert.equal(completed.decision, "approved");
 
-  // Credit is an internal ledger product, not a sandbox-funding shortcut. It
-  // gives this test real balance without enabling POST /accounts/:id/credit.
+  // A credit-line draw is a real balanced product flow and gives this account a
+  // balance without using the sandbox-only direct funding endpoint.
   const credit = await api.request("POST", "/v2/credit", {
     key: BOOTSTRAP_KEY,
     body: { account: account.body.id, limit: "1000.00" },
@@ -213,33 +244,136 @@ test("production cards, receiving details, onboarding and transfers execute thro
   assert.equal(credit.status, 201);
   const draw = await api.request("POST", `/v2/credit/${credit.body.id}/draw`, {
     key: BOOTSTRAP_KEY,
-    body: { amount: "250.00" },
+    body: { amount: "500.00" },
   });
   assert.equal(draw.status, 200);
 
+  const recipient = await api.request("POST", "/v2/recipients", {
+    key: BOOTSTRAP_KEY,
+    body: { name: "Production Supplier" },
+  });
+  const destination = await api.request(
+    "POST",
+    `/v2/recipients/${recipient.body.id}/destinations`,
+    {
+      key: BOOTSTRAP_KEY,
+      body: {
+        rail: "paynow",
+        name: "Production Supplier",
+        currency: "SGD",
+        proxy: "+6593334444",
+      },
+    },
+  );
   const transfer = await api.request("POST", "/v2/transfers", {
     key: BOOTSTRAP_KEY,
-    body: { from: account.body.id, amount: "50.00", rail: "paynow" },
+    body: {
+      from: account.body.id,
+      recipient: recipient.body.id,
+      destination: destination.body.id,
+      rail: "paynow",
+      amount: "125.00",
+    },
   });
   assert.equal(transfer.status, 201);
-  assert.notEqual(transfer.body.status, "settled");
+  assert.equal(transfer.body.status, "funds_received");
   assert.equal(transfer.body.provider_status, "queued");
 
-  const settledTransfer = await waitFor(async () => {
+  const settled = await waitFor(async () => {
     const response = await api.request("GET", `/v2/transfers/${transfer.body.id}`, {
       key: BOOTSTRAP_KEY,
     });
-    return response.body.status === "settled" ? response : null;
+    return response.status === 200 && response.body.status === "settled"
+      ? response.body
+      : null;
   }, "provider-backed transfer settlement");
-  assert.equal(settledTransfer.body.provider_reference, "payment-provider-1");
+  assert.equal(settled.provider_reference, "payment-provider-1");
+  assert.equal(settled.reconciliation_required, false);
 
-  assert.ok(seen.some((envelope) => envelope.capability === "accounts.receiving_details"));
-  assert.ok(seen.some((envelope) => envelope.capability === "cards.issuing"));
-  assert.ok(seen.some((envelope) => envelope.capability === "identity.verification"));
-  assert.ok(seen.some((envelope) => envelope.capability === "payments.transfer"));
-  for (const envelope of seen) {
-    assert.ok(envelope.command_id);
-    assert.ok(envelope.payload && typeof envelope.payload === "object");
-    assert.equal(envelope.payload.format, undefined, "gateway must receive decrypted payload, not ciphertext envelope");
-  }
+  assert.deepEqual(
+    new Set(seen.map((envelope) => envelope.capability)),
+    new Set([
+      "accounts.receiving_details",
+      "cards.issuing",
+      "identity.verification",
+      "payments.transfer",
+    ]),
+  );
+});
+
+test("ambiguous transfer submission reconciles with the same provider idempotency key", async (t) => {
+  const attempts = [];
+  let first = true;
+  const gateway = await listenGateway(async (req, res) => {
+    const envelope = await bodyOf(req);
+    attempts.push({
+      jobId: req.headers["x-idempotency-key"],
+      phase: envelope.phase,
+    });
+    if (envelope.capability !== "payments.transfer") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(gatewayResponse(envelope)));
+      return;
+    }
+    if (first) {
+      first = false;
+      req.socket.destroy();
+      return;
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({
+        outcome: "succeeded",
+        provider_reference: "reconciled-payment-1",
+        provider_state: "settled",
+        funds_state: "settled",
+      }),
+    );
+  });
+  t.after(() => gateway.close());
+  const api = await productionApi(t, gateway);
+
+  const customer = await api.request("POST", "/v2/customers", {
+    key: BOOTSTRAP_KEY,
+    body: { type: "business", name: "Reconciliation Test Ltd" },
+  });
+  const account = await api.request("POST", "/v2/accounts", {
+    key: BOOTSTRAP_KEY,
+    body: { customer: customer.body.id, currency: "SGD" },
+  });
+  const credit = await api.request("POST", "/v2/credit", {
+    key: BOOTSTRAP_KEY,
+    body: { account: account.body.id, limit: "500.00" },
+  });
+  await api.request("POST", `/v2/credit/${credit.body.id}/draw`, {
+    key: BOOTSTRAP_KEY,
+    body: { amount: "250.00" },
+  });
+
+  const transfer = await api.request("POST", "/v2/transfers", {
+    key: BOOTSTRAP_KEY,
+    body: { from: account.body.id, rail: "paynow", amount: "50.00" },
+  });
+  assert.equal(transfer.status, 201);
+
+  const reconciled = await waitFor(async () => {
+    const response = await api.request("GET", `/v2/transfers/${transfer.body.id}`, {
+      key: BOOTSTRAP_KEY,
+    });
+    return response.status === 200 && response.body.status === "settled"
+      ? response.body
+      : null;
+  }, "ambiguous provider submission reconciliation", 8_000);
+  assert.equal(reconciled.provider_reference, "reconciled-payment-1");
+
+  const transferAttempts = attempts.filter(
+    (entry) => entry.jobId === transfer.body.provider_operation_id,
+  );
+  assert.ok(transferAttempts.length >= 2);
+  assert.equal(transferAttempts[0].phase, "submit");
+  assert.equal(transferAttempts[1].phase, "reconcile");
+  assert.ok(
+    transferAttempts.every((entry) => entry.jobId === transferAttempts[0].jobId),
+    "submission and reconciliation must use one stable provider idempotency key",
+  );
 });
