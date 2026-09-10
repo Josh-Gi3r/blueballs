@@ -19,6 +19,7 @@ import {
   post,
   balanceOf,
   collection as persistentCollection,
+  inRequestScope,
   subscribeToEvents,
   subscribeToEventsBeforeCommit,
 } from "./lib.js";
@@ -47,6 +48,7 @@ export {
   emit,
   post,
   balanceOf,
+  inRequestScope,
   subscribeToEvents,
   subscribeToEventsBeforeCommit,
   randomBytes,
