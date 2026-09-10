@@ -1,10 +1,10 @@
-/** Fail when catalogue operations and effective production success contracts drift. */
+/** Fail when catalogue operations and production success contracts drift. */
 import { FAMILIES } from "../src/endpoints.ts";
 import {
   PAGINATED_RESPONSE_OPERATIONS,
   RESPONSE_LIST_OPERATIONS,
   responseContractFor,
-} from "../spec/banking/openapi/effective-response-contracts.mjs";
+} from "../spec/banking/openapi/production-response-contracts.mjs";
 import { RESPONSE_SCHEMA_OVERRIDES } from "../spec/banking/openapi/response-contracts.mjs";
 import { ADAPTER_REQUIRED_OPERATIONS } from "../spec/banking/openapi/contracts.mjs";
 import { validateSchemaExample } from "../apps/api/src/response-validation.js";
@@ -60,6 +60,7 @@ for (const operationId of ADAPTER_REQUIRED_OPERATIONS) {
 
 const expectedTransitions = {
   postApplicationsIdSubmit: "Application",
+  postApplicationsIdAttestation: "Attestation",
   postTransfersIdCancel: "Transfer",
   postCardsIdUnfreeze: "Card",
   postAuthorisationsIdApprove: "Authorisation",
@@ -68,6 +69,10 @@ const expectedTransitions = {
   postQrGenerate: "QrCode",
   postQrDecode: "QrDecode",
   postMandates: "Mandate",
+  postApprovalchains: "ApprovalChain",
+  getApprovalchainsId: "ApprovalChain",
+  deleteAccountsId: "Account",
+  deleteVaultsId: "Vault",
 };
 for (const [operationId, schema] of Object.entries(expectedTransitions)) {
   const actual = operations.get(operationId)?.contract.schema?.$ref?.split("/").at(-1);
@@ -83,5 +88,5 @@ if (failures.length) {
 
 const successCount = operations.size - ADAPTER_REQUIRED_OPERATIONS.size;
 console.log(
-  `response contracts: ${successCount} effective success schemas/examples · ${ADAPTER_REQUIRED_OPERATIONS.size} fail-closed adapter contracts · ${RESPONSE_LIST_OPERATIONS.size} typed collections`,
+  `response contracts: ${successCount} production success schemas/examples · ${ADAPTER_REQUIRED_OPERATIONS.size} fail-closed adapter contracts · ${RESPONSE_LIST_OPERATIONS.size} typed collections`,
 );
