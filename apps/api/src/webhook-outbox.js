@@ -14,10 +14,7 @@ import {
   subscribeToEvents,
   subscribeToEventsBeforeCommit,
 } from "./kernel.js";
-import {
-  WEBHOOK_DELIVERY_MODE,
-  fetchWebhook,
-} from "./webhook-egress.js";
+import { WEBHOOK_DELIVERY_MODE, fetchWebhook } from "./webhook-egress.js";
 
 const API_VERSION = "2026-08-06";
 const DEFAULT_RETRY_DELAYS_MS = [0, 1_000, 10_000, 60_000, 300_000, 1_800_000];
@@ -58,12 +55,14 @@ export function withoutSecret(wh) {
 function newDelivery(wh, evt, opts = {}) {
   const deliveryId = ksuid("whd");
   const createdAt = now();
+  const eventCreatedAt = evt.created_at ?? createdAt;
   const record = {
     id: deliveryId,
     object: "webhook_delivery",
     webhook: wh.id,
     event_id: evt.id,
     event_type: evt.type,
+    event_created_at: eventCreatedAt,
     data: evt.data,
     url: wh.url,
     replay: !!opts.replay,
@@ -84,6 +83,7 @@ function newDelivery(wh, evt, opts = {}) {
     webhook: wh.id,
     event_id: evt.id,
     event_type: evt.type,
+    event_created_at: eventCreatedAt,
     data: evt.data,
     url: wh.url,
     secret: wh.secret,
@@ -109,8 +109,8 @@ export function queueWebhookDelivery(wh, evt, opts = {}) {
   return newDelivery(wh, evt, opts);
 }
 
-/** Every normal tenant event with a matching target gets a durable delivery
- * intent before the financial commit. No network call is allowed here. */
+/** Every tenant event with a matching target gets a durable delivery intent
+ * before the financial commit. No network call is allowed here. */
 function enqueueEvent(evt) {
   if (WEBHOOK_DELIVERY_MODE !== "allowlist") return;
   for (const wh of webhooks.values()) {
@@ -165,6 +165,7 @@ async function claim(jobId) {
       webhook: job.webhook,
       event_id: job.event_id,
       event_type: job.event_type,
+      event_created_at: job.event_created_at,
       data: structuredClone(job.data),
       url: job.url,
       secret: job.secret,
@@ -179,14 +180,11 @@ function signedRequest(claimed) {
   const payload = {
     id: claimed.event_id,
     type: claimed.event_type,
-    created: undefined,
+    created: claimed.event_created_at,
     api_version: API_VERSION,
     delivery_id: claimed.delivery_id,
     data: claimed.data,
   };
-  // JSON.stringify drops the undefined created field. Historical deliveries did
-  // not persist event.created_at separately; event identity and stable delivery
-  // ID remain sufficient for dedupe and verification.
   const body = JSON.stringify(payload);
   const signature = createHmac("sha256", claimed.secret)
     .update(`${timestamp}.${body}`)
@@ -201,6 +199,20 @@ function signedRequest(claimed) {
   };
   if (claimed.replay) headers["x-webhook-replay"] = "true";
   return { body, headers };
+}
+
+/** Retry failures that are plausibly transient. Most 4xx responses are a
+ * permanent receiver/configuration problem and become terminal immediately. */
+function retryableHttp(status) {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function retryAfterMs(response) {
+  const raw = response.headers.get("retry-after");
+  if (!raw) return null;
+  if (/^\d+$/.test(raw.trim())) return Number(raw.trim()) * 1000;
+  const at = Date.parse(raw);
+  return Number.isFinite(at) ? Math.max(0, at - Date.now()) : null;
 }
 
 async function finish(claimed, outcome) {
@@ -226,17 +238,20 @@ async function finish(claimed, outcome) {
       return record;
     }
 
-    const terminal = job.attempt_count >= RETRY_DELAYS_MS.length;
-    const delay = RETRY_DELAYS_MS[Math.min(job.attempt_count, RETRY_DELAYS_MS.length - 1)];
-    job.status = terminal ? "failed" : "retrying";
-    job.next_attempt_at = terminal
-      ? null
-      : new Date(Date.now() + delay).toISOString();
+    const exhausted = job.attempt_count >= RETRY_DELAYS_MS.length;
+    const retryable = outcome.retryable !== false && !exhausted;
+    const configuredDelay =
+      RETRY_DELAYS_MS[Math.min(job.attempt_count, RETRY_DELAYS_MS.length - 1)];
+    const delay = Math.max(configuredDelay, outcome.retry_after_ms ?? 0);
+    job.status = retryable ? "retrying" : "failed";
+    job.next_attempt_at = retryable
+      ? new Date(Date.now() + delay).toISOString()
+      : null;
     job.lease_token = null;
     job.lease_expires_at = null;
     job.updated_at = stamp;
     if (record) {
-      record.status = terminal ? "failed" : "retrying";
+      record.status = retryable ? "retrying" : "failed";
       record.response_code = outcome.status ?? null;
       record.error = outcome.error ?? `HTTP ${outcome.status}`;
       record.next_attempt_at = job.next_attempt_at;
@@ -260,12 +275,17 @@ async function attempt(jobId) {
     return finish(claimed, {
       ok: response.ok,
       status: response.status,
+      retryable: !response.ok && retryableHttp(response.status),
+      retry_after_ms: response.status === 429 ? retryAfterMs(response) : null,
       error: response.ok ? null : `HTTP ${response.status}`,
     });
   } catch (error) {
+    // A network exception is ambiguous: the receiver may have accepted the
+    // request before the connection failed. Retry with the same delivery ID.
     return finish(claimed, {
       ok: false,
       status: null,
+      retryable: true,
       error: error instanceof Error ? error.message : String(error),
     });
   }
