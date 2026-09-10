@@ -52,7 +52,8 @@ reconciliation state.
 The repository-local `pnpm verify` command is the canonical release test, and
 GitHub Actions must run equivalent production gates on every pull request and
 push to `main`. Hosted CI is not a substitute for a clean-checkout release proof;
-both are required.
+both are required. A pull request may not merge while the hosted production gate
+is missing, skipped or red.
 
 - [x] Keep the complete cross-surface gate in `pnpm verify`.
 - [x] Make targeted production deploy commands run the same release verification
