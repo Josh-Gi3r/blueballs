@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { handleAsNodeRequest } from "cloudflare:node";
 import { setWorkerSql } from "../../packages/sqlite-compat/src/index.js";
+import { configureBankingRuntimeEnvironment } from "../../apps/api/src/runtime-env.js";
 
 // v2 intentionally starts with empty pre-release state. The previous sandbox
 // cannot be migrated safely because email was used as an unverified principal.
@@ -11,6 +12,7 @@ export class BlueballsBankApi extends DurableObject {
     super(ctx, env);
     this.ready = ctx.blockConcurrencyWhile(async () => {
       setWorkerSql(this.ctx.storage);
+      configureBankingRuntimeEnvironment(env);
 
       // Provider credentials and encryption material belong to Worker secret
       // storage. Configure both before route/provider modules load; production
