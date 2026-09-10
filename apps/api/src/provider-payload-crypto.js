@@ -15,6 +15,7 @@ const ALGORITHM = "aes-256-gcm";
 const FORMAT = "A256GCM";
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
 const KEY_ID = /^[A-Za-z0-9._-]{1,64}$/;
+let configuredEnvironment = null;
 
 function keyBytes(material) {
   if (typeof material !== "string" || !material.trim()) {
@@ -23,14 +24,8 @@ function keyBytes(material) {
   const value = material.trim();
   let decoded;
   if (/^[0-9a-fA-F]{64}$/.test(value)) decoded = Buffer.from(value, "hex");
-  else {
-    try {
-      decoded = Buffer.from(value, "base64");
-    } catch {
-      decoded = null;
-    }
-  }
-  if (!decoded || decoded.length !== 32) {
+  else decoded = Buffer.from(value, "base64");
+  if (decoded.length !== 32) {
     throw new Error(
       "Provider payload encryption keys must decode to exactly 32 bytes (64 hex characters or base64)",
     );
@@ -38,8 +33,8 @@ function keyBytes(material) {
   return decoded;
 }
 
-function parseKeyring(env = process.env) {
-  const configured = env.BANK_PROVIDER_PAYLOAD_KEYS;
+function parseKeyring(env) {
+  const configured = env?.BANK_PROVIDER_PAYLOAD_KEYS;
   if (configured) {
     let parsed;
     try {
@@ -65,7 +60,7 @@ function parseKeyring(env = process.env) {
     return { active, keys };
   }
 
-  if (env.BANK_PROVIDER_PAYLOAD_KEY) {
+  if (env?.BANK_PROVIDER_PAYLOAD_KEY) {
     const active = env.BANK_PROVIDER_PAYLOAD_ACTIVE_KEY_ID || "default";
     if (!KEY_ID.test(active)) throw new Error(`Invalid provider payload key id ${active}`);
     return {
@@ -77,8 +72,27 @@ function parseKeyring(env = process.env) {
   return null;
 }
 
-function productionMode(env = process.env) {
-  return (env.BANK_API_MODE ?? "sandbox") === "production";
+function activeEnvironment(env) {
+  return env ?? configuredEnvironment ?? process.env;
+}
+
+function productionMode(env) {
+  return (env?.BANK_API_MODE ?? "sandbox") === "production";
+}
+
+/** Configure Cloudflare Worker vars/secrets explicitly before the banking
+ * runtime imports provider modules. This avoids relying on process.env bridging
+ * for encryption material. */
+export function configureProviderPayloadEnvironment(env) {
+  configuredEnvironment = env ?? null;
+  const active = activeEnvironment(env);
+  const ring = parseKeyring(active);
+  if (productionMode(active) && !ring) {
+    throw new Error(
+      "Production provider operations require BANK_PROVIDER_PAYLOAD_KEY or BANK_PROVIDER_PAYLOAD_KEYS",
+    );
+  }
+  return !!ring;
 }
 
 function plaintext(value) {
@@ -94,10 +108,11 @@ function plaintext(value) {
 }
 
 /** Seal a JSON-compatible provider payload. Production requires a keyring. */
-export function sealProviderPayload(value, env = process.env) {
-  const ring = parseKeyring(env);
+export function sealProviderPayload(value, env) {
+  const active = activeEnvironment(env);
+  const ring = parseKeyring(active);
   if (!ring) {
-    if (productionMode(env)) {
+    if (productionMode(active)) {
       const error = new Error(
         "Production provider operations require BANK_PROVIDER_PAYLOAD_KEY or BANK_PROVIDER_PAYLOAD_KEYS",
       );
@@ -123,12 +138,13 @@ export function sealProviderPayload(value, env = process.env) {
 
 /** Open a payload. Key rotation is supported by retaining old keys in the
  * keyring until no durable jobs reference their key ids. */
-export function openProviderPayload(sealed, env = process.env) {
+export function openProviderPayload(sealed, env) {
+  const active = activeEnvironment(env);
   if (!sealed || typeof sealed !== "object") {
     throw new Error("Provider payload envelope is missing");
   }
   if (sealed.format === "PLAINTEXT_TEST_ONLY") {
-    if (productionMode(env)) {
+    if (productionMode(active)) {
       throw new Error("Production refuses a plaintext provider payload envelope");
     }
     return structuredClone(sealed.value ?? {});
@@ -136,7 +152,7 @@ export function openProviderPayload(sealed, env = process.env) {
   if (sealed.format !== FORMAT || !KEY_ID.test(String(sealed.kid ?? ""))) {
     throw new Error("Provider payload envelope format is unsupported");
   }
-  const ring = parseKeyring(env);
+  const ring = parseKeyring(active);
   const key = ring?.keys.get(sealed.kid);
   if (!key) {
     const error = new Error(`Provider payload key ${sealed.kid} is unavailable`);
@@ -160,6 +176,6 @@ export function openProviderPayload(sealed, env = process.env) {
   return parsed;
 }
 
-export function providerPayloadEncryptionReady(env = process.env) {
-  return !!parseKeyring(env);
+export function providerPayloadEncryptionReady(env) {
+  return !!parseKeyring(activeEnvironment(env));
 }
