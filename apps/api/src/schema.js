@@ -43,10 +43,13 @@ const V1_COLLECTION_TABLES = Object.freeze([
   "ramps",
 ]);
 
+const V4_FX_COLLECTION_TABLES = Object.freeze(["fxAppetite", "fxRfqs"]);
+
 export const BANKING_COLLECTION_TABLES = Object.freeze([
   ...V1_COLLECTION_TABLES,
   "webhookOutbox",
   "auditRecords",
+  ...V4_FX_COLLECTION_TABLES,
 ]);
 
 export const BANKING_COLLECTION_TABLE_SET = new Set(BANKING_COLLECTION_TABLES);
@@ -123,6 +126,15 @@ export const BANKING_SCHEMA_MIGRATIONS = Object.freeze([
       database.exec(
         "CREATE INDEX IF NOT EXISTS idx_events_command ON events(command_id, seq)",
       );
+    },
+  },
+  {
+    version: 4,
+    name: "complete-legacy-fx-durable-schema",
+    up(database) {
+      for (const table of V4_FX_COLLECTION_TABLES) {
+        createJsonCollection(database, table);
+      }
     },
   },
 ]);
