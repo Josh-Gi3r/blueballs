@@ -27,6 +27,10 @@ import {
   BANKING_COLLECTION_TABLE_SET,
   migrateBankingSchema,
 } from "./schema.js";
+import {
+  publicResponse,
+  validateSuccessfulResponse,
+} from "./response-validation.js";
 
 migrateBankingSchema();
 
@@ -111,13 +115,7 @@ export const RAILS = {
     max: "200000.00",
   },
 };
-// Fiat, then the stablecoins at their peg. A stablecoin trades at its peg by
-// definition, so EURC carries EUR's rate.
-//
-// The stablecoin entries were missing: assets.js defines USDC and EURC and the
-// FX engine prices corridors in them, but this list is what POST /v2/accounts
-// validates against. A liquidity provider could not hold the currency they were
-// being asked to commit. Keep in sync with STABLECOINS in assets.js.
+
 export const RATES = {
   USD: 1,
   EUR: 1.083,
@@ -131,13 +129,15 @@ export const THIN = new Set(["MYR"]);
 
 /* ---------------- route registry ---------------- */
 export const routes = [];
+const RESPONSE_CONTRACT_VALIDATION =
+  process.env.RESPONSE_CONTRACT_VALIDATION === "true";
 
 /**
  * Register a route.
- * @param method  GET | POST | PATCH | PUT | DELETE
- * @param pattern e.g. "/v2/cards/:id/freeze"
- * @param handler ({ params, body, url, key, req }) => result  — throw ApiError for failures
- * @param opts    { access: PUBLIC | TENANT | OPERATOR | GLOBAL_READ, created?: boolean }. Default TENANT/200.
+ * Public serialization is centralized here so persistence-only fields never
+ * leak merely because a handler returned its stored object directly. When
+ * RESPONSE_CONTRACT_VALIDATION=true every successful catalogued response is
+ * checked against the same schema used to generate OpenAPI.
  */
 export const route = (method, pattern, handler, opts = {}) => {
   const key = `${method} ${pattern}`;
@@ -151,11 +151,17 @@ export const route = (method, pattern, handler, opts = {}) => {
     throw new Error(`Invalid access class ${access} for ${key}`);
   }
   const successStatus = opts.created ? 201 : 200;
+  const publicHandler = async (ctx) => {
+    const result = await handler(ctx);
+    return RESPONSE_CONTRACT_VALIDATION
+      ? validateSuccessfulResponse(method, pattern, result)
+      : publicResponse(result);
+  };
   routes.push({
     method,
     pattern,
     parts: pattern.split("/").filter(Boolean),
-    handler,
+    handler: publicHandler,
     access,
     successStatus,
   });
@@ -184,7 +190,6 @@ export const match = (method, path) => {
 };
 
 /* ---------------- handler helpers ---------------- */
-/** Throw a 400 listing every missing field at once, not one at a time. */
 export function need(body, fields) {
   const errors = fields
     .filter((f) => body[f] === undefined || body[f] === "")
@@ -198,8 +203,6 @@ export function need(body, fields) {
     );
 }
 
-/** Parse a decimal-string money input and require an economically meaningful
- * positive amount. Read paths should continue to use toMinor directly. */
 export function positiveMinor(value, field = "amount") {
   const minor = toMinor(value);
   if (minor <= 0n) {
@@ -213,7 +216,6 @@ export function positiveMinor(value, field = "amount") {
   return minor;
 }
 
-/** Stable authenticated tenant identity. Keys can rotate without changing it. */
 export function principalId(key) {
   if (!key?.tenant_id) {
     throw new ApiError(
@@ -225,12 +227,6 @@ export function principalId(key) {
   return key.tenant_id;
 }
 
-/** Tenant isolation. A row that carries an `owner` is tenant data and is visible
- *  only to the key that created it. Reference data (rails, corridors, calendars)
- *  has no `owner` and stays readable by everyone.
- *
- *  This answers 404, not 403, on purpose: a 403 would confirm that someone else's
- *  identifier exists, which is itself a disclosure. */
 export function ownedBy(row, key, noun, id) {
   if (key && row.owner !== principalId(key)) {
     throw new ApiError("not-found", 404, `No ${noun} ${id ?? row.id}`);
@@ -238,18 +234,15 @@ export function ownedBy(row, key, noun, id) {
   return row;
 }
 
-/** Every row of `rows` this key is allowed to see. */
 export const visibleTo = (rows, key) =>
   rows.filter((r) => !key || r.owner === principalId(key));
 
-/** Fetch or 404 with a readable detail. Pass `key` to scope it to one tenant. */
 export function must(collection, id, noun, key) {
   const row = collection.get(id);
   if (!row) throw new ApiError("not-found", 404, `No ${noun} ${id}`);
   return ownedBy(row, key, noun, id);
 }
 
-/** Cursor pagination — never offset. */
 export const paginate = (rows, url) => {
   const requestedLimit = Number(url.searchParams.get("limit") || 25);
   if (!Number.isInteger(requestedLimit) || requestedLimit < 1) {
@@ -259,7 +252,14 @@ export const paginate = (rows, url) => {
       "limit must be a positive integer",
     );
   }
-  const limit = Math.min(requestedLimit, 100);
+  if (requestedLimit > 100) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      "limit must be no greater than 100",
+    );
+  }
+  const limit = requestedLimit;
   const after = url.searchParams.get("starting_after");
   const before = url.searchParams.get("ending_before");
   if (after && before) {
