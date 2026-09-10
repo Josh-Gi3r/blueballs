@@ -33,7 +33,7 @@ const OVERRIDES = {
     schema: ref("KeySecret"),
     example: {
       ...keyPrincipal,
-      permissions: ["customers:read"],
+      permissions: ["identity:read"],
       key: "bb_sandbox_returned_once",
       note: "This is the only time the key is shown.",
     },
