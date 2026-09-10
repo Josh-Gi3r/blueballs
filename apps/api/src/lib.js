@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
 
 /* ---------------- identifiers: type-prefixed KSUID-style ---------------- */
 const B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-const EPOCH = 1400000000; // KSUID epoch
+const EPOCH = 1400000000;
 
 /** 27-char base62, time-sortable, opaque. */
 export function ksuid(prefix) {
@@ -27,7 +27,6 @@ export function ksuid(prefix) {
 }
 
 /* ---------------- money: decimal strings, never floats ---------------- */
-/** Parse "2400.00" → 240000n minor units. Rejects floats and junk. */
 export function toMinor(amount, dp = 2) {
   if (typeof amount !== "string" || !/^-?\d+(\.\d+)?$/.test(amount)) {
     throw new ApiError(
@@ -122,11 +121,7 @@ export class ApiError extends Error {
   }
 }
 
-/* ---------------- storage (SQLite, node:sqlite stdlib — zero deps) ----------------
- * Same exported interface as the old in-memory version (db.keys.get/.set/.values(),
- * db.ledger.push/.filter, db.events.push/.shift/.length, emit(), post(), balanceOf())
- * so server.js does not need to change how it talks to storage. */
-
+/* ---------------- storage ---------------- */
 const DB_PATH =
   process.env.DB_PATH ||
   (process.env.CLOUDFLARE_WORKER === "true"
@@ -135,52 +130,17 @@ const DB_PATH =
 const sqlite = new DatabaseSync(DB_PATH);
 sqlite.exec("PRAGMA journal_mode = WAL");
 
-/* =========================================================================
- * REQUEST-SCOPED PERSISTENCE
- *
- * `get()` used to hand back the live cached object, and `set()` was the only
- * thing that wrote SQLite. So a handler that did
- *
- *     const q = must(db.quotes, id, "quote");
- *     post([...]);            // durable
- *     q.executed = true;      // RAM only
- *
- * moved money durably and left the guard that stops the second run in memory.
- * A restart replayed the money. Twenty-six handlers had that shape and four of
- * them moved money.
- *
- * Adding the missing `.set()` twenty-six times fixes today and does nothing
- * about the twenty-seventh handler someone writes after forking this. So the
- * storage layer tracks it instead: `get()` returns a proxy that records the row
- * as dirty the moment anything on it is written, at any depth, and the request
- * boundary persists every dirty row once the handler has returned successfully.
- *
- * A handler that throws rolls the rows back to the snapshot taken before its
- * first write, so a half-applied mutation cannot survive its own failure —
- * which the explicit `.set()` calls never protected against either.
- * ====================================================================== */
-
 const RAW = Symbol("blueballs.raw");
 const MISSING = Symbol("blueballs.missing");
 
-/** Per-request unit of work. Handlers may await external work, so we cannot hold
- *  a synchronous SQLite transaction open across the handler. Instead every
- *  durable write is staged in memory and committed together after the handler
- *  succeeds. If the handler throws, the cache is restored and no ledger/event/
- *  idempotency/resource row has reached SQLite.
- *
- *  This is the financial atomicity boundary:
- *    resource state + ledger + events + idempotency = one commit.
- */
+/** Per-request unit of work. All local durable financial state is staged until
+ * the handler succeeds, then committed together. */
 const requestScope = new AsyncLocalStorage();
 const proxies = new WeakMap();
 
-/** The reference runtime owns one SQLite database and one in-memory resource
- * cache. Until a deployment shards that state by tenant/database, overlapping
- * request scopes would be able to observe the same mutable cache and two debits
- * could both validate against the same pre-commit balance. Serialize complete
- * request units of work so the single-node runtime provides serializable
- * financial semantics rather than merely atomic commits. */
+/** The single-database reference runtime serializes complete request units of
+ * work. This prevents overlapping debits from validating against the same
+ * pre-commit balance. */
 let requestSerial = Promise.resolve();
 function serializeRequest(run) {
   const current = requestSerial.then(run, run);
@@ -203,7 +163,6 @@ function unwrap(value) {
     : value;
 }
 
-/** Record the row's pre-mutation state once per request, before its first write. */
 function snapshotOnce(store, map, id, root = MISSING) {
   let rows = store.snapshots.get(map);
   if (!rows) {
@@ -215,9 +174,6 @@ function snapshotOnce(store, map, id, root = MISSING) {
   }
 }
 
-/** Recursive so `approval.decisions.push(...)` and `recipient.destinations[0].x = 1`
- *  count as writes. Dates are left alone — they are values here, and proxying one
- *  breaks the internal slots its methods rely on. */
 function track(value, map, id, root) {
   if (value === null || typeof value !== "object") return value;
   if (value instanceof Date) return value;
@@ -232,10 +188,6 @@ function track(value, map, id, root) {
       const store = requestScope.getStore();
       if (store) snapshotOnce(store, map, id, root);
       const ok = Reflect.set(target, prop, unwrap(next), receiver);
-      // Boot-time seeding and scripts run outside a request. There is no commit
-      // coming for them, so write through immediately rather than silently
-      // leaving the change in memory — the exact failure this whole mechanism
-      // exists to remove.
       if (!store) map._persist(id);
       return ok;
     },
@@ -251,17 +203,39 @@ function track(value, map, id, root) {
   return proxy;
 }
 
-/** Run one API request as a serializable financial unit of work. All durable
- * mutations are staged while the handler runs, then flushed inside one
- * synchronous SQLite transaction. Subscriber side effects (for example
- * outbound webhook delivery) are triggered only after the database commit
- * succeeds. */
+const eventBeforeCommitSubscribers = new Set();
+const eventSubscribers = new Set();
+
+/** Register local event work that must be staged before the financial database
+ * commit. Subscribers must perform local deterministic writes only; they must
+ * never make network calls. A failure aborts the entire request unit of work. */
+export function subscribeToEventsBeforeCommit(subscriber) {
+  eventBeforeCommitSubscribers.add(subscriber);
+  return () => eventBeforeCommitSubscribers.delete(subscriber);
+}
+
+/** Register post-commit side effects. Failures here cannot roll back committed
+ * money; durable work should already have been captured by a before-commit
+ * subscriber (for example the webhook outbox). */
+export function subscribeToEvents(subscriber) {
+  eventSubscribers.add(subscriber);
+  return () => eventSubscribers.delete(subscriber);
+}
+
+/** Run one API request as a serializable financial unit of work. */
 export async function inRequestScope(run) {
   return serializeRequest(() => {
     const store = createRequestStore();
     return requestScope.run(store, async () => {
       try {
         const result = await run();
+
+        // Local outbox/audit enrichers run before the database transaction so
+        // their staged rows are committed atomically with money and domain state.
+        for (const evt of store.events) {
+          for (const subscriber of eventBeforeCommitSubscribers) subscriber(evt);
+        }
+
         sqlite.transactionSync(() => {
           for (const [map, rows] of store.snapshots)
             for (const id of rows.keys()) map._persist(id);
@@ -271,8 +245,6 @@ export async function inRequestScope(run) {
             db.events._trimTenant(tenantId, maximum);
         });
 
-        // External side effects are deliberately after commit. A webhook failure
-        // must not roll back money, and an uncommitted event must never escape.
         for (const evt of store.events) {
           for (const subscriber of eventSubscribers) {
             try {
@@ -297,8 +269,6 @@ export async function inRequestScope(run) {
   });
 }
 
-/** Map-like collection (get/set/has/delete/values/keys/entries/size) backed by a
- *  SQLite table, JSON-serialised, fully cached in memory after load for Map-speed reads. */
 class PersistentMap {
   constructor(table) {
     this.table = table;
@@ -350,21 +320,17 @@ class PersistentMap {
     this._del.run(id);
     return existed;
   }
-  /** Write a row the request mutated in place. */
   _persist(id) {
     const row = this._cache.get(id);
     if (row === undefined) this._del.run(id);
     else this._upsert.run(id, JSON.stringify(row));
   }
-  /** Put a row back the way it was before the request touched it. */
   _restore(id, snapshot) {
     const current = this._cache.get(id);
     if (current && typeof current === "object") proxies.delete(current);
     if (snapshot === MISSING) this._cache.delete(id);
     else this._cache.set(id, snapshot);
   }
-  // Iteration is tracked too: a handler that mutates a row it reached through
-  // values() has changed the same cached object get() would have handed it.
   *values() {
     for (const [id, row] of this._cache) yield track(row, this, id, row);
   }
@@ -382,8 +348,6 @@ class PersistentMap {
   }
 }
 
-/** Append-only ledger rows. Amounts are stored as TEXT (stringified minor-unit
- *  BigInt) — never REAL — and rehydrated back into BigInt on read. */
 class PersistentLedger {
   constructor() {
     sqlite.exec(`CREATE TABLE IF NOT EXISTS ledger (
@@ -399,9 +363,6 @@ class PersistentLedger {
       `SELECT amount FROM ledger WHERE account = ? AND currency = ?`,
     );
   }
-  /** Sum one account's rows exactly. Pending rows from the current request are
-   *  included so a second posting in the same command sees the first posting
-   *  even though neither has been committed yet. */
   balance(account, currency) {
     let n = 0n;
     for (const r of this._selectAccount.all(account, currency))
@@ -462,7 +423,6 @@ class PersistentLedger {
   }
 }
 
-/** Bounded event log — push/shift like the old array, but durable. */
 class PersistentEvents {
   constructor() {
     sqlite.exec(`CREATE TABLE IF NOT EXISTS events (
@@ -540,16 +500,13 @@ class PersistentEvents {
   }
 }
 
-/** Create a durable, Map-shaped collection. Route modules use this instead of
- *  `new Map()` so new resource types survive a restart like everything else.
- *  Usage:  const cards = collection("cards");  // then .get/.set/.values() as normal */
 export function collection(name) {
   return new PersistentMap(name);
 }
 
 export const db = {
-  tenants: new PersistentMap("tenants"), // tenant_id -> tenant metadata
-  keys: new PersistentMap("keys"), // hashedKey -> { id, tenant_id, email, scope, created_at }
+  tenants: new PersistentMap("tenants"),
+  keys: new PersistentMap("keys"),
   customers: new PersistentMap("customers"),
   accounts: new PersistentMap("accounts"),
   recipients: new PersistentMap("recipients"),
@@ -557,17 +514,10 @@ export const db = {
   transfers: new PersistentMap("transfers"),
   ledger: new PersistentLedger(),
   events: new PersistentEvents(),
-  idempotency: new PersistentMap("idempotency"), // hash(tenant + operation + caller key) -> cached result
+  idempotency: new PersistentMap("idempotency"),
 };
 
 export const hashKey = (k) => createHash("sha256").update(k).digest("hex");
-
-const eventSubscribers = new Set();
-
-export function subscribeToEvents(subscriber) {
-  eventSubscribers.add(subscriber);
-  return () => eventSubscribers.delete(subscriber);
-}
 
 export function emit(type, data, { tenantId } = {}) {
   if (!tenantId) throw new Error(`Event ${type} requires an explicit tenantId`);
@@ -582,30 +532,33 @@ export function emit(type, data, { tenantId } = {}) {
     data,
     tenant_id: tenantId,
   };
-  db.events.push(evt);
-  db.events.trimTenant(tenantId, retention);
 
-  // Outside an API request (boot scripts/tests) there is no deferred commit.
-  // Deliver immediately. Inside a request, inRequestScope notifies subscribers
-  // only after the database transaction has committed.
-  if (!requestScope.getStore()) {
-    for (const subscriber of eventSubscribers) subscriber(evt);
+  const store = requestScope.getStore();
+  if (store) {
+    db.events.push(evt);
+    db.events.trimTenant(tenantId, retention);
+    return evt;
+  }
+
+  // Standalone emitters still get event + durable before-commit side work in one
+  // SQLite transaction. Post-commit side effects run only after it succeeds.
+  sqlite.transactionSync(() => {
+    for (const subscriber of eventBeforeCommitSubscribers) subscriber(evt);
+    db.events.push(evt);
+    db.events.trimTenant(tenantId, retention);
+  });
+  for (const subscriber of eventSubscribers) {
+    try {
+      subscriber(evt);
+    } catch (error) {
+      console.error("event subscriber failed after commit", error);
+    }
   }
   return evt;
 }
 
-/** Accounts that are *meant* to run negative are namespaced with a colon —
- *  "clearing:paynow", "external:funding", "lp:USDC/EURC:USDC", "principal:EURC",
- *  "issuance:…", "reserve:…", "spread:…", "fx:clearing", "sandbox:…". They are the
- *  system's side of a movement: the money has left the customer and is somewhere
- *  in the machine. A customer-facing account is a bare type-prefixed KSUID
- *  (acc_…, vlt_…, wal_…, crd_…) and never contains a colon. */
 const isSystemAccount = (account) => account.includes(":");
 
-/** No customer account may be driven below zero, whatever a handler forgets.
- *  Only the accounts this posting takes money *out* of are checked, and only the
- *  net movement counts, so an entry that debits and credits the same account in
- *  one transaction is judged on its result rather than its steps. */
 function assertNoOverdraft(entries) {
   const deltas = new Map();
   for (const e of entries) {
@@ -627,8 +580,6 @@ function assertNoOverdraft(entries) {
   }
 }
 
-/** Double-entry: every movement writes two rows that must sum to zero, and no
- *  customer account ends it overdrawn. */
 export function post(entries, memo) {
   const sum = entries.reduce((n, e) => n + e.amount, 0n);
   if (sum !== 0n)
@@ -645,14 +596,11 @@ export function post(entries, memo) {
     memo,
   }));
 
-  // API requests stage ledger rows so the request-level unit of work can commit
-  // them atomically with the resource state, events and idempotency record.
   if (requestScope.getStore()) {
     for (const row of rows) db.ledger.push(row);
     return txn;
   }
 
-  // Standalone scripts/tests still get balanced-or-nothing ledger posting.
   return sqlite.transactionSync(() => {
     for (const row of rows) db.ledger._persist(row);
     return txn;
