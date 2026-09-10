@@ -7,6 +7,7 @@ import {
   robotsText,
   sitemapXml,
 } from "./crawler-pages.js";
+import { runtimeForPath } from "../../spec/runtime-ownership.mjs";
 import { getAgentByName } from "agents";
 export { NeobankBuilder } from "./neobank-builder.js";
 export { BuilderBudget } from "./builder-budget.js";
@@ -19,21 +20,9 @@ async function withinLimit(binding, key) {
   return (await binding.limit({ key })).success;
 }
 
-/** Path prefixes served by the FX node rather than the banking API. */
-const FX_NODE_PATHS = [
-  "/v2/fx/depth",
-  "/v2/fx/reference",
-  "/v2/fx/orders",
-  "/v2/fx/quotes",
-  "/v2/fx/routes",
-  "/v2/fx/fiat",
-];
-
 /** Every path the app actually routes. Anything else that asks for HTML gets a
- *  404, rather than the single-page-application fallback quietly serving the
- *  homepage under someone else's URL: /cards returned HTTP 200 with the home
- *  page and the home page's title, which reads as a real page to a crawler and
- *  to anyone who was sent the link. */
+ * 404 rather than the SPA fallback quietly serving the homepage under an
+ * unrelated URL. */
 const KNOWN_PAGES = new Set([
   "/",
   "/home",
@@ -45,11 +34,6 @@ const KNOWN_PAGES = new Set([
   "/developers",
   "/contact",
 ]);
-
-const isFxNodePath = (pathname) =>
-  FX_NODE_PATHS.some(
-    (base) => pathname === base || pathname.startsWith(base + "/"),
-  );
 
 function internalRequest(request, headers) {
   const next = new Headers(request.headers);
@@ -79,26 +63,16 @@ export default {
       "content-security-policy",
       "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
     );
-
-    // Served only over TLS, and say so for a year so a browser never tries
-    // plaintext again.
     headers.set(
       "strict-transport-security",
       "max-age=31536000; includeSubDomains",
     );
 
-    // The API shares this hostname with the marketing site. API responses vary
-    // by key and must never become a shared edge object: without an explicit
-    // no-store a single "Cache Everything" rule would let one caller be served
-    // another caller's response.
     if (url.pathname === "/v2" || url.pathname.startsWith("/v2/")) {
       headers.set("cache-control", "no-store");
       headers.set("vary", "x-api-key, authorization");
     }
 
-    // Keep HTML byte-for-byte under the application's control. Cloudflare's
-    // optional script injection is incompatible with the strict CSP above and
-    // is unnecessary for the reference site.
     if (headers.get("content-type")?.includes("text/html")) {
       const cacheControl = headers.get("cache-control");
       headers.set(
@@ -118,9 +92,6 @@ export default {
 async function handleRequest(request, env) {
   const url = new URL(request.url);
 
-  // Canonical origin: one hostname, always over TLS. The www redirect used to
-  // rewrite only the hostname, so http://www → http:// apex and the request
-  // stayed in the clear all the way through.
   const canonicalTarget = canonicalRedirectUrl(
     url,
     request.headers.get("host"),
@@ -159,25 +130,15 @@ async function handleRequest(request, env) {
     return Response.redirect(new URL("/developers", url).toString(), 301);
   }
 
-  // Paths the FX node owns. Everything else under /v2/fx/ — price,
-  // pricing-model, rfq, lp/*, intents, fills, net, batches, appetite, route —
-  // is implemented by the banking API and must reach it.
-  //
-  // This was previously a blanket `startsWith("/v2/fx/")`, which sent all of
-  // them to the FX node. The node implements a different path set, so 20 of
-  // the 26 catalogued FX endpoints answered 404 in production while their
-  // handlers sat there working.
-  if (isFxNodePath(url.pathname) || url.pathname === "/fx-health") {
+  // Runtime ownership is defined once in spec/runtime-ownership.mjs. The edge
+  // imports it directly instead of maintaining a second handwritten FX list.
+  if (runtimeForPath(url.pathname) === "fx") {
     const target =
       url.pathname === "/fx-health"
         ? new Request(new URL("/health", url), request)
         : request;
-    // The caller's own Authorization is forwarded untouched. The edge used to
-    // overwrite it with the operator key on every request, which made the
-    // node's authentication unreachable: anonymous callers were authenticated
-    // by the edge on the entire FX surface, ops and write routes included.
-    // The public demo still works because the reference sandbox and aggregate
-    // depth are public in the node by design, not by header injection.
+    // Forward the caller's Authorization/x-api-key untouched. The edge must
+    // never silently authenticate a caller with an operator credential.
     return env.FX.fetch(internalRequest(target, {}));
   }
 
@@ -218,9 +179,9 @@ async function handleRequest(request, env) {
         { status: 401 },
       );
 
-    // Ask the banking API to authenticate the exact credential. The response's
-    // `current` object identifies the key that authenticated this request; never
-    // infer tenancy from data[0], whose ordering can change after key rotation.
+    // Authenticate the exact credential. The response's `current` object
+    // identifies the key that authenticated this request; never infer tenancy
+    // from an arbitrary row in the key list.
     const accessCheck = await env.API.fetch(
       internalRequest(
         new Request(new URL("/v2/keys", url), {
