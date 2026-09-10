@@ -12,13 +12,15 @@ export class BlueballsBankApi extends DurableObject {
     this.ready = ctx.blockConcurrencyWhile(async () => {
       setWorkerSql(this.ctx.storage);
 
-      // Provider credentials/vars belong to the Worker environment. Configure
-      // the provider transport before route modules load so production requests
-      // never depend on process.env population behavior.
-      const providerTransport = await import(
-        "../../apps/api/src/provider-transport.js"
-      );
+      // Provider credentials and encryption material belong to Worker secret
+      // storage. Configure both before route/provider modules load; production
+      // safety must not depend on process.env bridging semantics.
+      const [providerTransport, providerPayloadCrypto] = await Promise.all([
+        import("../../apps/api/src/provider-transport.js"),
+        import("../../apps/api/src/provider-payload-crypto.js"),
+      ]);
       providerTransport.configureProviderEnvironment(env);
+      providerPayloadCrypto.configureProviderPayloadEnvironment(env);
 
       const [{ FAMILIES }, api, webhookOutbox, providerOutbox] = await Promise.all([
         import("../../src/endpoints.ts"),
