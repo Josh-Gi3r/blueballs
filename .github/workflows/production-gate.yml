@@ -1,0 +1,145 @@
+name: Blueballs Production Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+
+jobs:
+  quality:
+    name: Build, contracts and static gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: node scripts/check-catalogue.mjs
+      - run: node scripts/check-openapi-requests.mjs
+      - run: node scripts/check-openapi-responses.mjs
+      - run: pnpm lint:openapi
+
+  banking_api:
+    name: Banking API 181-operation proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:api
+      - name: Upload API operation coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-operation-coverage
+          path: artifacts/api-operation-coverage.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  workers:
+    name: Cloudflare runtime parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:workers
+
+  fx:
+    name: FX packages and SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:fx
+      - run: pnpm sdk:pack
+
+  contracts:
+    name: Solidity build, fuzz and invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - run: make -C packages/fx-contracts ci
+
+  container:
+    name: Reference container and Compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f compose.reference.yml config --quiet
+      - run: docker build --pull=false -f Dockerfile.reference -t blueballs/reference:${{ github.sha }} .
+
+  production_gate:
+    name: Production gate
+    if: always()
+    needs: [quality, banking_api, workers, fx, contracts, container]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every production check to pass
+        env:
+          QUALITY: ${{ needs.quality.result }}
+          BANKING: ${{ needs.banking_api.result }}
+          WORKERS: ${{ needs.workers.result }}
+          FX: ${{ needs.fx.result }}
+          CONTRACTS: ${{ needs.contracts.result }}
+          CONTAINER: ${{ needs.container.result }}
+        run: |
+          printf 'quality=%s\nbanking=%s\nworkers=%s\nfx=%s\ncontracts=%s\ncontainer=%s\n' "$QUALITY" "$BANKING" "$WORKERS" "$FX" "$CONTRACTS" "$CONTAINER"
+          test "$QUALITY" = success
+          test "$BANKING" = success
+          test "$WORKERS" = success
+          test "$FX" = success
+          test "$CONTRACTS" = success
+          test "$CONTAINER" = success
