@@ -4,38 +4,28 @@ import { FAMILIES } from "../src/endpoints.ts";
 import {
   KEY_PERMISSION_DOMAINS,
   KEY_PERMISSIONS,
+  PERMISSION_ROUTE_RULES,
+  permissionDomainForRoute,
+  permissionForRoute,
 } from "../spec/banking/key-permission-catalog.mjs";
-
-const DOMAIN_RULES = [
-  [/^\/v2\/keys(?:\/|$)/, "keys"],
-  [/^\/v2\/(?:customers|applications)(?:\/|$)/, "identity"],
-  [/^\/v2\/(?:accounts|details)(?:\/|$)/, "accounts"],
-  [/^\/v2\/wallets(?:\/|$)/, "wallets"],
-  [/^\/v2\/(?:recipients|destinations|transfers|qr|links|mandates|subscriptions)(?:\/|$)/, "payments"],
-  [/^\/v2\/(?:fx|ramps)(?:\/|$)/, "fx"],
-  [/^\/v2\/(?:cards|authorisations|disputes)(?:\/|$)/, "cards"],
-  [/^\/v2\/(?:vaults|credit)(?:\/|$)/, "lending"],
-  [/^\/v2\/(?:policies|approval-chains|approvals|orgs)(?:\/|$)/, "controls"],
-  [/^\/v2\/(?:ledger|statements|fees)(?:\/|$)/, "ledger"],
-  [/^\/v2\/(?:webhooks|events)(?:\/|$)/, "webhooks"],
-  [/^\/v2\/(?:builder|sandbox)(?:\/|$)/, "sandbox"],
-];
 
 const failures = [];
 const seenDomains = new Set();
 for (const family of FAMILIES) {
   for (const endpoint of family.endpoints) {
     if (!["TENANT", "GLOBAL_READ"].includes(endpoint.access)) continue;
-    const matches = DOMAIN_RULES.filter(([rule]) => rule.test(endpoint.path));
+    const matches = PERMISSION_ROUTE_RULES.filter(([rule]) =>
+      rule.test(endpoint.path),
+    );
     if (matches.length !== 1) {
       failures.push(
         `${endpoint.verb} ${endpoint.path}: expected exactly one permission domain, got ${matches.length}`,
       );
       continue;
     }
-    const domain = matches[0][1];
+    const domain = permissionDomainForRoute(endpoint.path);
+    const permission = permissionForRoute(endpoint.verb, endpoint.path);
     seenDomains.add(domain);
-    const permission = `${domain}:${endpoint.verb === "GET" ? "read" : "write"}`;
     if (!KEY_PERMISSIONS.includes(permission)) {
       failures.push(`${endpoint.verb} ${endpoint.path}: unknown permission ${permission}`);
     }
