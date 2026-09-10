@@ -2,10 +2,11 @@
  *
  * Sandbox routes may generate deterministic reference artifacts. Production
  * mode strips those artifacts before commit and queues a durable provider job in
- * the same local transaction. This module contains no provider credentials or
- * vendor names.
+ * the same local transaction. Provider payloads are sealed before they enter the
+ * durable outbox so identity/account/card data is not stored as plaintext job JSON.
  */
 import { publicShape } from "./public-shape.js";
+import { sealProviderPayload } from "./provider-payload-crypto.js";
 
 const RECEIVING_INSTRUMENT_FIELDS = [
   "type",
@@ -18,6 +19,8 @@ const RECEIVING_INSTRUMENT_FIELDS = [
   "address",
   "network",
 ];
+
+const protectedPayload = (value) => sealProviderPayload(publicShape(value ?? {}));
 
 function rewriteCurrentEvent(db, commandId, oldType, newType, data) {
   for (const event of db.events) {
@@ -60,7 +63,11 @@ export function prepareProductionProviderIntent({
   // POST /v2/accounts/:id/details to provision a real provider-backed instrument.
   if (method === "POST" && pattern === "/v2/accounts") {
     const account = db.accounts.get(result.id);
-    if (!account) throw new Error(`Account ${result.id} vanished before production normalization`);
+    if (!account) {
+      throw new Error(
+        `Account ${result.id} vanished before production normalization`,
+      );
+    }
     account.details = null;
     rewriteCurrentEvent(
       db,
@@ -77,7 +84,8 @@ export function prepareProductionProviderIntent({
 
   if (method === "POST" && pattern === "/v2/transfers") {
     const transfer = db.transfers.get(result.id);
-    if (!transfer) throw new Error(`Transfer ${result.id} vanished before provider queue`);
+    if (!transfer)
+      throw new Error(`Transfer ${result.id} vanished before provider queue`);
     const destination = destinationFor(db, transfer.destination);
     const job = queue({
       capability: "payments.transfer",
@@ -85,13 +93,13 @@ export function prepareProductionProviderIntent({
       resource_type: "transfer",
       resource_id: transfer.id,
       owner: transfer.owner,
-      payload: {
+      payload: protectedPayload({
         transfer: publicShape(transfer),
         recipient: destination
           ? { id: destination.recipient.id, name: destination.recipient.name }
           : null,
         destination: destination ? publicShape(destination.destination) : null,
-      },
+      }),
     });
     transfer.provider_operation_id = job.id;
     transfer.provider_status = "queued";
@@ -118,11 +126,11 @@ export function prepareProductionProviderIntent({
       resource_type: "card",
       resource_id: card.id,
       owner: card.owner,
-      payload: {
+      payload: protectedPayload({
         card: publicShape(card),
         customer: publicShape(db.customers.get(card.customer)),
         account: publicShape(db.accounts.get(card.account)),
-      },
+      }),
     });
     card.provider_operation_id = job.id;
     card.provider_status = "queued";
@@ -136,10 +144,7 @@ export function prepareProductionProviderIntent({
     return card;
   }
 
-  if (
-    method === "POST" &&
-    pattern === "/v2/accounts/:id/details"
-  ) {
+  if (method === "POST" && pattern === "/v2/accounts/:id/details") {
     const detail = db.details?.get(result.id);
     if (!detail) {
       throw new Error(
@@ -158,11 +163,11 @@ export function prepareProductionProviderIntent({
       resource_type: "receiving_detail",
       resource_id: detail.id,
       owner: detail.owner,
-      payload: {
+      payload: protectedPayload({
         account: publicShape(account),
         rail: detail.rail,
         currency: detail.currency,
-      },
+      }),
     });
     detail.provider_operation_id = job.id;
     detail.provider_status = "queued";
@@ -176,10 +181,7 @@ export function prepareProductionProviderIntent({
     return detail;
   }
 
-  if (
-    method === "POST" &&
-    pattern === "/v2/applications/:id/submit"
-  ) {
+  if (method === "POST" && pattern === "/v2/applications/:id/submit") {
     const application = db.applications?.get(result.id);
     if (!application) {
       throw new Error(`Application ${result.id} vanished before provider queue`);
@@ -190,7 +192,7 @@ export function prepareProductionProviderIntent({
       resource_type: "application",
       resource_id: application.id,
       owner: application.owner,
-      payload: { application: publicShape(application) },
+      payload: protectedPayload({ application: publicShape(application) }),
     });
     application.provider_operation_id = job.id;
     application.provider_status = "queued";
