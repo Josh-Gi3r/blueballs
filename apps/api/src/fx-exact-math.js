@@ -1,21 +1,21 @@
 /** Exact monetary arithmetic for the compatibility FX engine.
  * Monetary quantities stay BigInt minor units. Spread inputs are normalized to
- * hundredths of one basis point before they touch money. */
+ * 1/10,000 of one basis point before they touch money. */
 import { exactRate } from "./exact-rates.js";
 
-const CENTIBPS_PER_WHOLE = 100n;
-const CENTIBPS_DENOMINATOR = 10_000n * CENTIBPS_PER_WHOLE;
+const BPS_UNITS_PER_WHOLE = 10_000n;
+const BPS_DENOMINATOR = 10_000n * BPS_UNITS_PER_WHOLE;
 
-export function bpsToCentibps(value) {
-  const scaled = Number(value) * 100;
-  const centibps = Math.round(scaled);
-  if (!Number.isSafeInteger(centibps) || Math.abs(scaled - centibps) > 1e-9) {
-    throw new RangeError("spread bps must have at most two decimal places");
+export function bpsToUnits(value) {
+  const scaled = Number(value) * Number(BPS_UNITS_PER_WHOLE);
+  const units = Math.round(scaled);
+  if (!Number.isSafeInteger(units) || Math.abs(scaled - units) > 1e-7) {
+    throw new RangeError("spread bps must have at most four decimal places");
   }
-  if (centibps < 0 || centibps > 1_000_000) {
+  if (units < 0 || units > Number(BPS_DENOMINATOR)) {
     throw new RangeError("spread bps must be between 0 and 10000");
   }
-  return BigInt(centibps);
+  return BigInt(units);
 }
 
 /** Mid conversion, rounded down so the engine never creates value by rounding. */
@@ -24,15 +24,15 @@ export function convertAtMid(amountMinor, from, to) {
   return (BigInt(amountMinor) * numerator) / denominator;
 }
 
-/** Apply a spread quoted in bps (up to 2 decimal places), entirely in integers. */
+/** Apply a spread quoted in bps (up to 4 decimal places), entirely in integers. */
 export function convertWithSpread(amountMinor, from, to, spreadBps) {
   const { numerator, denominator } = exactRate(from, to);
-  const spreadCentibps = bpsToCentibps(spreadBps);
-  const keep = CENTIBPS_DENOMINATOR - spreadCentibps;
+  const spreadUnits = bpsToUnits(spreadBps);
+  const keep = BPS_DENOMINATOR - spreadUnits;
   if (keep < 0n) throw new RangeError("spread cannot exceed 10000 bps");
   return (
-    BigInt(amountMinor) * numerator * keep /
-    (denominator * CENTIBPS_DENOMINATOR)
+    (BigInt(amountMinor) * numerator * keep) /
+    (denominator * BPS_DENOMINATOR)
   );
 }
 
