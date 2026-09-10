@@ -10,21 +10,20 @@ import {
 const workerSource = readFileSync("workers/site/index.js", "utf8");
 const fxSource = readFileSync("apps/fx-node/src/server.js", "utf8");
 
-const ownershipBlock = workerSource.match(
-  /const FX_NODE_PATHS = \[([\s\S]*?)\];/,
+assert.match(
+  workerSource,
+  /import\s*\{[^}]*runtimeForPath[^}]*\}\s*from\s*["']\.\.\/\.\.\/spec\/runtime-ownership\.mjs["']/,
+  "Site Worker must import runtimeForPath from the shared ownership contract",
 );
-assert.ok(
-  ownershipBlock,
-  "Site Worker must expose its FX_NODE_PATHS routing table for drift checking",
+assert.doesNotMatch(
+  workerSource,
+  /const\s+FX_NODE_PATHS\s*=/,
+  "Site Worker must not maintain a second handwritten FX routing table",
 );
-const workerPrefixes = [
-  ...ownershipBlock[1].matchAll(/"([^"\n]+)"/g),
-].map((match) => match[1]);
-
-assert.deepEqual(
-  workerPrefixes,
-  [...FX_NODE_PATH_PREFIXES],
-  "Site Worker FX routing differs from spec/runtime-ownership.mjs",
+assert.match(
+  workerSource,
+  /runtimeForPath\(url\.pathname\)\s*===\s*["']fx["']/,
+  "Site Worker must route FX requests using runtimeForPath(url.pathname)",
 );
 
 const fxRouteLiterals = new Set(
