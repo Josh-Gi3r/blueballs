@@ -20,6 +20,7 @@ const API_VERSION = "2026-08-06";
 const DEFAULT_RETRY_DELAYS_MS = [0, 1_000, 10_000, 60_000, 300_000, 1_800_000];
 const LEASE_MS = Number(process.env.WEBHOOK_LEASE_MS || 30_000);
 const PUMP_MS = Number(process.env.WEBHOOK_PUMP_MS || 1_000);
+const IS_CLOUDFLARE = process.env.CLOUDFLARE_WORKER === "true";
 
 function retryDelays() {
   const raw = process.env.WEBHOOK_RETRY_DELAYS_MS;
@@ -103,14 +104,10 @@ function newDelivery(wh, evt, opts = {}) {
   return record;
 }
 
-/** Queue a logical delivery. When called from an API handler this is staged in
- * the same request transaction as the surrounding domain state. */
 export function queueWebhookDelivery(wh, evt, opts = {}) {
   return newDelivery(wh, evt, opts);
 }
 
-/** Every tenant event with a matching target gets a durable delivery intent
- * before the financial commit. No network call is allowed here. */
 function enqueueEvent(evt) {
   if (WEBHOOK_DELIVERY_MODE !== "allowlist") return;
   for (const wh of webhooks.values()) {
@@ -201,8 +198,6 @@ function signedRequest(claimed) {
   return { body, headers };
 }
 
-/** Retry failures that are plausibly transient. Most 4xx responses are a
- * permanent receiver/configuration problem and become terminal immediately. */
 function retryableHttp(status) {
   return status === 408 || status === 425 || status === 429 || status >= 500;
 }
@@ -280,8 +275,6 @@ async function attempt(jobId) {
       error: response.ok ? null : `HTTP ${response.status}`,
     });
   } catch (error) {
-    // A network exception is ambiguous: the receiver may have accepted the
-    // request before the connection failed. Retry with the same delivery ID.
     return finish(claimed, {
       ok: false,
       status: null,
@@ -341,16 +334,17 @@ export function webhookOutboxStatus() {
 }
 
 subscribeToEventsBeforeCommit(enqueueEvent);
-subscribeToEvents(() => {
-  void drainWebhookOutbox();
-});
 
-// Local Node has no platform alarm facility, so keep a lightweight durable
-// outbox pump. Cloudflare uses Durable Object alarms in workers/api/index.js.
-if (
-  WEBHOOK_DELIVERY_MODE === "allowlist" &&
-  process.env.CLOUDFLARE_WORKER !== "true"
-) {
+// Node owns its own lightweight pump. Cloudflare intentionally does not launch
+// an un-awaited background Promise from an HTTP request; the Durable Object
+// schedules and owns retry work through alarms.
+if (!IS_CLOUDFLARE) {
+  subscribeToEvents(() => {
+    void drainWebhookOutbox();
+  });
+}
+
+if (WEBHOOK_DELIVERY_MODE === "allowlist" && !IS_CLOUDFLARE) {
   const timer = setInterval(() => {
     void drainWebhookOutbox();
   }, PUMP_MS);
