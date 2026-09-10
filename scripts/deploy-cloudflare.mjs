@@ -78,7 +78,18 @@ if (target === "all" || target === "fx") {
   }
 }
 
-if (target === "all") run("pnpm", ["verify"]);
+// Every production publication, including a single Worker, must prove the
+// complete repository first. A targeted deploy changes one component of a
+// coupled financial system; allowing it to bypass the release gate would make
+// deploy:api/deploy:fx/deploy:site materially weaker than deploy:cloudflare.
+run("pnpm", ["verify"]);
+
+if (target !== "all") {
+  console.warn(
+    `Deploying ${target} only. This intentionally creates a temporary mixed-version deployment until the remaining components are promoted from the same commit.`,
+  );
+}
+
 for (const name of target === "all" ? ["api", "fx", "site"] : [target]) {
   run("pnpm", [
     "exec",
