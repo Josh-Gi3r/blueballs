@@ -20,20 +20,15 @@ import {
   balanceOf,
   collection as persistentCollection,
   subscribeToEvents,
+  subscribeToEventsBeforeCommit,
 } from "./lib.js";
 import {
   BANKING_COLLECTION_TABLE_SET,
   migrateBankingSchema,
 } from "./schema.js";
 
-// Apply and validate the complete banking data schema before any family module
-// opens its durable collections. This is intentionally separate from Cloudflare
-// Durable Object class migrations.
 migrateBankingSchema();
 
-/** Route families may only open collections that are part of the versioned
- * banking schema. Adding a new durable resource requires an append-only schema
- * migration first; typo-created or ad-hoc tables fail at startup. */
 export function collection(name) {
   if (!BANKING_COLLECTION_TABLE_SET.has(name)) {
     throw new Error(
@@ -53,6 +48,7 @@ export {
   post,
   balanceOf,
   subscribeToEvents,
+  subscribeToEventsBeforeCommit,
   randomBytes,
 };
 
@@ -240,13 +236,7 @@ export function ownedBy(row, key, noun, id) {
   return row;
 }
 
-/** Every row of `rows` this key is allowed to see.
- *
- *  Fails closed. An earlier version exempted rows with no `owner` so that
- *  reference data stayed readable, which left every record created before
- *  ownership existed readable by anyone — the exposure survived the fix that
- *  was supposed to close it. Reference data is served by public routes, where
- *  `key` is undefined, so it does not need the exemption. */
+/** Every row of `rows` this key is allowed to see. */
 export const visibleTo = (rows, key) =>
   rows.filter((r) => !key || r.owner === principalId(key));
 
