@@ -3,9 +3,10 @@
  * Sandbox routes may generate deterministic reference artifacts. Production
  * mode strips those artifacts before commit and queues a durable provider job in
  * the same local transaction. Provider payloads are sealed before they enter the
- * durable outbox so identity/account/card data is not stored as plaintext job JSON.
+ * durable outbox so identity/account/card/custody data is not stored as plaintext
+ * job JSON.
  */
-import { ApiError } from "./lib.js";
+import { ApiError, post, toMinor } from "./lib.js";
 import { publicShape } from "./public-shape.js";
 import { sealProviderPayload } from "./provider-payload-crypto.js";
 import { providerTransportAvailable } from "./provider-transport.js";
@@ -60,6 +61,70 @@ function destinationFor(db, id) {
     if (destination) return { recipient, destination };
   }
   return null;
+}
+
+function reserveCustodyTransfer({ db, commandId, queue, resource, wallet }) {
+  const amount = resource.amount?.amount;
+  const currency = resource.amount?.currency;
+  if (!wallet || typeof amount !== "string" || !currency) {
+    throw new Error("Custody transfer requires a wallet and exact money object");
+  }
+  const minor = toMinor(amount);
+
+  // The generic wallet handler has already debited the wallet and credited its
+  // sandbox/reference external account. Replace that staged destination with a
+  // custody clearing reservation in the same transaction. No customer money is
+  // declared externally settled until the provider confirms finality.
+  post(
+    [
+      {
+        account: "external:wallet_send",
+        currency,
+        amount: -minor,
+      },
+      {
+        account: "clearing:custody",
+        currency,
+        amount: minor,
+      },
+    ],
+    `custody reservation ${resource.id}`,
+  );
+
+  const job = queue({
+    capability: "custody.transfer",
+    action: "submit",
+    resource_type: resource.object === "approval" ? "approval" : "wallet_send",
+    resource_id: resource.id,
+    owner: wallet.owner,
+    payload: protectedPayload({
+      wallet: publicShape(wallet),
+      transfer: {
+        id: resource.id,
+        wallet: wallet.id,
+        amount: { amount, currency },
+        to: resource.to,
+        approval: resource.approval ?? null,
+      },
+    }),
+  });
+
+  rewriteCurrentEvent(
+    db,
+    commandId,
+    "wallet.sent",
+    "wallet.send_requested",
+    {
+      id: resource.id,
+      wallet: wallet.id,
+      amount: { amount, currency },
+      to: resource.to,
+      approval: resource.approval ?? null,
+      status: "funds_reserved",
+      provider_operation_id: job.id,
+    },
+  );
+  return job;
 }
 
 /** Normalize a successful core handler result for production and atomically
@@ -163,6 +228,89 @@ export function prepareProductionProviderIntent({
       card,
     );
     return card;
+  }
+
+  if (method === "POST" && pattern === "/v2/wallets") {
+    const wallet = db.wallets?.get(result.id);
+    if (!wallet) throw new Error(`Wallet ${result.id} vanished before provider queue`);
+
+    // The generic product handler creates a plausible on-chain address for the
+    // sandbox. Production must never expose or persist that address as though a
+    // custodian actually provisioned it.
+    wallet.address = null;
+    wallet.status = "pending_provisioning";
+    wallet.provider_reference = null;
+    wallet.provider_state = null;
+    wallet.reconciliation_required = false;
+
+    const job = queue({
+      capability: "custody.wallet",
+      action: "create",
+      resource_type: "wallet",
+      resource_id: wallet.id,
+      owner: wallet.owner,
+      payload: protectedPayload({
+        wallet: publicShape(wallet),
+        customer: publicShape(db.customers.get(wallet.customer)),
+      }),
+    });
+    wallet.provider_operation_id = job.id;
+    wallet.provider_status = "queued";
+    rewriteCurrentEvent(
+      db,
+      commandId,
+      "wallet.created",
+      "wallet.provisioning_requested",
+      wallet,
+    );
+    return { ...wallet, balance: result.balance };
+  }
+
+  if (
+    method === "POST" &&
+    pattern === "/v2/wallets/:id/send" &&
+    result.status === "sent"
+  ) {
+    const wallet = db.wallets?.get(result.wallet);
+    const job = reserveCustodyTransfer({
+      db,
+      commandId,
+      queue,
+      resource: result,
+      wallet,
+    });
+    return {
+      ...result,
+      status: "funds_reserved",
+      provider_operation_id: job.id,
+      provider_status: "queued",
+    };
+  }
+
+  if (
+    method === "POST" &&
+    pattern === "/v2/approvals/:id/approve" &&
+    result.status === "executed" &&
+    result.wallet &&
+    result.amount
+  ) {
+    const wallet = db.wallets?.get(result.wallet);
+    const resource = {
+      ...result,
+      object: "approval",
+      approval: result.id,
+    };
+    const job = reserveCustodyTransfer({
+      db,
+      commandId,
+      queue,
+      resource,
+      wallet,
+    });
+    result.provider_operation_id = job.id;
+    result.provider_status = "queued";
+    result.execution_status = "funds_reserved";
+    return result;
   }
 
   if (method === "POST" && pattern === "/v2/accounts/:id/details") {
