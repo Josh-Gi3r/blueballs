@@ -11,6 +11,11 @@ import {
 } from "./provider-outbox.js";
 
 const now = () => new Date().toISOString();
+const SAFE_REFUND_STATES = new Set([
+  "not_sent",
+  "returned",
+  "rejected_before_submission",
+]);
 
 function attachProviderEvidence(resource, job, result) {
   resource.provider_operation_id = job.id;
@@ -91,12 +96,7 @@ registerProviderOutcomeHandler(
     }
 
     if (result.outcome === "failed") {
-      const safeRefundStates = new Set([
-        "not_sent",
-        "returned",
-        "rejected_before_submission",
-      ]);
-      if (safeRefundStates.has(result.funds_state)) {
+      if (SAFE_REFUND_STATES.has(result.funds_state)) {
         const amount = toMinor(transfer.amount.amount);
         post(
           [
@@ -163,6 +163,7 @@ registerProviderOutcomeHandler(
         result.outcome === "ambiguous"
           ? "provider_outcome_ambiguous"
           : "provider_processing";
+      card.reconciliation_required = result.outcome === "ambiguous";
       card.updated_at = now();
       return;
     }
@@ -170,6 +171,7 @@ registerProviderOutcomeHandler(
     if (result.outcome === "failed") {
       card.status = "issuance_failed";
       card.status_reason = result.error_code ?? "provider_rejected";
+      card.reconciliation_required = false;
       card.updated_at = now();
       return;
     }
@@ -188,7 +190,11 @@ registerProviderOutcomeHandler(
     if (card.last4 !== null && !/^\d{4}$/.test(String(card.last4))) {
       card.last4 = null;
     }
-    if (card.bin !== null && card.bin !== undefined && !/^\d{6,8}$/.test(String(card.bin))) {
+    if (
+      card.bin !== null &&
+      card.bin !== undefined &&
+      !/^\d{6,8}$/.test(String(card.bin))
+    ) {
       card.bin = null;
     }
     card.status = ["active", "pending_activation"].includes(providerCard.status)
@@ -256,6 +262,7 @@ registerProviderOutcomeHandler(
     if (result.outcome === "failed") {
       detail.status = "provisioning_failed";
       detail.error_code = result.error_code ?? "provider_rejected";
+      detail.reconciliation_required = false;
       detail.updated_at = now();
       return;
     }
@@ -354,5 +361,185 @@ registerProviderOutcomeHandler(
       },
       { tenantId: application.owner },
     );
+  },
+);
+
+registerProviderOutcomeHandler(
+  "custody.wallet",
+  "create",
+  async ({ job, result }) => {
+    const wallet = db.wallets?.get(job.resource_id);
+    if (!wallet) return;
+    attachProviderEvidence(wallet, job, result);
+
+    if (result.outcome === "pending" || result.outcome === "ambiguous") {
+      wallet.status = "pending_provisioning";
+      wallet.reconciliation_required = result.outcome === "ambiguous";
+      wallet.updated_at = now();
+      return;
+    }
+
+    if (result.outcome === "failed") {
+      wallet.status = "provisioning_failed";
+      wallet.status_reason = result.error_code ?? "provider_rejected";
+      wallet.reconciliation_required = false;
+      wallet.updated_at = now();
+      return;
+    }
+
+    const provisioned = result.result ?? {};
+    wallet.address = provisioned.address;
+    if (provisioned.network) wallet.network = provisioned.network;
+    wallet.status = "active";
+    wallet.status_reason = null;
+    wallet.reconciliation_required = false;
+    wallet.provisioned_at = now();
+    wallet.updated_at = wallet.provisioned_at;
+    emit(
+      "wallet.provisioned",
+      {
+        id: wallet.id,
+        network: wallet.network,
+        address: wallet.address,
+        provider_reference: wallet.provider_reference,
+      },
+      { tenantId: wallet.owner },
+    );
+  },
+);
+
+function custodySendEvent(job) {
+  const rows = [...db.events];
+  for (let index = rows.length - 1; index >= 0; index--) {
+    const event = rows[index];
+    if (
+      event.command_id === job.command_id &&
+      event.tenant_id === job.owner &&
+      event.type === "wallet.send_requested"
+    ) {
+      return event;
+    }
+  }
+  return null;
+}
+
+registerProviderOutcomeHandler(
+  "custody.transfer",
+  "submit",
+  async ({ job, result }) => {
+    const evidence = custodySendEvent(job);
+    if (!evidence) {
+      openProviderReconciliationCase(job, "custody_send_local_evidence_missing", result);
+      return;
+    }
+    const walletId = evidence.data?.wallet;
+    const money = evidence.data?.amount;
+    const wallet = db.wallets?.get(walletId);
+    if (!wallet || !money?.amount || !money?.currency) {
+      openProviderReconciliationCase(job, "custody_send_local_evidence_invalid", result);
+      return;
+    }
+    const amount = toMinor(money.amount);
+
+    if (result.outcome === "pending") {
+      emit(
+        "wallet.send_submitted",
+        {
+          id: job.resource_id,
+          wallet: wallet.id,
+          amount: money,
+          provider_operation_id: job.id,
+          provider_reference: result.provider_reference ?? job.provider_reference ?? null,
+        },
+        { tenantId: wallet.owner },
+      );
+      return;
+    }
+
+    if (result.outcome === "ambiguous") {
+      openProviderReconciliationCase(job, "custody_transfer_outcome_ambiguous", result);
+      emit(
+        "wallet.send_confirming",
+        {
+          id: job.resource_id,
+          wallet: wallet.id,
+          amount: money,
+          provider_operation_id: job.id,
+        },
+        { tenantId: wallet.owner },
+      );
+      return;
+    }
+
+    if (result.outcome === "succeeded") {
+      post(
+        [
+          { account: "clearing:custody", currency: money.currency, amount: -amount },
+          {
+            account: "external:settled:custody",
+            currency: money.currency,
+            amount,
+          },
+        ],
+        `custody settlement ${job.resource_id}`,
+      );
+      emit(
+        "wallet.send_settled",
+        {
+          id: job.resource_id,
+          wallet: wallet.id,
+          amount: money,
+          provider_operation_id: job.id,
+          provider_reference: result.provider_reference ?? job.provider_reference ?? null,
+          settled_at: now(),
+        },
+        { tenantId: wallet.owner },
+      );
+      return;
+    }
+
+    if (result.outcome === "failed" && SAFE_REFUND_STATES.has(result.funds_state)) {
+      post(
+        [
+          { account: "clearing:custody", currency: money.currency, amount: -amount },
+          { account: wallet.id, currency: money.currency, amount },
+        ],
+        `custody failure refund ${job.resource_id}`,
+      );
+      emit(
+        "wallet.send_failed",
+        {
+          id: job.resource_id,
+          wallet: wallet.id,
+          amount: money,
+          provider_operation_id: job.id,
+          error_code: result.error_code ?? "provider_rejected",
+          refunded: true,
+        },
+        { tenantId: wallet.owner },
+      );
+      return;
+    }
+
+    if (result.outcome === "failed") {
+      // Unknown/submitted funds state is never refunded automatically; that
+      // could duplicate customer funds while the custodian also completed it.
+      openProviderReconciliationCase(
+        job,
+        "custody_transfer_failure_requires_funds_reconciliation",
+        result,
+      );
+      emit(
+        "wallet.send_confirming",
+        {
+          id: job.resource_id,
+          wallet: wallet.id,
+          amount: money,
+          provider_operation_id: job.id,
+          error_code: result.error_code ?? "provider_failure_funds_state_unknown",
+        },
+        { tenantId: wallet.owner },
+      );
+    }
   },
 );
