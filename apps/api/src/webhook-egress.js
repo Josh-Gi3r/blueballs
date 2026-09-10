@@ -1,14 +1,28 @@
 import { ApiError } from "./lib.js";
 
-export const WEBHOOK_DELIVERY_MODE =
-  process.env.WEBHOOK_DELIVERY_MODE === "allowlist" ? "allowlist" : "disabled";
+const configuredMode = process.env.WEBHOOK_DELIVERY_MODE || "disabled";
+if (!["disabled", "allowlist"].includes(configuredMode)) {
+  throw new Error("WEBHOOK_DELIVERY_MODE must be disabled or allowlist");
+}
+export const WEBHOOK_DELIVERY_MODE = configuredMode;
+
 const allowedTargets = new Set(
   String(process.env.WEBHOOK_ALLOWED_HOSTS || "")
     .split(",")
     .map((target) => target.trim().toLowerCase())
     .filter(Boolean),
 );
+if (WEBHOOK_DELIVERY_MODE === "allowlist" && allowedTargets.size === 0) {
+  throw new Error(
+    "WEBHOOK_DELIVERY_MODE=allowlist requires at least one WEBHOOK_ALLOWED_HOSTS entry",
+  );
+}
+
 const MAX_CONCURRENCY = Number(process.env.WEBHOOK_MAX_CONCURRENCY || 8);
+if (!Number.isSafeInteger(MAX_CONCURRENCY) || MAX_CONCURRENCY < 1 || MAX_CONCURRENCY > 256) {
+  throw new Error("WEBHOOK_MAX_CONCURRENCY must be an integer between 1 and 256");
+}
+
 let active = 0;
 const waiting = [];
 
