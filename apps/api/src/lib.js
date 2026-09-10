@@ -1,5 +1,5 @@
 /** Shared primitives implementing spec/conventions.md.
- *  Zero dependencies — the whole point is that self-hosting is trivial. */
+ * Zero dependencies — self-hosting stays deliberately small. */
 
 import { randomBytes, createHash } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -53,6 +53,7 @@ export function toMinor(amount, dp = 2) {
   }
   return BigInt(whole + frac.padEnd(dp, "0"));
 }
+
 export function fromMinor(minor, dp = 2) {
   const neg = minor < 0n;
   const s = (neg ? -minor : minor).toString().padStart(dp + 1, "0");
@@ -129,8 +130,8 @@ const DB_PATH =
     ? ":memory:"
     : join(dirname(fileURLToPath(import.meta.url)), "..", "blueballs.sqlite"));
 
-// Schema migration is the authority for persistent structure. It must complete
-// before any collection object opens/caches its table.
+// Application-data migrations are authoritative. Storage adapters never create
+// or alter tables opportunistically after this point.
 migrateBankingSchema();
 const sqlite = new DatabaseSync(DB_PATH);
 sqlite.exec("PRAGMA journal_mode = WAL");
@@ -140,8 +141,8 @@ const MISSING = Symbol("blueballs.missing");
 const requestScope = new AsyncLocalStorage();
 const proxies = new WeakMap();
 
-/** One SQLite database + one in-memory cache means complete request units are
- * serialized until the storage layer moves to MVCC/sharded ownership. */
+/** One SQLite database + one mutable in-memory cache means complete request
+ * units are serialized until the storage layer moves to MVCC/sharded ownership. */
 let requestSerial = Promise.resolve();
 function serializeRequest(run) {
   const current = requestSerial.then(run, run);
@@ -149,13 +150,32 @@ function serializeRequest(run) {
   return current;
 }
 
-function createRequestStore() {
+function createRequestStore(context = {}) {
   return {
+    commandId: context.command_id || ksuid("cmd"),
+    context: {
+      started_at: new Date().toISOString(),
+      idempotent_replay: false,
+      ...context,
+    },
     snapshots: new Map(),
     ledger: [],
     events: [],
+    audit: [],
     eventTrims: new Map(),
   };
+}
+
+/** Add actor/operation metadata after authentication without leaving the unit of work. */
+export function setCommandContext(patch) {
+  const store = requestScope.getStore();
+  if (!store) throw new Error("setCommandContext requires an active request scope");
+  Object.assign(store.context, patch);
+  return store.commandId;
+}
+
+export function currentCommandId() {
+  return requestScope.getStore()?.commandId ?? null;
 }
 
 function unwrap(value) {
@@ -217,24 +237,67 @@ export function subscribeToEvents(subscriber) {
   return () => eventSubscribers.delete(subscriber);
 }
 
+function resourceChanges(store) {
+  const rows = [];
+  for (const [map, ids] of store.snapshots) {
+    if (!map.table || map.table === "auditRecords") continue;
+    for (const id of ids.keys()) rows.push({ collection: map.table, id });
+  }
+  return rows;
+}
+
+function auditRecord(store, outcome, error = null) {
+  if (store.context.audit === false || !store.context.operation) return null;
+  return {
+    id: store.commandId,
+    object: "audit_record",
+    command_id: store.commandId,
+    request_id: store.context.request_id ?? null,
+    operation: store.context.operation,
+    method: store.context.method ?? null,
+    path: store.context.path ?? null,
+    access: store.context.access ?? null,
+    tenant_id: store.context.tenant_id ?? null,
+    actor_id: store.context.actor_id ?? null,
+    actor_scope: store.context.actor_scope ?? null,
+    source_hash: store.context.source_hash ?? null,
+    idempotency_key_hash: store.context.idempotency_key_hash ?? null,
+    idempotent_replay: !!store.context.idempotent_replay,
+    outcome,
+    error_type: error?.type ?? error?.code ?? null,
+    error_status: Number.isInteger(error?.status) ? error.status : null,
+    ledger_transactions: [...new Set(store.ledger.map((row) => row.txn))],
+    event_ids: store.events.map((evt) => evt.id),
+    resources: resourceChanges(store),
+    started_at: store.context.started_at,
+    completed_at: new Date().toISOString(),
+  };
+}
+
 /** Serializable request/background unit of work. Resource state, ledger,
- * events/outbox and idempotency commit together or not at all. */
-export async function inRequestScope(run) {
+ * events/outbox, idempotency and successful audit evidence commit together. */
+export async function inRequestScope(run, context = {}) {
   return serializeRequest(() => {
-    const store = createRequestStore();
+    const store = createRequestStore(context);
     return requestScope.run(store, async () => {
       try {
         const result = await run();
 
+        // Subscribers may stage durable outbox rows. They run before the audit
+        // snapshot so those rows are included in the command's resource changes.
         for (const evt of store.events) {
           for (const subscriber of eventBeforeCommitSubscribers) subscriber(evt);
         }
+
+        const successAudit = auditRecord(store, "succeeded");
+        if (successAudit) store.audit.push(successAudit);
 
         sqlite.transactionSync(() => {
           for (const [map, rows] of store.snapshots)
             for (const id of rows.keys()) map._persist(id);
           for (const row of store.ledger) db.ledger._persist(row);
           for (const evt of store.events) db.events._persist(evt);
+          for (const row of store.audit) db.audit._persist(row);
           for (const [tenantId, maximum] of store.eventTrims)
             db.events._trimTenant(tenantId, maximum);
         });
@@ -252,11 +315,25 @@ export async function inRequestScope(run) {
       } catch (error) {
         for (const [map, rows] of store.snapshots)
           for (const [id, snapshot] of rows) map._restore(id, snapshot);
+
+        // Failed commands must leave no financial/resource writes, but the fact
+        // they failed is itself audit evidence. Persist only IDs/metadata, never
+        // request bodies, secrets or arbitrary exception text.
+        const failedAudit = auditRecord(store, "failed", error);
+        if (failedAudit) {
+          try {
+            sqlite.transactionSync(() => db.audit._persist(failedAudit));
+          } catch (auditError) {
+            console.error("failed to persist command failure audit", auditError);
+          }
+        }
+        if (error && typeof error === "object") error.command_id = store.commandId;
         throw error;
       } finally {
         store.snapshots.clear();
         store.ledger.length = 0;
         store.events.length = 0;
+        store.audit.length = 0;
         store.eventTrims.clear();
       }
     });
@@ -266,9 +343,6 @@ export async function inRequestScope(run) {
 class PersistentMap {
   constructor(table) {
     this.table = table;
-    sqlite.exec(
-      `CREATE TABLE IF NOT EXISTS "${table}" (id TEXT PRIMARY KEY, data TEXT NOT NULL)`,
-    );
     this._cache = new Map();
     for (const row of sqlite.prepare(`SELECT id, data FROM "${table}"`).all()) {
       this._cache.set(row.id, JSON.parse(row.data));
@@ -344,13 +418,8 @@ class PersistentMap {
 
 class PersistentLedger {
   constructor() {
-    sqlite.exec(`CREATE TABLE IF NOT EXISTS ledger (
-      seq INTEGER PRIMARY KEY AUTOINCREMENT,
-      txn TEXT NOT NULL, at TEXT NOT NULL, account TEXT NOT NULL,
-      currency TEXT NOT NULL, amount TEXT NOT NULL, memo TEXT
-    )`);
     this._insert = sqlite.prepare(
-      `INSERT INTO ledger (txn, at, account, currency, amount, memo) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO ledger (txn, at, account, currency, amount, memo, command_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     );
     this._selectAll = sqlite.prepare(`SELECT * FROM ledger ORDER BY seq`);
     this._selectAccount = sqlite.prepare(
@@ -385,6 +454,7 @@ class PersistentLedger {
       row.currency,
       row.amount.toString(),
       row.memo ?? null,
+      row.command_id ?? null,
     );
   }
   _all() {
@@ -395,6 +465,7 @@ class PersistentLedger {
       currency: r.currency,
       amount: BigInt(r.amount),
       memo: r.memo,
+      command_id: r.command_id ?? null,
     }));
     const store = requestScope.getStore();
     return store ? rows.concat(store.ledger) : rows;
@@ -419,17 +490,8 @@ class PersistentLedger {
 
 class PersistentEvents {
   constructor() {
-    sqlite.exec(`CREATE TABLE IF NOT EXISTS events (
-      seq INTEGER PRIMARY KEY AUTOINCREMENT,
-      id TEXT NOT NULL, type TEXT NOT NULL, created_at TEXT NOT NULL, data TEXT NOT NULL,
-      tenant_id TEXT
-    )`);
-    const columns = sqlite.prepare(`PRAGMA table_info(events)`).all();
-    if (!columns.some((column) => column.name === "tenant_id")) {
-      sqlite.exec(`ALTER TABLE events ADD COLUMN tenant_id TEXT`);
-    }
     this._insert = sqlite.prepare(
-      `INSERT INTO events (id, type, created_at, data, tenant_id) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO events (id, type, created_at, data, tenant_id, command_id) VALUES (?, ?, ?, ?, ?, ?)`,
     );
     this._shiftOldest = sqlite.prepare(
       `DELETE FROM events WHERE seq = (SELECT MIN(seq) FROM events)`,
@@ -457,6 +519,7 @@ class PersistentEvents {
       evt.created_at,
       JSON.stringify(evt.data),
       evt.tenant_id ?? null,
+      evt.command_id ?? null,
     );
   }
   shift() {
@@ -485,12 +548,40 @@ class PersistentEvents {
       created_at: r.created_at,
       data: JSON.parse(r.data),
       tenant_id: r.tenant_id,
+      command_id: r.command_id ?? null,
     }));
     const store = requestScope.getStore();
     return store ? rows.concat(store.events) : rows;
   }
   [Symbol.iterator]() {
     return this._all()[Symbol.iterator]();
+  }
+}
+
+/** Append-only audit store. No update/delete API is exposed. */
+class PersistentAuditLog {
+  constructor() {
+    this._insert = sqlite.prepare(
+      `INSERT INTO "auditRecords" (id, data) VALUES (?, ?)`,
+    );
+    this._selectAll = sqlite.prepare(
+      `SELECT id, data FROM "auditRecords" ORDER BY rowid`,
+    );
+  }
+  append(record) {
+    const store = requestScope.getStore();
+    if (store) {
+      store.audit.push(record);
+      return record;
+    }
+    sqlite.transactionSync(() => this._persist(record));
+    return record;
+  }
+  _persist(record) {
+    this._insert.run(record.id, JSON.stringify(record));
+  }
+  values() {
+    return this._selectAll.all().map((row) => JSON.parse(row.data));
   }
 }
 
@@ -509,6 +600,7 @@ export const db = {
   ledger: new PersistentLedger(),
   events: new PersistentEvents(),
   idempotency: new PersistentMap("idempotency"),
+  audit: new PersistentAuditLog(),
 };
 
 export const hashKey = (k) => createHash("sha256").update(k).digest("hex");
@@ -519,15 +611,16 @@ export function emit(type, data, { tenantId } = {}) {
   if (!Number.isSafeInteger(retention) || retention < 1) {
     throw new Error("EVENT_RETENTION_PER_TENANT must be a positive integer");
   }
+  const store = requestScope.getStore();
   const evt = {
     id: ksuid("evt"),
     type,
     created_at: new Date().toISOString(),
     data,
     tenant_id: tenantId,
+    command_id: store?.commandId ?? ksuid("cmd"),
   };
 
-  const store = requestScope.getStore();
   if (store) {
     db.events.push(evt);
     db.events.trimTenant(tenantId, retention);
@@ -577,6 +670,8 @@ export function post(entries, memo) {
   if (sum !== 0n)
     throw new ApiError("internal-error", 500, "Ledger entries do not balance");
   assertNoOverdraft(entries);
+  const store = requestScope.getStore();
+  const commandId = store?.commandId ?? ksuid("cmd");
   const txn = ksuid("led");
   const at = new Date().toISOString();
   const rows = entries.map((e) => ({
@@ -586,9 +681,10 @@ export function post(entries, memo) {
     currency: e.currency,
     amount: e.amount,
     memo,
+    command_id: commandId,
   }));
 
-  if (requestScope.getStore()) {
+  if (store) {
     for (const row of rows) db.ledger.push(row);
     return txn;
   }
