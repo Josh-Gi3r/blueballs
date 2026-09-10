@@ -43,10 +43,21 @@ import {
 import { ensureProductionBootstrap } from "./production-bootstrap.js";
 import { queueProviderOperation } from "./provider-outbox.js";
 import { prepareProductionProviderIntent } from "./production-provider-intents.js";
+import {
+  bankingFlag,
+  bankingRuntimeEnvironment,
+} from "./runtime-env.js";
 import "./production-provider-outcomes.js";
 
-export const BANK_API_MODE = bankingApiMode();
-ensureProductionBootstrap({ db, hashKey, ksuid, mode: BANK_API_MODE });
+const RUNTIME_ENV = bankingRuntimeEnvironment();
+export const BANK_API_MODE = bankingApiMode(RUNTIME_ENV);
+ensureProductionBootstrap({
+  db,
+  hashKey,
+  ksuid,
+  mode: BANK_API_MODE,
+  env: RUNTIME_ENV,
+});
 
 export function collection(name) {
   if (!BANKING_COLLECTION_TABLE_SET.has(name)) {
@@ -150,8 +161,10 @@ export const THIN = new Set(["MYR"]);
 
 /* ---------------- route registry ---------------- */
 export const routes = [];
-const RESPONSE_CONTRACT_VALIDATION =
-  process.env.RESPONSE_CONTRACT_VALIDATION === "true";
+const RESPONSE_CONTRACT_VALIDATION = bankingFlag(
+  "RESPONSE_CONTRACT_VALIDATION",
+  false,
+);
 
 function auditSourceHash(req) {
   const source =
