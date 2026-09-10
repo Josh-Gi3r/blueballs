@@ -1,33 +1,9 @@
-/** The swap engine.
+/** Compatibility stablecoin FX market.
  *
- *  Design decisions, and why:
- *
- *  1. THE BOOK IS OFF-CHAIN. Orders, matching, KYC and the ledger live here. The only
- *     thing that needs to be trustless is custody and the atomic swap itself. Putting
- *     the book on-chain would leak every customer's flow and buy nothing.
- *
- *  2. INTENTS, NOT ORDERS. A user signs an intent — what they'll give, the least they'll
- *     accept, and an expiry. It only binds when matched. Nothing locks until commit, so
- *     nobody sits in a pool being picked off.
- *
- *  3. THE FALLBACK LADDER. A corridor is never dead, only expensive:
- *       p2p        match against an opposing intent      tightest
- *       lp         a liquidity provider fills            +25% of spread
- *       principal  the operator fills as last resort     +100% of spread
- *
- *  4. AGGREGATE DEPTH IS PUBLIC, IDENTITY IS NOT. Anyone offering quotes leaks
- *     aggregate depth anyway — you can ladder quote sizes and reconstruct it. So we
- *     publish it properly (L2) and keep what probing CANNOT recover private: maker
- *     identity and per-order detail (L3). Peers can price; peers cannot pick each
- *     other off. The operator can attribute every fill for compliance.
- *
- *  5. NETTING. Flow in a corridor is netted before settlement, so liquidity has to
- *     cover the NET imbalance, not the gross. This is the difference between needing
- *     a balance sheet and needing a clearing house.
- *
- *  6. SETTLEMENT IS ATOMIC. Both legs post in one double-entry transaction or neither
- *     does — post() throws unless entries sum to zero.
- */
+ * This surface remains for banking-API compatibility; the canonical FX runtime
+ * lives in apps/fx-node. The compatibility engine still obeys the same financial
+ * invariants: exact money, explicit source/destination accounts, attributable
+ * counterparties, bounded principal risk and atomic request-level settlement. */
 
 import {
   route,
@@ -42,144 +18,212 @@ import {
   emit,
   collection,
   now,
-  randomBytes,
   must,
   visibleTo,
   principalId,
+  positiveMinor,
+  paginate,
 } from "../kernel.js";
-import { isStable, midOf, CORRIDORS } from "../assets.js";
+import { isStable } from "../assets.js";
 import { priceCorridor, principalQuote, DEFAULT_APPETITE } from "../pricing.js";
 import * as PRICING from "../pricing.js";
+import {
+  convertAtMid,
+  convertWithSpread,
+  percentageSaved,
+} from "../fx-exact-math.js";
 import { creditProviders, poolAccount } from "./fx-lp.js";
 
-const intents = collection("fxIntents"); // signed, unmatched
-const fills = collection("fxFills"); // matched, settled
-const batches = collection("fxBatches"); // netting runs
+const intents = collection("fxIntents");
+const fills = collection("fxFills");
+const batches = collection("fxBatches");
+const appetite = collection("fxAppetite");
+const rfqs = collection("fxRfqs");
 
 const pairKey = (a, b) => `${a}/${b}`;
-const LADDER = { p2p: 1.0, lp: 1.25, principal: 2.0 };
+const LADDER = { p2p: 1, lp: 1.25, principal: 2 };
+const RFQ_WINDOW_MS = 60_000;
+const RFQ_FIRMNESS_BPS = 2;
 
-/** A stable pseudonym for a counterparty: peers see this, never the customer id.
- *  The operator can still resolve it — attribution without exposure. */
 const pseudonym = (customerId) =>
   "ctp_" + Buffer.from(customerId).toString("base64url").slice(-10);
 
-/** Live resting depth per direction — the input the price is derived from. */
 function restingDepth() {
   const out = {};
-  for (const i of intents.values()) {
-    if (i.status !== "open" || i.mode !== "maker") continue;
-    if (Date.parse(i.expires_at) <= Date.now()) continue;
-    const k = pairKey(i.from, i.to);
-    out[k] = (out[k] ?? 0n) + BigInt(i.remaining);
+  for (const intent of intents.values()) {
+    if (intent.status !== "open" || intent.mode !== "maker") continue;
+    if (Date.parse(intent.expires_at) <= Date.now()) continue;
+    const key = pairKey(intent.from, intent.to);
+    out[key] = (out[key] ?? 0n) + BigInt(intent.remaining);
   }
   return out;
 }
 
-/** The price, derived from book state — never a static number. */
 function priceNow(from, to, sizeMinor = 0n) {
   return priceCorridor(restingDepth(), from, to, sizeMinor);
 }
 
-const appetite = collection("fxAppetite");
-const appetiteFor = (pair) =>
-  appetite.get(pair) ?? { pair, ...DEFAULT_APPETITE };
-const principalPosition = (cur) => {
-  const v = balanceOf(`principal:${cur}`, cur);
-  return v < 0n ? -v : v;
-};
+function appetiteFor(pair) {
+  return (
+    appetite.get(pair) ?? {
+      pair,
+      ...DEFAULT_APPETITE,
+      currency: pair.split("/")[0],
+    }
+  );
+}
 
-/* ------------------------------------------------------------------ */
-/* Depth — aggregated only. No maker, no per-order rows, by design.     */
-/* ------------------------------------------------------------------ */
+function principalPosition(currency) {
+  const value = balanceOf(`principal:${currency}`, currency);
+  return value < 0n ? -value : value;
+}
+
+function validatePair(from, to) {
+  if (!isStable(from) || !isStable(to)) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      "Swap legs must both be stablecoins — use /v2/ramps to cross fiat",
+    );
+  }
+  if (from === to)
+    throw new ApiError("validation-error", 400, "from and to must differ");
+}
+
+/** Resolve explicit source/output accounts. For pre-1.0 compatibility an omitted
+ * receive_account may be auto-resolved only when exactly one same-customer account
+ * exists in the target currency. Ambiguity fails closed. */
+function settlementAccounts(body, key, from, to) {
+  const source = must(db.accounts, body.account, "account", key);
+  if (source.currency !== from) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      `Source account ${source.id} holds ${source.currency}, not ${from}`,
+    );
+  }
+
+  let receive = null;
+  if (body.receive_account) {
+    receive = must(db.accounts, body.receive_account, "receive account", key);
+  } else {
+    const candidates = visibleTo([...db.accounts.values()], key).filter(
+      (candidate) =>
+        candidate.customer === source.customer &&
+        candidate.currency === to &&
+        candidate.status !== "closed",
+    );
+    if (candidates.length === 1) receive = candidates[0];
+    else {
+      throw new ApiError(
+        "validation-error",
+        400,
+        candidates.length
+          ? `Multiple ${to} accounts exist for customer ${source.customer}; provide receive_account explicitly`
+          : `No ${to} receive account exists for customer ${source.customer}; create one or provide receive_account`,
+      );
+    }
+  }
+
+  if (receive.customer !== source.customer) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      "Source and receive accounts must belong to the same customer",
+    );
+  }
+  if (receive.currency !== to) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      `Receive account ${receive.id} holds ${receive.currency}, not ${to}`,
+    );
+  }
+  if (receive.status === "closed") {
+    throw new ApiError("conflict", 409, `Receive account ${receive.id} is closed`);
+  }
+  return { source, receive };
+}
+
+function scaledBps(base, multiplier) {
+  return Math.round(base * multiplier * 10_000) / 10_000;
+}
+
+/* =========================== DEPTH =========================== */
 route(
   "GET",
   "/v2/fx/depth",
   ({ url }) => {
-    const pair = url.searchParams.get("pair");
+    const requestedPair = url.searchParams.get("pair")?.toUpperCase() ?? null;
     const live = [...intents.values()].filter(
-      (i) => i.status === "open" && Date.parse(i.expires_at) > Date.now(),
+      (intent) =>
+        intent.status === "open" &&
+        intent.mode === "maker" &&
+        Date.parse(intent.expires_at) > Date.now(),
     );
-
     const byPair = {};
-    for (const i of live) {
-      const k = pairKey(i.from, i.to);
-      if (pair && k !== pair) continue;
-      byPair[k] ??= { pair: k, from: i.from, to: i.to, resting: 0n, orders: 0 };
-      byPair[k].resting += BigInt(i.remaining);
-      byPair[k].orders += 1;
+    for (const intent of live) {
+      const pair = pairKey(intent.from, intent.to);
+      if (requestedPair && pair !== requestedPair) continue;
+      byPair[pair] ??= {
+        pair,
+        from: intent.from,
+        to: intent.to,
+        resting: 0n,
+        orders: 0,
+      };
+      byPair[pair].resting += BigInt(intent.remaining);
+      byPair[pair].orders += 1;
     }
 
     return {
       object: "list",
       disclosure: "aggregate",
       note:
-        "Aggregate depth only. Maker identity and per-order detail are never served — " +
-        "they cannot be recovered by quote-probing, so keeping them private is meaningful.",
-      data: Object.values(byPair).map((d) => ({
-        pair: d.pair,
-        from: d.from,
-        to: d.to,
-        resting: { amount: fromMinor(d.resting), currency: d.from },
-        // deliberately coarse: a count band, not an order count you could fingerprint
-        makers:
-          d.orders === 0
-            ? "none"
-            : d.orders < 3
-              ? "few"
-              : d.orders < 10
-                ? "several"
-                : "many",
-        ...(() => {
-          const p = priceNow(d.from, d.to);
-          return {
-            spread_bps: p.spread_bps,
-            rebate_bps: p.rebate_bps,
-            imbalance: p.imbalance,
-            liquidity: p.liquidity,
-          };
-        })(),
-      })),
+        "Aggregate depth only. Maker identity and per-order detail remain private.",
+      data: Object.values(byPair).map((depth) => {
+        const price = priceNow(depth.from, depth.to);
+        return {
+          pair: depth.pair,
+          from: depth.from,
+          to: depth.to,
+          resting: { amount: fromMinor(depth.resting), currency: depth.from },
+          makers:
+            depth.orders < 3 ? "few" : depth.orders < 10 ? "several" : "many",
+          spread_bps: price.spread_bps,
+          rebate_bps: price.rebate_bps,
+          imbalance: price.imbalance,
+          liquidity: price.liquidity,
+        };
+      }),
     };
   },
   { public: true },
 );
 
-/* ------------------------------------------------------------------ */
-/* Submit a signed intent. Matching runs immediately down the ladder.   */
-/* ------------------------------------------------------------------ */
+/* =========================== INTENTS =========================== */
 route(
   "POST",
   "/v2/fx/intents",
   ({ body, key }) => {
     need(body, ["account", "from", "to", "amount", "min_receive"]);
-    const acc = must(db.accounts, body.account, "account", key);
+    const from = String(body.from).toUpperCase();
+    const to = String(body.to).toUpperCase();
+    validatePair(from, to);
+    const { source, receive } = settlementAccounts(body, key, from, to);
 
-    const from = String(body.from).toUpperCase(),
-      to = String(body.to).toUpperCase();
-    if (!isStable(from) || !isStable(to)) {
-      throw new ApiError(
-        "validation-error",
-        400,
-        "Swap legs must both be stablecoins — use /v2/ramps to cross fiat",
-      );
-    }
-    if (from === to)
-      throw new ApiError("validation-error", 400, "from and to must differ");
-
-    const amount = toMinor(body.amount);
-    const minReceive = toMinor(body.min_receive);
-    if (balanceOf(acc.id, from) < amount) {
+    const amount = positiveMinor(body.amount);
+    positiveMinor(body.min_receive, "min_receive");
+    if (balanceOf(source.id, from) < amount) {
       throw new ApiError(
         "insufficient-balance",
         400,
-        `Account holds ${fromMinor(balanceOf(acc.id, from))} ${from}`,
+        `Account holds ${fromMinor(balanceOf(source.id, from))} ${from}`,
       );
     }
 
-    const cus = db.customers.get(acc.customer);
-    if (!cus || cus.decision !== "approved") {
-      // every counterparty is verified — that is what makes the book attributable
+    const customer = db.customers.get(source.customer);
+    if (!customer || customer.decision !== "approved") {
       throw new ApiError(
         "tier-insufficient",
         403,
@@ -187,28 +231,24 @@ route(
       );
     }
 
-    // maker rests on the book and waits for a counterparty; taker walks the ladder now.
-    // Without makers there are no resting orders, and without those there is no P2P at all.
     const mode = body.mode === "maker" ? "maker" : "taker";
-
+    const ttlSeconds = body.ttl_seconds ?? 300;
     const intent = {
       id: ksuid("int"),
-      account: acc.id,
-      customer: acc.customer,
-      counterparty: pseudonym(acc.customer),
+      account: source.id,
+      receive_account: receive.id,
+      customer: source.customer,
+      counterparty: pseudonym(source.customer),
       from,
       to,
       amount: body.amount,
       remaining: amount.toString(),
       min_receive: body.min_receive,
-      // the signature binds the intent; we record it rather than inventing one
       signature: body.signature ?? null,
       signed: !!body.signature,
       mode,
       status: "open",
-      expires_at: new Date(
-        Date.now() + (Number(body.ttl_seconds) || 300) * 1000,
-      ).toISOString(),
+      expires_at: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
       created_at: now(),
       owner: principalId(key),
     };
@@ -220,146 +260,139 @@ route(
     );
 
     if (mode === "maker") {
-      // rest only. A maker is never force-filled by the fallback ladder — that would
-      // turn every liquidity provider into a taker at their own expense.
       return {
         ...intents.get(intent.id),
         filled: false,
         fill_legs: [],
         resting: true,
-        note: "Resting on the book. It fills when a taker crosses it, or expires.",
+        note: "Resting on the private book until crossed, cancelled or expired.",
       };
     }
+
     const result = matchIntent(intent);
     return { ...intents.get(intent.id), ...result };
   },
   { created: true },
 );
 
-/** Walk the ladder: opposing intents first, then LP, then principal.
- *
- *  Two phases, and the split is load-bearing. PLAN computes every leg without
- *  touching the ledger, the book or the intent; only once the total clears the
- *  signed min_receive floor does COMMIT apply any of it. Before this split the
- *  legs were settled as they were found and the floor was checked afterwards,
- *  so a refused fill returned HTTP 400 with the money already moved.
- *
- *  This cannot be solved with a database transaction: when the API runs inside
- *  a Durable Object, packages/sqlite-compat swallows BEGIN/COMMIT/ROLLBACK, so
- *  a rollback would work locally and silently do nothing in production. */
 function matchIntent(intent) {
   const plan = [];
   let remaining = BigInt(intent.remaining);
-  const mid = midOf(intent.from) / midOf(intent.to);
 
-  // ---- 1. P2P: an opposing intent in the same corridor ----
   const opposing = [...intents.values()]
     .filter(
-      (o) =>
-        o.status === "open" &&
-        o.id !== intent.id &&
-        o.mode === "maker" &&
-        o.from === intent.to &&
-        o.to === intent.from &&
-        o.customer !== intent.customer &&
-        Date.parse(o.expires_at) > Date.now(),
+      (maker) =>
+        maker.status === "open" &&
+        maker.id !== intent.id &&
+        maker.mode === "maker" &&
+        maker.from === intent.to &&
+        maker.to === intent.from &&
+        maker.customer !== intent.customer &&
+        Date.parse(maker.expires_at) > Date.now(),
     )
     .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
 
-  for (const o of opposing) {
+  for (const maker of opposing) {
     if (remaining <= 0n) break;
-    const oRemaining = BigInt(o.remaining);
-    // what the maker's side is worth in our currency
-    const oInOurs = BigInt(Math.floor(Number(oRemaining) / mid));
-    const take = remaining < oInOurs ? remaining : oInOurs;
+    const makerRemaining = BigInt(maker.remaining);
+    const makerCapacityInTakerCurrency = convertAtMid(
+      makerRemaining,
+      intent.to,
+      intent.from,
+    );
+    const take =
+      remaining < makerCapacityInTakerCurrency
+        ? remaining
+        : makerCapacityInTakerCurrency;
     if (take <= 0n) continue;
 
     const priced = priceNow(intent.from, intent.to, take);
-    const bps = priced.spread_bps * LADDER.p2p;
-    const out = BigInt(Math.floor(Number(take) * mid * (1 - bps / 10000)));
+    const bps = scaledBps(priced.spread_bps, LADDER.p2p);
+    const grossOut = convertAtMid(take, intent.from, intent.to);
+    const out = convertWithSpread(take, intent.from, intent.to, bps);
+    if (balanceOf(maker.account, intent.to) < grossOut) continue;
 
     plan.push({
       source: "p2p",
-      account: o.account,
+      counterInAccount: maker.receive_account,
+      counterOutAccount: maker.account,
       take,
+      grossOut,
       out,
       bps,
+      maker,
+      makerRemaining: (makerRemaining - grossOut).toString(),
       leg: {
         source: "p2p",
-        counterparty: o.counterparty,
+        counterparty: maker.counterparty,
         in: fromMinor(take),
         out: fromMinor(out),
-        spread_bps: Math.round(bps),
+        spread_bps: Math.round(bps * 100) / 100,
       },
-      maker: o,
-      makerRemaining: (
-        oRemaining - BigInt(Math.floor(Number(take) * mid))
-      ).toString(),
     });
     remaining -= take;
   }
 
-  // ---- 2. LP, then 3. principal — always available, priced wider ----
-  for (const src of ["lp", "principal"]) {
+  for (const source of ["lp", "principal"]) {
     if (remaining <= 0n) break;
     const priced = priceNow(intent.from, intent.to, remaining);
-    let bps = priced.spread_bps * LADDER[src];
-    let account = `${src}:${intent.to}`;
+    let bps = scaledBps(priced.spread_bps, LADDER[source]);
+    let counterInAccount;
+    let counterOutAccount;
 
-    if (src === "lp") {
-      // Draw on the corridor's actual pool, not a synthetic `lp:<currency>`
-      // account. They were different accounts: committed capital sat in the
-      // pool while every fill was booked against the synthetic one, which had
-      // no balance and no solvency check, so it ran unboundedly negative and
-      // providers earned spread on liquidity nothing ever drew from.
-      account = poolAccount(pairKey(intent.from, intent.to), intent.to);
-      const out = BigInt(
-        Math.floor(Number(remaining) * mid * (1 - bps / 10000)),
-      );
-      if (balanceOf(account, intent.to) < out) {
-        // A pool that cannot cover the fill is not a fill. Fall through to the
-        // principal backstop rather than lending the pool money it never had.
+    if (source === "lp") {
+      const pair = pairKey(intent.from, intent.to);
+      counterInAccount = poolAccount(pair, intent.from);
+      counterOutAccount = poolAccount(pair, intent.to);
+      const grossOut = convertAtMid(remaining, intent.from, intent.to);
+      if (balanceOf(counterOutAccount, intent.to) < grossOut) {
         plan.push({
           declined: true,
           leg: {
             source: "lp",
             declined: true,
-            reason: "corridor pool cannot cover this size",
+            reason: "corridor output pool cannot cover the gross settlement amount",
           },
         });
         continue;
       }
-    }
-
-    if (src === "principal") {
-      // the backstop is the operator's balance sheet — it has a limit, and says so
+    } else {
       const pair = pairKey(intent.from, intent.to);
-      const pq = principalQuote(
+      const principal = principalQuote(
         appetiteFor(pair),
         principalPosition(intent.from),
         remaining,
         priced.spread_bps,
       );
-      if (!pq.available) {
+      if (!principal.available) {
         plan.push({
           declined: true,
-          leg: { source: "principal", declined: true, reason: pq.reason },
+          leg: {
+            source: "principal",
+            declined: true,
+            reason: principal.reason,
+          },
         });
         break;
       }
-      bps = pq.spread_bps;
+      bps = principal.spread_bps;
+      counterInAccount = `principal:${intent.from}`;
+      counterOutAccount = `principal:${intent.to}`;
     }
 
-    const out = BigInt(Math.floor(Number(remaining) * mid * (1 - bps / 10000)));
+    const grossOut = convertAtMid(remaining, intent.from, intent.to);
+    const out = convertWithSpread(remaining, intent.from, intent.to, bps);
     plan.push({
-      source: src,
-      account,
+      source,
+      counterInAccount,
+      counterOutAccount,
       take: remaining,
+      grossOut,
       out,
       bps,
       leg: {
-        source: src,
-        counterparty: src,
+        source,
+        counterparty: source,
         in: fromMinor(remaining),
         out: fromMinor(out),
         spread_bps: Math.round(bps * 100) / 100,
@@ -369,10 +402,11 @@ function matchIntent(intent) {
     remaining = 0n;
   }
 
-  // ---- the floor, checked while the plan is still only a plan ----
-  const totalOut = plan.reduce((n, p) => n + (p.declined ? 0n : p.out), 0n);
+  const totalOut = plan.reduce(
+    (total, step) => total + (step.declined ? 0n : step.out),
+    0n,
+  );
   if (totalOut < toMinor(intent.min_receive)) {
-    // we never silently fill below the signed floor — and now nothing has moved
     throw new ApiError(
       "validation-error",
       400,
@@ -380,14 +414,22 @@ function matchIntent(intent) {
     );
   }
 
-  // ---- COMMIT: from here the plan is applied; nothing above this line mutated ----
   const legs = [];
   for (const step of plan) {
     if (step.declined) {
       legs.push(step.leg);
       continue;
     }
-    settle(intent, step.account, step.take, step.out, step.source, step.bps);
+    settle(
+      intent,
+      step.counterInAccount,
+      step.counterOutAccount,
+      step.take,
+      step.grossOut,
+      step.out,
+      step.source,
+      step.bps,
+    );
     if (step.maker) {
       step.maker.remaining = step.makerRemaining;
       if (BigInt(step.maker.remaining) <= 0n) step.maker.status = "filled";
@@ -399,43 +441,61 @@ function matchIntent(intent) {
   const stored = intents.get(intent.id);
   stored.remaining = remaining.toString();
   stored.status = remaining <= 0n ? "filled" : "open";
-  intents.set(intent.id, stored);
+  intents.set(stored.id, stored);
 
   return {
-    filled: legs.length > 0,
+    filled: legs.some((leg) => !leg.declined),
     fill_legs: legs,
     received: { amount: fromMinor(totalOut), currency: intent.to },
+    receive_account: intent.receive_account,
     ladder: "p2p → lp → principal",
   };
 }
 
-/** Atomic: both sides post in one transaction, or post() throws and nothing moves. */
-function settle(intent, counterAccount, inMinor, outMinor, source, bps) {
+/** Request-level atomic settlement. The counterparty may have separate input and
+ * output accounts; LP/principal use currency-specific system accounts. */
+function settle(
+  intent,
+  counterInAccount,
+  counterOutAccount,
+  inMinor,
+  grossOutMinor,
+  outMinor,
+  source,
+  bps,
+) {
   post(
     [
       { account: intent.account, currency: intent.from, amount: -inMinor },
-      { account: counterAccount, currency: intent.from, amount: inMinor },
+      { account: counterInAccount, currency: intent.from, amount: inMinor },
     ],
-    `swap ${intent.id} ${source} leg-in`,
+    `swap ${intent.id} ${source} input`,
   );
   post(
     [
-      { account: intent.account, currency: intent.to, amount: outMinor },
-      { account: counterAccount, currency: intent.to, amount: -outMinor },
+      {
+        account: counterOutAccount,
+        currency: intent.to,
+        amount: -outMinor,
+      },
+      {
+        account: intent.receive_account,
+        currency: intent.to,
+        amount: outMinor,
+      },
     ],
-    `swap ${intent.id} ${source} leg-out`,
+    `swap ${intent.id} ${source} output`,
   );
 
-  // The spread the taker paid is real money. Book it explicitly so it can be shared
-  // with whoever provided the liquidity, rather than vanishing into a rounding gap.
-  const gross = BigInt(
-    Math.floor(Number(inMinor) * (midOf(intent.from) / midOf(intent.to))),
-  );
-  const spread = gross - outMinor;
+  const spread = grossOutMinor - outMinor;
   if (spread > 0n) {
     post(
       [
-        { account: counterAccount, currency: intent.to, amount: -spread },
+        {
+          account: counterOutAccount,
+          currency: intent.to,
+          amount: -spread,
+        },
         {
           account: `spread:${pairKey(intent.from, intent.to)}`,
           currency: intent.to,
@@ -446,128 +506,138 @@ function settle(intent, counterAccount, inMinor, outMinor, source, bps) {
     );
   }
 
-  const f = {
+  const fill = {
     id: ksuid("fil"),
     intent: intent.id,
     source,
     pair: pairKey(intent.from, intent.to),
     in: { amount: fromMinor(inMinor), currency: intent.from },
     out: { amount: fromMinor(outMinor), currency: intent.to },
-    spread_bps: Math.round(bps),
-    // attribution the operator can audit; peers only ever see the pseudonym
+    spread_bps: Math.round(bps * 100) / 100,
     taker: intent.counterparty,
     taker_customer: intent.customer,
     settled_at: now(),
     owner: intent.owner,
   };
-  fills.set(f.id, f);
+  fills.set(fill.id, fill);
   emit(
     "fx.fill.settled",
-    { id: f.id, pair: f.pair, source },
-    { tenantId: f.owner },
+    { id: fill.id, pair: fill.pair, source },
+    { tenantId: fill.owner },
   );
 
-  // pay the providers whose liquidity made this fill possible
-  if (spread > 0n) {
+  if (source === "lp" && spread > 0n) {
     const credited = creditProviders(
       pairKey(intent.from, intent.to),
       intent.to,
       spread,
-      f.id,
+      fill.id,
     );
     if (credited.length) {
-      f.spread_shared_with = credited.length;
-      f.spread = fromMinor(spread);
-      fills.set(f.id, f);
+      fill.spread_shared_with = credited.length;
+      fill.spread = fromMinor(spread);
+      fills.set(fill.id, fill);
     }
   }
 }
 
-route("GET", "/v2/fx/intents", ({ url, key }) => {
-  const rows = visibleTo([...intents.values()], key);
-  const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100);
-  return {
-    object: "list",
-    data: rows.slice(0, limit),
-    has_more: rows.length > limit,
-  };
-});
+route("GET", "/v2/fx/intents", ({ url, key }) =>
+  paginate(visibleTo([...intents.values()], key), url),
+);
 
 route("POST", "/v2/fx/intents/:id/cancel", ({ params, key }) => {
-  const i = must(intents, params.id, "intent", key);
-  if (i.status === "filled")
+  const intent = must(intents, params.id, "intent", key);
+  if (intent.status === "filled")
     throw new ApiError("conflict", 409, "Already filled");
-  i.status = "cancelled";
-  intents.set(i.id, i);
-  return i;
+  if (intent.status === "cancelled")
+    throw new ApiError("conflict", 409, "Already cancelled");
+  intent.status = "cancelled";
+  intent.cancelled_at = now();
+  emit(
+    "fx.intent.cancelled",
+    { id: intent.id },
+    { tenantId: intent.owner },
+  );
+  return intent;
 });
 
+/* =========================== FILLS / NETTING =========================== */
 route(
   "GET",
   "/v2/fx/fills",
-  ({ url, key }) => {
-    const rows = [...fills.values()];
-    const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100);
+  ({ url }) => {
+    const rows = [...fills.values()].map(
+      ({ taker_customer: _customer, owner: _owner, ...fill }) => fill,
+    );
+    const page = paginate(rows, url);
     return {
-      object: "list",
-      note: "Counterparties appear as pseudonyms. The operator can resolve them for compliance; peers cannot.",
-      data: rows.slice(0, limit).map(({ taker_customer, owner, ...f }) => f),
-      has_more: rows.length > limit,
+      ...page,
+      note:
+        "Counterparties appear as pseudonyms. The operator retains private attribution for compliance.",
     };
   },
   { access: "GLOBAL_READ" },
 );
 
-/* ------------------------------------------------------------------ */
-/* Netting — liquidity covers the NET imbalance, not the gross.         */
-/* ------------------------------------------------------------------ */
 route(
   "POST",
   "/v2/fx/net",
   ({ key }) => {
-    const unsettled = [...fills.values()].filter((f) => !f.batch);
+    const unsettled = [...fills.values()].filter((fill) => !fill.batch);
     const net = {};
-    let gross = 0n;
+    let grossUsd = 0n;
+    const participants = new Set();
 
-    for (const f of unsettled) {
-      const [a, b] = f.pair.split("/");
-      const k = [a, b].sort().join("/");
-      net[k] ??= { pair: k, [a]: 0n, [b]: 0n };
-      net[k][a] = (net[k][a] ?? 0n) - toMinor(f.in.amount);
-      net[k][b] = (net[k][b] ?? 0n) + toMinor(f.out.amount);
-      gross += toMinor(f.in.amount);
+    for (const fill of unsettled) {
+      const [a, b] = fill.pair.split("/");
+      const normalized = [a, b].sort().join("/");
+      net[normalized] ??= { pair: normalized, [a]: 0n, [b]: 0n };
+      const input = toMinor(fill.in.amount);
+      const output = toMinor(fill.out.amount);
+      net[normalized][a] = (net[normalized][a] ?? 0n) - input;
+      net[normalized][b] = (net[normalized][b] ?? 0n) + output;
+      grossUsd += convertAtMid(input, a, "USD");
+      if (fill.owner) participants.add(fill.owner);
     }
 
-    const rows = Object.values(net).map((n) => {
-      const [a, b] = n.pair.split("/");
-      const residual = n[a] < 0n ? -n[a] : n[a];
+    let residualUsd = 0n;
+    const rows = Object.values(net).map((position) => {
+      const [a, b] = position.pair.split("/");
+      const absA = position[a] < 0n ? -position[a] : position[a];
+      const absB = position[b] < 0n ? -position[b] : position[b];
+      const aUsd = convertAtMid(absA, a, "USD");
+      const bUsd = convertAtMid(absB, b, "USD");
+      const settleCurrency = aUsd >= bUsd ? a : b;
+      const settleAmount = settleCurrency === a ? absA : absB;
+      residualUsd += aUsd >= bUsd ? aUsd : bUsd;
       return {
-        pair: n.pair,
-        net_position: { [a]: fromMinor(n[a]), [b]: fromMinor(n[b]) },
-        residual_to_settle: { amount: fromMinor(residual), currency: a },
+        pair: position.pair,
+        net_position: {
+          [a]: fromMinor(position[a]),
+          [b]: fromMinor(position[b]),
+        },
+        residual_to_settle: {
+          amount: fromMinor(settleAmount),
+          currency: settleCurrency,
+        },
       };
     });
 
-    const residualTotal = rows.reduce(
-      (s, r) => s + toMinor(r.residual_to_settle.amount),
-      0n,
-    );
     const batch = {
       id: ksuid("bat"),
       fills: unsettled.length,
-      gross: fromMinor(gross),
-      residual: fromMinor(residualTotal),
-      saved_pct:
-        gross === 0n
-          ? "0.00"
-          : (100 - (Number(residualTotal) / Number(gross)) * 100).toFixed(2),
+      gross: fromMinor(grossUsd),
+      residual: fromMinor(residualUsd),
+      reporting_currency: "USD",
+      saved_pct: percentageSaved(residualUsd, grossUsd),
       rows,
+      participant_tenants: [...participants].sort(),
       created_at: now(),
       owner: principalId(key),
     };
-    for (const f of unsettled) {
-      f.batch = batch.id;
-      fills.set(f.id, f);
+    for (const fill of unsettled) {
+      fill.batch = batch.id;
+      fills.set(fill.id, fill);
     }
     batches.set(batch.id, batch);
     emit(
@@ -576,55 +646,52 @@ route(
       { tenantId: batch.owner },
     );
 
+    const { participant_tenants: _participants, ...publicBatch } = batch;
     return {
-      ...batch,
-      note: "Only the residual needs funding. Netting is why this is a clearing house rather than a balance sheet.",
+      ...publicBatch,
+      note:
+        "Gross and residual are normalized to USD reference value solely for the netting-efficiency ratio; settlement remains per asset in rows.",
     };
   },
   { access: "OPERATOR" },
 );
 
-route("GET", "/v2/fx/batches", ({ key }) => ({
-  object: "list",
-  data: visibleTo([...batches.values()], key),
-}));
+route("GET", "/v2/fx/batches", ({ url, key }) => {
+  const tenant = principalId(key);
+  const rows = [...batches.values()]
+    .filter((batch) => batch.participant_tenants?.includes(tenant))
+    .map(({ participant_tenants: _participants, ...batch }) => batch);
+  return paginate(rows, url);
+});
 
-/* ------------------------------------------------------------------ */
-/* Price a corridor without trading — same numbers the ladder will use. */
-/* ------------------------------------------------------------------ */
+/* =========================== PRICING =========================== */
 route(
   "GET",
   "/v2/fx/price",
   ({ url }) => {
     const from = (url.searchParams.get("from") || "").toUpperCase();
     const to = (url.searchParams.get("to") || "").toUpperCase();
-    if (!isStable(from) || !isStable(to)) {
-      throw new ApiError(
-        "validation-error",
-        400,
-        "from and to must both be stablecoins",
-      );
-    }
+    validatePair(from, to);
     const size = url.searchParams.get("size")
-      ? toMinor(url.searchParams.get("size"))
+      ? positiveMinor(url.searchParams.get("size"), "size")
       : 0n;
-    const p = priceNow(from, to, size);
+    const price = priceNow(from, to, size);
     const reverse = priceNow(to, from, size);
     return {
       pair: pairKey(from, to),
-      ...p,
+      ...price,
       reverse_direction: {
         pair: pairKey(to, from),
         spread_bps: reverse.spread_bps,
         rebate_bps: reverse.rebate_bps,
       },
-      note: "Derived from live book state, not a table. Same inputs always give the same price.",
+      note:
+        "Derived from live book state using fixed-point monetary arithmetic.",
     };
   },
   { public: true },
 );
 
-/* ---- principal appetite: the operator's risk limit, per corridor ---- */
 route(
   "GET",
   "/v2/fx/appetite",
@@ -642,20 +709,37 @@ route(
   "/v2/fx/appetite",
   ({ body, key }) => {
     need(body, ["pair"]);
-    const a = { pair: body.pair, ...DEFAULT_APPETITE, ...body };
-    appetite.set(body.pair, a);
-    emit("fx.appetite.updated", a, { tenantId: principalId(key) });
-    return a;
+    const pair = String(body.pair).toUpperCase();
+    const [from, to] = pair.split("/");
+    validatePair(from, to);
+    if (body.max_position !== undefined)
+      positiveMinor(body.max_position, "max_position");
+    if (
+      body.markup_bps !== undefined &&
+      (!Number.isFinite(body.markup_bps) ||
+        body.markup_bps < 0 ||
+        body.markup_bps > 10_000)
+    ) {
+      throw new ApiError(
+        "validation-error",
+        400,
+        "markup_bps must be a finite number between 0 and 10000",
+      );
+    }
+    const value = {
+      pair,
+      ...DEFAULT_APPETITE,
+      ...body,
+      pair,
+      currency: from,
+    };
+    appetite.set(pair, value);
+    emit("fx.appetite.updated", value, { tenantId: principalId(key) });
+    return value;
   },
   { access: "OPERATOR" },
 );
 
-/* ------------------------------------------------------------------ */
-/* The pricing model itself — constants and formula, published.        */
-/* A client can run the identical arithmetic and get the identical     */
-/* number. Publishing this is what makes the pricing checkable rather  */
-/* than something you have to take on trust.                           */
-/* ------------------------------------------------------------------ */
 route(
   "GET",
   "/v2/fx/pricing-model",
@@ -665,113 +749,71 @@ route(
     rebate_threshold: PRICING.REBATE_THRESHOLD,
     max_rebate_bps: PRICING.MAX_REBATE_BPS,
     thin_depth: PRICING.THIN_DEPTH,
+    arithmetic: "fixed_point",
     formula: [
       "imbalance = (depth_with_flow - depth_against_flow) / total_depth",
-      "impact    = min(1, size / depth_against_flow)",
-      "spread    = base + max_skew * max(0, imbalance) + max_skew * 0.4 * impact",
-      "if imbalance < -rebate_threshold:",
-      "  strength = min(1, (|imbalance| - threshold) / (1 - threshold))",
-      "  rebate   = max_rebate * strength;  spread = max(0, base - rebate)",
+      "impact = min(1, size / depth_against_flow)",
+      "spread = base + max_skew * max(0, imbalance) + max_skew * 0.4 * impact",
+      "correcting flow beyond the threshold receives a bounded rebate",
     ],
-    note: "Deterministic. Same book state always yields the same price, so any quote you were given can be recomputed and checked.",
+    note:
+      "All monetary depth and size arithmetic is integer/fixed-point; bounded bps and ratios are serialized as numbers.",
   }),
   { public: true },
 );
 
-/* =========================================================================
- * RFQ — the middle disclosure tier
- *
- * Three tiers exist, and they are set by who is asking, not by a plan:
- *
- *   public      GET /v2/fx/depth   aggregate depth only, no identity, no orders
- *   integrator  POST /v2/fx/rfq    a FIRM price for your own size, held for a window
- *   private     GET /v2/fx/intents your own orders, and never anyone else's
- *
- * The middle tier is what a bank integrating this rail actually needs: it cannot
- * quote its own customers off a rate that might move between the quote and the
- * click. So it asks for a price at a size, and that price is binding for a window.
- *
- * What an RFQ reveals is strictly more than aggregate depth — it tells you the
- * executable rate at your size, which is the shape of the book at that depth — and
- * strictly less than the book: no maker identity, no other participants' orders,
- * nothing about flow that is not yours.
- *
- * Honouring a firm price is principal risk. If the corridor moves against us inside
- * the window we pay the difference; if it moves our way we keep it. That is what
- * "firm" costs, and it is why the window is short and the size is capped by the
- * same appetite that governs the principal leg.
- * ========================================================================= */
-
-const rfqs = collection("fxRfqs");
-const RFQ_WINDOW_MS = 60_000;
-/** A firm price is worth paying for: it is the operator, not the taker, carrying
- *  the movement inside the window. */
-const RFQ_FIRMNESS_BPS = 2;
-
+/* =========================== RFQ =========================== */
 route(
   "POST",
   "/v2/fx/rfq",
   ({ body, key }) => {
     need(body, ["account", "from", "to", "amount"]);
-    const acc = must(db.accounts, body.account, "account", key);
+    const from = String(body.from).toUpperCase();
+    const to = String(body.to).toUpperCase();
+    validatePair(from, to);
+    const { source, receive } = settlementAccounts(body, key, from, to);
 
-    const cus = db.customers.get(acc.customer);
-    if (!cus || cus.decision !== "approved") {
+    const customer = db.customers.get(source.customer);
+    if (!customer || customer.decision !== "approved") {
       throw new ApiError(
         "tier-insufficient",
         403,
-        "Counterparties must be verified before they can provide or take liquidity",
+        "Counterparties must be verified before they can request firm liquidity",
       );
     }
-    if (cus.type !== "business") {
+    if (customer.type !== "business") {
       throw new ApiError(
         "tier-insufficient",
         403,
-        "Firm quotes are the integrator tier — they commit the operator's balance sheet for a window, so they are served to verified business customers. Use POST /v2/fx/quote for an indicative price.",
+        "Firm quotes are available to verified business/integrator customers",
       );
     }
 
-    const from = String(body.from).toUpperCase(),
-      to = String(body.to).toUpperCase();
-    if (!isStable(from) || !isStable(to)) {
-      throw new ApiError(
-        "validation-error",
-        400,
-        "Swap legs must both be stablecoins — use /v2/ramps to cross fiat",
-      );
-    }
-    if (from === to)
-      throw new ApiError("validation-error", 400, "from and to must differ");
-
-    const size = toMinor(body.amount);
+    const size = positiveMinor(body.amount);
     const pair = pairKey(from, to);
     const priced = priceNow(from, to, size);
-
-    // A firm quote consumes the same appetite the principal leg does — we cannot
-    // promise a price we would not be willing to fill.
-    const pq = principalQuote(
+    const principal = principalQuote(
       appetiteFor(pair),
       principalPosition(from),
       size,
       priced.spread_bps,
     );
-    if (!pq.available) {
+    if (!principal.available) {
       throw new ApiError(
         "conflict",
         409,
-        `No firm price available for that size right now: ${pq.reason}. The indicative price stands at POST /v2/fx/quote, or rest a maker order and wait for a counterparty.`,
+        `No firm price available for that size: ${principal.reason}`,
       );
     }
 
-    const bps = pq.spread_bps + RFQ_FIRMNESS_BPS;
-    const mid = midOf(from) / midOf(to);
-    const receives = BigInt(Math.floor(Number(size) * mid * (1 - bps / 10000)));
-
-    const r = {
+    const bps = principal.spread_bps + RFQ_FIRMNESS_BPS;
+    const receives = convertWithSpread(size, from, to, bps);
+    const rfq = {
       id: ksuid("rfq"),
-      account: acc.id,
-      customer: acc.customer,
-      counterparty: pseudonym(acc.customer),
+      account: source.id,
+      receive_account: receive.id,
+      customer: source.customer,
+      counterparty: pseudonym(source.customer),
       pair,
       from,
       to,
@@ -784,17 +826,16 @@ route(
       created_at: now(),
       owner: principalId(key),
     };
-    rfqs.set(r.id, r);
+    rfqs.set(rfq.id, rfq);
     emit(
       "fx.rfq.quoted",
-      { id: r.id, pair, locked_bps: r.locked_bps },
-      { tenantId: r.owner },
+      { id: rfq.id, pair, locked_bps: rfq.locked_bps },
+      { tenantId: rfq.owner },
     );
 
     return {
-      ...r,
+      ...rfq,
       disclosure: "firm-quote",
-      // the extra disclosure this tier buys, and its explicit limit
       depth_at_your_size: {
         liquidity: priced.liquidity,
         imbalance: priced.imbalance,
@@ -802,95 +843,92 @@ route(
         firmness_bps: RFQ_FIRMNESS_BPS,
       },
       note:
-        "Binding for the window. Accept it with POST /v2/fx/rfq/{id}/accept and you " +
-        "get exactly this rate even if the corridor has moved. Maker identity and " +
-        "other participants' orders are not disclosed at any tier.",
+        "Binding for the quote window. Other participants' identities/orders remain private.",
     };
   },
   { created: true },
 );
 
-route("GET", "/v2/fx/rfq", ({ key, url }) => {
-  const rows = visibleTo([...rfqs.values()], key);
-  const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100);
-  return {
-    object: "list",
-    disclosure: "own-quotes",
-    data: rows.slice(0, limit),
-    has_more: rows.length > limit,
-  };
-});
+route("GET", "/v2/fx/rfq", ({ key, url }) =>
+  paginate(visibleTo([...rfqs.values()], key), url),
+);
 
 route("POST", "/v2/fx/rfq/:id/accept", ({ params, key }) => {
-  const r = must(rfqs, params.id, "quote", key);
-  if (r.status !== "open")
-    throw new ApiError("conflict", 409, `Quote ${r.id} is already ${r.status}`);
-  if (Date.parse(r.expires_at) <= Date.now()) {
-    r.status = "expired";
-    rfqs.set(r.id, r);
-    throw new ApiError(
-      "conflict",
-      409,
-      "That quote has expired — ask for another. A firm price is only firm for its window.",
-    );
+  const rfq = must(rfqs, params.id, "quote", key);
+  if (rfq.status !== "open")
+    throw new ApiError("conflict", 409, `Quote ${rfq.id} is already ${rfq.status}`);
+  if (Date.parse(rfq.expires_at) <= Date.now()) {
+    rfq.status = "expired";
+    rfqs.set(rfq.id, rfq);
+    throw new ApiError("conflict", 409, "That firm quote has expired");
   }
 
-  const size = toMinor(r.amount.amount);
-  if (balanceOf(r.account, r.from) < size) {
+  const size = toMinor(rfq.amount.amount);
+  if (balanceOf(rfq.account, rfq.from) < size) {
     throw new ApiError(
       "insufficient-balance",
       400,
-      `Account holds ${fromMinor(balanceOf(r.account, r.from))} ${r.from}`,
+      `Account holds ${fromMinor(balanceOf(rfq.account, rfq.from))} ${rfq.from}`,
     );
   }
 
-  // Fill as principal at the LOCKED rate — not at whatever the corridor is doing
-  // now. Any drift inside the window is the operator's, which is the whole point.
   const intent = {
     id: ksuid("int"),
-    account: r.account,
-    customer: r.customer,
-    counterparty: r.counterparty,
-    from: r.from,
-    to: r.to,
-    amount: r.amount.amount,
+    account: rfq.account,
+    receive_account: rfq.receive_account,
+    customer: rfq.customer,
+    counterparty: rfq.counterparty,
+    from: rfq.from,
+    to: rfq.to,
+    amount: rfq.amount.amount,
     remaining: size.toString(),
-    min_receive: r.receives.amount,
+    min_receive: rfq.receives.amount,
     mode: "taker",
     status: "open",
-    rfq: r.id,
-    expires_at: r.expires_at,
+    rfq: rfq.id,
+    expires_at: rfq.expires_at,
     created_at: now(),
     owner: principalId(key),
   };
   intents.set(intent.id, intent);
 
-  const out = toMinor(r.receives.amount);
-  settle(intent, `principal:${r.to}`, size, out, "principal", r.locked_bps);
+  const out = toMinor(rfq.receives.amount);
+  const grossOut = convertAtMid(size, rfq.from, rfq.to);
+  settle(
+    intent,
+    `principal:${rfq.from}`,
+    `principal:${rfq.to}`,
+    size,
+    grossOut,
+    out,
+    "principal",
+    rfq.locked_bps,
+  );
 
   intent.remaining = "0";
   intent.status = "filled";
   intents.set(intent.id, intent);
 
-  const live = priceNow(r.from, r.to, size);
-  r.status = "accepted";
-  r.accepted_at = now();
-  r.intent = intent.id;
-  rfqs.set(r.id, r);
+  const live = priceNow(rfq.from, rfq.to, size);
+  rfq.status = "accepted";
+  rfq.accepted_at = now();
+  rfq.intent = intent.id;
+  rfqs.set(rfq.id, rfq);
   emit(
     "fx.rfq.accepted",
-    { id: r.id, intent: intent.id },
-    { tenantId: r.owner },
+    { id: rfq.id, intent: intent.id },
+    { tenantId: rfq.owner },
   );
 
   return {
-    ...r,
+    ...rfq,
     filled: true,
-    received: r.receives,
-    honoured_at_bps: r.locked_bps,
+    received: rfq.receives,
+    honoured_at_bps: rfq.locked_bps,
     corridor_now_bps: live.spread_bps,
-    // stated plainly rather than quietly pocketed either way
-    drift_bps: Math.round((live.spread_bps - r.locked_bps) * 100) / 100,
-    note: "Filled at the locked rate. Movement inside the window sat with the operator, not with you.",
+    drift_bps:
+      Math.round((live.spread_bps - rfq.locked_bps) * 100) / 100,
+    note:
+      "Filled at the locked rate; movement inside the quote window remained with the operator.",
   };
 });
