@@ -44,12 +44,18 @@ const V1_COLLECTION_TABLES = Object.freeze([
 ]);
 
 const V4_FX_COLLECTION_TABLES = Object.freeze(["fxAppetite", "fxRfqs"]);
+const V5_PROVIDER_COLLECTION_TABLES = Object.freeze([
+  "providerOutbox",
+  "providerAttempts",
+  "reconciliationCases",
+]);
 
 export const BANKING_COLLECTION_TABLES = Object.freeze([
   ...V1_COLLECTION_TABLES,
   "webhookOutbox",
   "auditRecords",
   ...V4_FX_COLLECTION_TABLES,
+  ...V5_PROVIDER_COLLECTION_TABLES,
 ]);
 
 export const BANKING_COLLECTION_TABLE_SET = new Set(BANKING_COLLECTION_TABLES);
@@ -133,6 +139,15 @@ export const BANKING_SCHEMA_MIGRATIONS = Object.freeze([
     name: "complete-legacy-fx-durable-schema",
     up(database) {
       for (const table of V4_FX_COLLECTION_TABLES) {
+        createJsonCollection(database, table);
+      }
+    },
+  },
+  {
+    version: 5,
+    name: "durable-provider-operations",
+    up(database) {
+      for (const table of V5_PROVIDER_COLLECTION_TABLES) {
         createJsonCollection(database, table);
       }
     },
