@@ -18,9 +18,30 @@ import {
   emit,
   post,
   balanceOf,
-  collection,
+  collection as persistentCollection,
   subscribeToEvents,
 } from "./lib.js";
+import {
+  BANKING_COLLECTION_TABLE_SET,
+  migrateBankingSchema,
+} from "./schema.js";
+
+// Apply and validate the complete banking data schema before any family module
+// opens its durable collections. This is intentionally separate from Cloudflare
+// Durable Object class migrations.
+migrateBankingSchema();
+
+/** Route families may only open collections that are part of the versioned
+ * banking schema. Adding a new durable resource requires an append-only schema
+ * migration first; typo-created or ad-hoc tables fail at startup. */
+export function collection(name) {
+  if (!BANKING_COLLECTION_TABLE_SET.has(name)) {
+    throw new Error(
+      `Durable collection ${name} is not registered in the banking schema`,
+    );
+  }
+  return persistentCollection(name);
+}
 
 export {
   ksuid,
@@ -31,7 +52,6 @@ export {
   emit,
   post,
   balanceOf,
-  collection,
   subscribeToEvents,
   randomBytes,
 };
