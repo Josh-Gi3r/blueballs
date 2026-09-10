@@ -3,8 +3,6 @@
  * The secret must come from deployment secret storage. Once the operator has
  * minted long-lived/scoped credentials through their own IAM process, remove the
  * bootstrap secret from the environment. Existing databases never require it. */
-import { randomBytes } from "node:crypto";
-
 export function ensureProductionBootstrap({
   db,
   hashKey,
@@ -40,7 +38,6 @@ export function ensureProductionBootstrap({
     permissions: ["*"],
     created_at: createdAt,
     expires: null,
-    bootstrap_nonce: randomBytes(8).toString("hex"),
   };
 
   db.tenants.set(tenantId, tenant);
