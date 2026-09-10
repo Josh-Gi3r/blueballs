@@ -1,13 +1,4 @@
-/** Versioned persistent schema for the Blueballs banking runtime.
- *
- * This is application-data schema versioning. It is deliberately separate from
- * Cloudflare Durable Object class migrations in wrangler.api.jsonc.
- *
- * Every durable JSON collection used by the banking API must be listed here.
- * New collections require an append-only schema migration before route code may
- * open them. Ledger and event tables are explicit because their columns are
- * financial/audit contracts rather than opaque JSON resources.
- */
+/** Versioned persistent schema for the Blueballs banking runtime. */
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "../../../packages/sqlite-compat/src/index.js";
@@ -55,6 +46,7 @@ const V1_COLLECTION_TABLES = Object.freeze([
 export const BANKING_COLLECTION_TABLES = Object.freeze([
   ...V1_COLLECTION_TABLES,
   "webhookOutbox",
+  "auditRecords",
 ]);
 
 export const BANKING_COLLECTION_TABLE_SET = new Set(BANKING_COLLECTION_TABLES);
@@ -68,16 +60,19 @@ function createJsonCollection(database, table) {
   );
 }
 
+function addColumnIfMissing(database, table, column, sqlType) {
+  const columns = database.prepare(`PRAGMA table_info("${table}")`).all();
+  if (!columns.some((candidate) => candidate.name === column)) {
+    database.exec(`ALTER TABLE "${table}" ADD COLUMN "${column}" ${sqlType}`);
+  }
+}
+
 export const BANKING_SCHEMA_MIGRATIONS = Object.freeze([
   {
     version: 1,
     name: "initial-banking-schema",
     up(database) {
-      // Migration v1 is immutable. Do not replace this list with the current
-      // registry: later collections belong in later migrations.
-      for (const table of V1_COLLECTION_TABLES) {
-        createJsonCollection(database, table);
-      }
+      for (const table of V1_COLLECTION_TABLES) createJsonCollection(database, table);
 
       database.exec(`CREATE TABLE IF NOT EXISTS ledger (
         seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,17 +93,11 @@ export const BANKING_SCHEMA_MIGRATIONS = Object.freeze([
         tenant_id TEXT
       )`);
 
-      const eventColumns = database.prepare("PRAGMA table_info(events)").all();
-      if (!eventColumns.some((column) => column.name === "tenant_id")) {
-        database.exec("ALTER TABLE events ADD COLUMN tenant_id TEXT");
-      }
-
+      addColumnIfMissing(database, "events", "tenant_id", "TEXT");
       database.exec(
         "CREATE INDEX IF NOT EXISTS idx_ledger_account_currency_seq ON ledger(account, currency, seq)",
       );
-      database.exec(
-        "CREATE INDEX IF NOT EXISTS idx_ledger_txn ON ledger(txn)",
-      );
+      database.exec("CREATE INDEX IF NOT EXISTS idx_ledger_txn ON ledger(txn)");
       database.exec(
         "CREATE INDEX IF NOT EXISTS idx_events_tenant_seq ON events(tenant_id, seq)",
       );
@@ -119,6 +108,21 @@ export const BANKING_SCHEMA_MIGRATIONS = Object.freeze([
     name: "durable-webhook-outbox",
     up(database) {
       createJsonCollection(database, "webhookOutbox");
+    },
+  },
+  {
+    version: 3,
+    name: "command-audit-correlation",
+    up(database) {
+      createJsonCollection(database, "auditRecords");
+      addColumnIfMissing(database, "ledger", "command_id", "TEXT");
+      addColumnIfMissing(database, "events", "command_id", "TEXT");
+      database.exec(
+        "CREATE INDEX IF NOT EXISTS idx_ledger_command ON ledger(command_id, seq)",
+      );
+      database.exec(
+        "CREATE INDEX IF NOT EXISTS idx_events_command ON events(command_id, seq)",
+      );
     },
   },
 ]);
@@ -132,7 +136,6 @@ function databasePath() {
   );
 }
 
-/** Apply/validate the banking schema before route families initialise. */
 export function migrateBankingSchema() {
   const database = new DatabaseSync(databasePath());
   try {
