@@ -1,13 +1,37 @@
 # Default ownership. Replace/add teams as the maintainer group grows.
 * @Josh-Gi3r
 
-# Financially and security sensitive surfaces
+# Banking core and persistence
 /apps/api/ @Josh-Gi3r
+/packages/sqlite-compat/ @Josh-Gi3r
+/packages/validation/ @Josh-Gi3r
+
+# Canonical FX and settlement
 /apps/fx-node/ @Josh-Gi3r
 /packages/fx-contracts/ @Josh-Gi3r
+/packages/fx-fiat/ @Josh-Gi3r
 /packages/fx-liquidity/ @Josh-Gi3r
 /packages/fx-market/ @Josh-Gi3r
+/packages/fx-monetary/ @Josh-Gi3r
 /packages/fx-policy/ @Josh-Gi3r
 /packages/fx-pricing/ @Josh-Gi3r
+/packages/fx-sdk/ @Josh-Gi3r
+
+# Production edge/runtime routing
+/workers/ @Josh-Gi3r
+/wrangler.jsonc @Josh-Gi3r
+/wrangler.api.jsonc @Josh-Gi3r
+/wrangler.fx.jsonc @Josh-Gi3r
+/compose.reference.yml @Josh-Gi3r
+/Dockerfile.reference @Josh-Gi3r
+
+# Public contracts, verification and release gates
 /spec/ @Josh-Gi3r
+/scripts/verify.mjs @Josh-Gi3r
+/scripts/check-catalogue.mjs @Josh-Gi3r
+/scripts/check-openapi-requests.mjs @Josh-Gi3r
+/scripts/check-openapi-responses.mjs @Josh-Gi3r
+/public/openapi.yaml @Josh-Gi3r
+/.github/workflows/ @Josh-Gi3r
 /SECURITY.md @Josh-Gi3r
+/PRODUCTION-HARDENING.md @Josh-Gi3r
