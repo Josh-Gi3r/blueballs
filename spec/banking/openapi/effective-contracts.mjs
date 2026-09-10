@@ -38,10 +38,7 @@ export const EFFECTIVE_SCHEMAS = {
   ...LEGACY_SCHEMAS,
 
   Money: closed(
-    {
-      amount: ref("DecimalAmount"),
-      currency: ref("CurrencyCode"),
-    },
+    { amount: ref("DecimalAmount"), currency: ref("CurrencyCode") },
     ["amount", "currency"],
   ),
 
@@ -57,6 +54,33 @@ export const EFFECTIVE_SCHEMAS = {
     ["id", "tenant_id", "scope", "created_at"],
   ),
 
+  Customer: resource(
+    {
+      type: { type: "string", enum: ["individual", "business"] },
+      name: string("Customer display or legal name"),
+      email: { type: ["string", "null"], format: "email" },
+      status: string("Lifecycle status"),
+      decision: { type: ["string", "null"] },
+      tier: { type: "integer", minimum: 0 },
+    },
+    ["type", "name", "status"],
+  ),
+
+  Application: resource(
+    {
+      type: { type: "string", enum: ["individual", "business"] },
+      customer: { type: ["string", "null"] },
+      status: string("Application state"),
+      decision: { type: ["string", "null"] },
+      business: { type: ["object", "null"], additionalProperties: true },
+      individual: { type: ["object", "null"], additionalProperties: true },
+      individuals: { type: "array", items: { type: "object", additionalProperties: true } },
+      documents: { type: "array", items: { type: "object", additionalProperties: true } },
+      attestations: { type: "array", items: { type: "object", additionalProperties: true } },
+    },
+    ["type", "status"],
+  ),
+
   Account: resource(
     {
       customer: ref("Identifier"),
@@ -69,6 +93,15 @@ export const EFFECTIVE_SCHEMAS = {
     ["customer", "currency", "status"],
   ),
 
+  ReceivingDetail: resource(
+    {
+      account: ref("Identifier"),
+      rail: string("Payment rail"),
+      details: { type: "object", additionalProperties: true },
+    },
+    ["account", "rail"],
+  ),
+
   Wallet: resource(
     {
       customer: ref("Identifier"),
@@ -79,6 +112,14 @@ export const EFFECTIVE_SCHEMAS = {
       approval_chain: { type: ["string", "null"] },
     },
     ["customer", "currency", "network", "address"],
+  ),
+
+  Recipient: resource(
+    {
+      name: string("Recipient name"),
+      destinations: { type: "array", items: { type: "object", additionalProperties: true } },
+    },
+    ["name", "destinations"],
   ),
 
   Destination: open(
@@ -110,6 +151,14 @@ export const EFFECTIVE_SCHEMAS = {
     ["from", "to", "amount", "receives", "rate", "expires_at"],
   ),
 
+  FxResource: open({
+    id: ref("Identifier"),
+    pair: string("Currency pair"),
+    amount: { anyOf: [money, ref("DecimalAmount")] },
+    status: string("FX lifecycle state"),
+    created_at: ref("Timestamp"),
+  }),
+
   Transfer: resource(
     {
       from: ref("Identifier"),
@@ -121,6 +170,20 @@ export const EFFECTIVE_SCHEMAS = {
       legs: { type: "array", items: ref("TransferLeg") },
     },
     ["from", "amount", "rail", "status", "legs"],
+  ),
+
+  Card: resource(
+    {
+      customer: ref("Identifier"),
+      account: ref("Identifier"),
+      type: { type: "string", enum: ["virtual", "physical"] },
+      status: string("Card state"),
+      last4: string("Last four digits", { pattern: "^[0-9]{4}$" }),
+      currency: ref("CurrencyCode"),
+      spend_limits: { type: "object", additionalProperties: true },
+      merchant_categories: { type: "object", additionalProperties: true },
+    },
+    ["customer", "account", "type", "status", "last4", "currency"],
   ),
 
   Authorisation: resource(
@@ -172,6 +235,15 @@ export const EFFECTIVE_SCHEMAS = {
     ["account", "currency", "limit", "drawn", "available", "status"],
   ),
 
+  Policy: resource(
+    {
+      name: string("Policy name"),
+      rules: { type: "array", items: { type: "object", additionalProperties: true } },
+      attached: { type: "array", items: { type: "object", additionalProperties: true } },
+    },
+    ["name", "rules", "attached"],
+  ),
+
   Approval: resource(
     {
       chain: ref("Identifier"),
@@ -183,6 +255,14 @@ export const EFFECTIVE_SCHEMAS = {
       required: { type: "integer", minimum: 1 },
     },
     ["status"],
+  ),
+
+  Organisation: resource(
+    {
+      name: string("Organisation name"),
+      members: { type: "array", items: ref("OrganisationMember") },
+    },
+    ["name", "members"],
   ),
 
   OrganisationMember: open(
@@ -245,6 +325,36 @@ export const EFFECTIVE_SCHEMAS = {
     ["customer", "mandate", "amount", "schedule", "status", "next_run_date"],
   ),
 
+  Webhook: resource(
+    {
+      url: string("HTTPS delivery URL", { format: "uri" }),
+      events: { type: "array", items: { type: "string" } },
+      status: string("Target state"),
+      delivery_mode: string("Delivery mode"),
+    },
+    ["url", "events", "status"],
+  ),
+
+  Event: open(
+    {
+      id: ref("Identifier"),
+      type: string("Event type"),
+      created_at: ref("Timestamp"),
+      data: { type: "object", additionalProperties: true },
+    },
+    ["id", "type", "created_at", "data"],
+  ),
+
+  SandboxRun: resource(
+    {
+      object: string("Sandbox run kind"),
+      scenario: string("Scenario identifier"),
+      status: string("Simulation state"),
+      history: { type: "array", items: { type: "object", additionalProperties: true } },
+    },
+    ["scenario", "status", "history"],
+  ),
+
   DestinationVerification: open(
     {
       destination: ref("Identifier"),
@@ -263,10 +373,7 @@ export const EFFECTIVE_SCHEMAS = {
       webhook: ref("Identifier"),
       event_id: ref("Identifier"),
       event_type: string("Event type"),
-      status: {
-        type: "string",
-        enum: ["pending", "attempting", "retrying", "succeeded", "failed"],
-      },
+      status: { type: "string", enum: ["pending", "attempting", "retrying", "succeeded", "failed"] },
       attempt_count: { type: "integer", minimum: 0 },
       response_code: { type: ["integer", "null"] },
       attempted_at: { anyOf: [ref("Timestamp"), { type: "null" }] },
@@ -295,10 +402,7 @@ export const EFFECTIVE_SCHEMAS = {
   ),
 
   CurrencyReference: open(
-    {
-      code: ref("CurrencyCode"),
-      thin_liquidity: { type: "boolean" },
-    },
+    { code: ref("CurrencyCode"), thin_liquidity: { type: "boolean" } },
     ["code", "thin_liquidity"],
   ),
 
