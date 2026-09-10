@@ -27,6 +27,46 @@ test("a failed transfer with settled funds is reconciliation, not a refund signa
   assert.equal(result.error_code, "transfer_failed_but_funds_settled");
 });
 
+test("custody transfers use the same explicit funds-finality contract", () => {
+  const incomplete = enforceProviderResultContract(claimed("custody.transfer"), {
+    outcome: "succeeded",
+    provider_reference: "custody_tx_1",
+    funds_state: "submitted",
+  });
+  assert.equal(incomplete.outcome, "ambiguous");
+  assert.equal(
+    incomplete.error_code,
+    "custody_transfer_success_requires_settled_funds",
+  );
+
+  const settled = enforceProviderResultContract(claimed("custody.transfer"), {
+    outcome: "succeeded",
+    provider_reference: "custody_tx_2",
+    funds_state: "settled",
+  });
+  assert.equal(settled.outcome, "succeeded");
+});
+
+test("custody wallet success requires a provider-backed address", () => {
+  const missing = enforceProviderResultContract(claimed("custody.wallet"), {
+    outcome: "succeeded",
+    provider_reference: "wallet_1",
+    result: {},
+  });
+  assert.equal(missing.outcome, "ambiguous");
+  assert.equal(missing.error_code, "custody_wallet_success_requires_address");
+
+  const valid = enforceProviderResultContract(claimed("custody.wallet"), {
+    outcome: "succeeded",
+    provider_reference: "wallet_2",
+    result: {
+      address: "0x1111111111111111111111111111111111111111",
+      network: "base",
+    },
+  });
+  assert.equal(valid.outcome, "succeeded");
+});
+
 test("identity success requires a canonical decision", () => {
   const result = enforceProviderResultContract(claimed("identity.verification"), {
     outcome: "succeeded",
