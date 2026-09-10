@@ -7,6 +7,7 @@ import { DatabaseSync } from "../../../packages/sqlite-compat/src/index.js";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { migrateBankingSchema } from "./schema.js";
+import { publicShape } from "./public-shape.js";
 
 /* ---------------- identifiers: type-prefixed KSUID-style ---------------- */
 const B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -616,7 +617,7 @@ export function emit(type, data, { tenantId } = {}) {
     id: ksuid("evt"),
     type,
     created_at: new Date().toISOString(),
-    data,
+    data: publicShape(data),
     tenant_id: tenantId,
     command_id: store?.commandId ?? ksuid("cmd"),
   };
