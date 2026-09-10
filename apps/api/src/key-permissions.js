@@ -2,24 +2,10 @@ import { ApiError } from "./lib.js";
 import {
   KEY_PERMISSION_DOMAINS,
   KEY_PERMISSIONS,
+  permissionForRoute,
 } from "../../../spec/banking/key-permission-catalog.mjs";
 
 export { KEY_PERMISSION_DOMAINS, KEY_PERMISSIONS };
-
-const DOMAIN_RULES = [
-  [/^\/v2\/keys(?:\/|$)/, "keys"],
-  [/^\/v2\/(?:customers|applications)(?:\/|$)/, "identity"],
-  [/^\/v2\/(?:accounts|details)(?:\/|$)/, "accounts"],
-  [/^\/v2\/wallets(?:\/|$)/, "wallets"],
-  [/^\/v2\/(?:recipients|destinations|transfers|qr|links|mandates|subscriptions)(?:\/|$)/, "payments"],
-  [/^\/v2\/(?:fx|ramps)(?:\/|$)/, "fx"],
-  [/^\/v2\/(?:cards|authorisations|disputes)(?:\/|$)/, "cards"],
-  [/^\/v2\/(?:vaults|credit)(?:\/|$)/, "lending"],
-  [/^\/v2\/(?:policies|approval-chains|approvals|orgs)(?:\/|$)/, "controls"],
-  [/^\/v2\/(?:ledger|statements|fees)(?:\/|$)/, "ledger"],
-  [/^\/v2\/(?:webhooks|events)(?:\/|$)/, "webhooks"],
-  [/^\/v2\/(?:builder|sandbox)(?:\/|$)/, "sandbox"],
-];
 
 function keyPermissions(key) {
   return Array.isArray(key?.permissions) && key.permissions.length
@@ -28,9 +14,7 @@ function keyPermissions(key) {
 }
 
 export function permissionFor(method, pattern) {
-  const domain = DOMAIN_RULES.find(([rule]) => rule.test(pattern))?.[1] ?? null;
-  if (!domain) return null;
-  return `${domain}:${method === "GET" ? "read" : "write"}`;
+  return permissionForRoute(method, pattern);
 }
 
 function permissionSetGrants(permissions, required) {
@@ -47,6 +31,13 @@ export function hasPermission(key, required) {
 
 export function assertKeyPermission(key, method, pattern) {
   const required = permissionFor(method, pattern);
+  if (!required) {
+    throw new ApiError(
+      "internal-error",
+      500,
+      `Authenticated route ${method} ${pattern} has no permission classification`,
+    );
+  }
   if (!hasPermission(key, required)) {
     throw new ApiError(
       "forbidden",
