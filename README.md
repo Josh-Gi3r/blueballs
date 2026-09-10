@@ -4,7 +4,7 @@
 </h1>
 
 <p align="center">
-  <strong>Open-source software for building a neobank.</strong>
+  <strong>Open-source infrastructure for building and operating a modern financial institution.</strong>
 </p>
 
 <p align="center">
@@ -20,15 +20,23 @@
   <img src="docs/assets/readme/home-hero.png" alt="Blueballs city cover reading Build the financial institution your market needs" width="100%" />
 </p>
 
-Blueballs is an MIT-licensed reference platform for designing and running a
-neobank or embedded-finance product. It combines a product interface, a
-tenant-isolated banking API, a double-entry ledger, a sandbox builder and a
-provider-neutral foreign-exchange runtime in one self-hostable repository.
+Blueballs is an MIT-licensed, self-hostable financial-infrastructure stack for
+building neobanks and embedded-finance products. It combines product interfaces,
+a tenant-isolated banking API, a double-entry ledger, a product builder and a
+provider-neutral foreign-exchange runtime in one repository.
 
-The project is designed to be read, forked and adapted. Banks, identity
-providers, card issuers, payment rails, custody systems and liquidity venues
-connect through deployment-owned adapters; their inclusion in the provider
-directory does not imply a partnership or live integration.
+The engineering target is production-grade core infrastructure: financial state
+must be exact, atomic, retry-safe, tenant-isolated, observable and contract-tested.
+The current pre-1.0 line is being hardened against that standard; remaining
+release blockers and their machine-verifiable acceptance criteria are tracked in
+[PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md).
+
+A deploying institution still owns what cannot safely or legally be universal:
+licences, regulated providers, credentials, jurisdiction-specific policy,
+customer protections and deployment operations. Banks, identity providers, card
+issuers, payment rails, custody systems and liquidity venues connect through
+versioned deployment-owned adapters; inclusion in the provider directory never
+implies a partnership or live integration.
 
 ## What is included
 
@@ -108,7 +116,8 @@ and short-lived.
 The browser-facing FX page is a deterministic simulation for understanding the
 system. The separately runnable FX node owns server-side policy, pricing,
 liquidity and reservation behavior. It fails closed when an execution adapter
-has not been configured.
+has not been configured. A simulation on the public site is never evidence that
+a production adapter is connected.
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) for data ownership, runtime topology and
 extension boundaries.
@@ -117,6 +126,8 @@ extension boundaries.
 
 - Monetary amounts cross API boundaries as decimal strings and are represented
   internally as integer minor units or atomic units.
+- Banking resource state, ledger postings, durable events and idempotency state
+  are committed as one request unit of work.
 - Ledger postings must balance, and customer accounts cannot be overdrawn by a
   posting.
 - Tenant resources, events and idempotency records are isolated by a stable
@@ -127,12 +138,13 @@ extension boundaries.
 - Provider credentials and production customer data never belong in the
   repository or browser bundle.
 
-Blueballs is software, not a bank, sponsor-bank relationship, insured account,
-custodian, compliance programme or production certification. A production
-deployment must supply its own licences, providers, security controls,
-availability design, monitoring, reconciliation and customer protections. See
-[SECURITY.md](SECURITY.md) and the
-[production checklist](spec/fx/PRODUCTION-CHECKLIST.md).
+Blueballs is software, not itself a bank, sponsor-bank relationship, insured
+account, custodian or regulatory licence. Production-grade core software does not
+remove the deploying institution's obligation to supply and operate the regulated
+relationships, controls, security policy and customer protections required for
+its product and jurisdictions. See [SECURITY.md](SECURITY.md),
+[PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md) and the
+[FX production checklist](spec/fx/PRODUCTION-CHECKLIST.md).
 
 ## Verification
 
@@ -152,6 +164,12 @@ pnpm test:fx
 pnpm test:workers
 ```
 
+The repository also defines mandatory-target GitHub Actions workflows for
+production verification and security analysis. A release is not considered
+verified merely because those workflow files exist: the release commit must have
+actual green check results and satisfy the criteria in
+[PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md).
+
 Foundry is required for the Solidity test suite. Docker and Wrangler are needed
 only for their respective deployment workflows. See [TESTING.md](TESTING.md)
 for the complete local setup.
@@ -162,11 +180,13 @@ for the complete local setup.
 | --- | --- |
 | [VISION.md](VISION.md) | Product direction and boundaries |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Components, ownership and extension points |
+| [PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md) | Production release blockers and acceptance criteria |
 | [SANDBOX.md](SANDBOX.md) | Sandbox Builder product and API |
 | [apps/api/README.md](apps/api/README.md) | Banking runtime |
 | [apps/fx-node/README.md](apps/fx-node/README.md) | FX runtime |
 | [packages/fx-sdk/README.md](packages/fx-sdk/README.md) | JavaScript SDK |
 | [docs/partners/README.md](docs/partners/README.md) | Provider directory standards |
+| [OPERATIONS.md](OPERATIONS.md) | Deployment, operations, backup and recovery |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and production boundaries |
 
