@@ -77,9 +77,12 @@ reconciliation state.
 
 ### Concurrency and persistence
 
-- [ ] Define and implement the banking concurrency model explicitly.
-- [ ] Eliminate shared mutable cache visibility between overlapping requests.
-- [ ] Prevent lost updates with serialization or optimistic concurrency control.
+- [x] Define and implement the banking concurrency model explicitly: the current
+  single-database runtime serializes complete request units of work.
+- [x] Eliminate shared mutable cache visibility between overlapping requests in
+  the single-process/Durable Object runtime by serializing request scopes.
+- [x] Prevent concurrent debits from validating against the same uncommitted
+  balance; a dedicated double-spend regression test is part of the banking suite.
 - [ ] Introduce versioned schema migrations for every persistent table/resource.
 - [ ] Test forward migration, restart during migration and rollback procedure.
 
