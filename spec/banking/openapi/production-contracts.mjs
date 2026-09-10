@@ -17,6 +17,7 @@ const permissionArray = {
 
 export const PRODUCTION_SCHEMAS = {
   ...EFFECTIVE_SCHEMAS,
+
   KeyPrincipal: open(
     {
       id: ref("Identifier"),
@@ -29,6 +30,7 @@ export const PRODUCTION_SCHEMAS = {
     },
     ["id", "tenant_id", "scope", "permissions", "created_at"],
   ),
+
   KeySecret: open(
     {
       id: ref("Identifier"),
@@ -42,6 +44,56 @@ export const PRODUCTION_SCHEMAS = {
     },
     ["id", "tenant_id", "key", "scope", "permissions", "created_at", "expires"],
   ),
+
+  ReceivingDetail: open(
+    {
+      id: ref("Identifier"),
+      account: ref("Identifier"),
+      rail: { type: "string" },
+      currency: ref("CurrencyCode"),
+      status: { type: "string" },
+      type: {
+        type: "string",
+        enum: ["iban", "sort_code", "aba", "paynow", "onchain"],
+      },
+      iban: { type: "string" },
+      bic: { type: "string" },
+      account_number: { type: "string" },
+      routing_number: { type: "string" },
+      sort_code: { type: "string" },
+      proxy: { type: "string" },
+      address: { type: "string" },
+      network: { type: "string" },
+      created_at: ref("Timestamp"),
+    },
+    ["id", "account", "rail", "currency", "status", "type", "created_at"],
+  ),
+
+  LedgerEntry: open(
+    {
+      id: ref("Identifier"),
+      txn: ref("Identifier"),
+      at: ref("Timestamp"),
+      account: ref("Identifier"),
+      currency: ref("CurrencyCode"),
+      amount: ref("DecimalAmount"),
+      memo: { type: ["string", "null"] },
+      command_id: { anyOf: [ref("Identifier"), { type: "null" }] },
+    },
+    ["id", "txn", "at", "account", "currency", "amount"],
+  ),
+
+  Event: open(
+    {
+      id: ref("Identifier"),
+      type: { type: "string" },
+      created_at: ref("Timestamp"),
+      data: { type: "object", additionalProperties: true },
+      command_id: { anyOf: [ref("Identifier"), { type: "null" }] },
+    },
+    ["id", "type", "created_at", "data"],
+  ),
+
   Attestation: open(
     {
       id: ref("Identifier"),
@@ -51,6 +103,7 @@ export const PRODUCTION_SCHEMAS = {
     },
     ["id", "statement", "agreed", "agreed_at"],
   ),
+
   ApprovalChain: open(
     {
       id: ref("Identifier"),
