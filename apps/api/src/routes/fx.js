@@ -1,5 +1,6 @@
 /** Stablecoin FX — the three legs, priced honestly.
- *  Owned by this file. See ../assets.js for the model. */
+ * Owned by this file. See ../assets.js for the model.
+ */
 
 import {
   route,
@@ -23,14 +24,13 @@ import {
   STABLECOINS,
   isFiat,
   isStable,
-  legKind,
   priceLeg,
   routeFor,
   CORRIDORS,
-  midOf,
   rampSettlement,
   RAMP_GAP_POLICY,
 } from "../assets.js";
+import { convertMinor } from "../exact-rates.js";
 
 const ramps = collection("ramps");
 
@@ -74,9 +74,10 @@ route(
 /* ---- price a single leg ---- */
 route("POST", "/v2/fx/quote", ({ body }) => {
   need(body, ["from", "to", "amount"]);
-  const from = String(body.from).toUpperCase(),
-    to = String(body.to).toUpperCase();
-  const priced = priceLeg(from, to, toMinor(body.amount));
+  const from = String(body.from).toUpperCase();
+  const to = String(body.to).toUpperCase();
+  const amount = toMinor(body.amount);
+  const priced = priceLeg(from, to, amount);
   if (!priced) {
     throw new ApiError(
       "validation-error",
@@ -91,11 +92,11 @@ route("POST", "/v2/fx/quote", ({ body }) => {
       ],
     );
   }
-  const amount = toMinor(body.amount);
-  const rate = priced.rate ? Number(priced.rate) : 1;
-  const gross = (Number(amount) / 100) * rate;
+
   const out =
-    priced.spread_bps == null ? null : gross * (1 - priced.spread_bps / 10000);
+    priced.spread_bps == null
+      ? null
+      : convertMinor(amount, from, to, priced.spread_bps);
 
   return {
     id: ksuid("quo"),
@@ -103,7 +104,8 @@ route("POST", "/v2/fx/quote", ({ body }) => {
     from,
     to,
     amount: { amount: body.amount, currency: from },
-    receives: out == null ? null : { amount: out.toFixed(2), currency: to },
+    receives:
+      out == null ? null : { amount: fromMinor(out), currency: to },
     ...priced,
     expires_at: new Date(Date.now() + 30000).toISOString(),
     created_at: now(),
@@ -113,8 +115,8 @@ route("POST", "/v2/fx/quote", ({ body }) => {
 /* ---- the full cross-border route, leg by leg ---- */
 route("POST", "/v2/fx/route", ({ body }) => {
   need(body, ["from", "to", "amount"]);
-  const from = String(body.from).toUpperCase(),
-    to = String(body.to).toUpperCase();
+  const from = String(body.from).toUpperCase();
+  const to = String(body.to).toUpperCase();
   if (!isFiat(from) || !isFiat(to)) {
     throw new ApiError(
       "validation-error",
@@ -123,54 +125,56 @@ route("POST", "/v2/fx/route", ({ body }) => {
     );
   }
   const legs = routeFor(from, to);
-  if (!legs)
+  if (!legs) {
     throw new ApiError(
       "validation-error",
       400,
       `No stablecoin exists for ${from} or ${to} yet`,
     );
+  }
 
-  const startMinor = toMinor(body.amount);
-  let running = Number(startMinor) / 100;
-  const priced = legs.map((l) => {
-    const rate = l.rate ? Number(l.rate) : 1;
+  let running = toMinor(body.amount);
+  const priced = legs.map((leg) => {
     const before = running;
-    running = running * rate * (1 - (l.spread_bps ?? 0) / 10000);
+    running = convertMinor(
+      running,
+      leg.from,
+      leg.to,
+      leg.spread_bps ?? 0,
+    );
     return {
-      ...l,
-      in: { amount: before.toFixed(2), currency: l.from },
-      out: { amount: running.toFixed(2), currency: l.to },
+      ...leg,
+      in: { amount: fromMinor(before), currency: leg.from },
+      out: { amount: fromMinor(running), currency: leg.to },
     };
   });
 
-  const totalBps = legs.reduce((n, l) => n + (l.spread_bps ?? 0), 0);
+  const totalBps = legs.reduce((n, leg) => n + (leg.spread_bps ?? 0), 0);
   return {
     id: ksuid("quo"),
     from,
     to,
     amount: { amount: body.amount, currency: from },
-    receives: { amount: running.toFixed(2), currency: to },
+    receives: { amount: fromMinor(running), currency: to },
     legs: priced,
     total_spread_bps: totalBps,
     note: "One spread, not three. The ramps are 1:1 — only the corridor is priced.",
-    // Cost and time are different claims. The ramps cost nothing; they are not
-    // instant, and they are not atomic with the corridor leg between them.
     settlement: (() => {
-      const inb = rampSettlement(from),
-        outb = rampSettlement(to);
-      const worst = [inb, outb]
-        .filter((x) => x.window_seconds != null)
-        .reduce((a, b) => (a.window_seconds >= b.window_seconds ? a : b), {
-          window_seconds: 0,
-        });
-      // A currency with no configured rail cannot be ramped, so quoting a price for
-      // that leg would be a promise we cannot keep. Say which end is missing.
-      const blocked = [inb.rail ? null : from, outb.rail ? null : to].filter(
-        Boolean,
-      );
+      const inbound = rampSettlement(from);
+      const outbound = rampSettlement(to);
+      const worst = [inbound, outbound]
+        .filter((item) => item.window_seconds != null)
+        .reduce(
+          (a, b) => (a.window_seconds >= b.window_seconds ? a : b),
+          { window_seconds: 0 },
+        );
+      const blocked = [
+        inbound.rail ? null : from,
+        outbound.rail ? null : to,
+      ].filter(Boolean);
       return {
-        on_ramp: inb,
-        off_ramp: outb,
+        on_ramp: inbound,
+        off_ramp: outbound,
         deliverable: blocked.length === 0,
         ...(blocked.length
           ? {
@@ -199,8 +203,9 @@ route("POST", "/v2/ramps/on", ({ body, key }) => {
   need(body, ["account", "amount", "to"]);
   const acc = must(db.accounts, body.account, "account", key);
   const to = String(body.to).toUpperCase();
-  if (!isStable(to))
+  if (!isStable(to)) {
     throw new ApiError("validation-error", 400, `${to} is not a stablecoin`);
+  }
   if (STABLECOINS[to].peg !== acc.currency) {
     throw new ApiError(
       "validation-error",
@@ -217,7 +222,6 @@ route("POST", "/v2/ramps/on", ({ body, key }) => {
     );
   }
 
-  // 1:1 — the fiat leaves the account, the token appears. No FX.
   post(
     [
       { account: acc.id, currency: acc.currency, amount: -minor },
@@ -249,15 +253,12 @@ route("POST", "/v2/ramps/on", ({ body, key }) => {
     status: "settled",
     created_at: now(),
     owner: principalId(key),
-    // The mint is 1:1 and carries no FX. What it does carry is time: the fiat leg
-    // rides an external rail, and the swap it feeds is priced when the swap runs,
-    // not when the money was sent. Say so rather than implying they are atomic.
     settlement: (() => {
-      const s = rampSettlement(acc.currency);
+      const settlement = rampSettlement(acc.currency);
       return {
-        rail: s.rail,
-        basis: s.basis,
-        window_seconds: s.window_seconds,
+        rail: settlement.rail,
+        basis: settlement.basis,
+        window_seconds: settlement.window_seconds,
         atomic_with_swap: false,
         rate_risk_borne_by: RAMP_GAP_POLICY,
         note:
@@ -277,8 +278,9 @@ route("POST", "/v2/ramps/off", ({ body, key }) => {
   need(body, ["account", "amount", "from"]);
   const acc = must(db.accounts, body.account, "account", key);
   const from = String(body.from).toUpperCase();
-  if (!isStable(from))
+  if (!isStable(from)) {
     throw new ApiError("validation-error", 400, `${from} is not a stablecoin`);
+  }
   if (STABLECOINS[from].peg !== acc.currency) {
     throw new ApiError(
       "validation-error",
