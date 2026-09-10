@@ -2,7 +2,7 @@
  *
  * HTTP success is not financial finality. This layer prevents a gateway from
  * returning internally contradictory canonical results that would otherwise
- * make Blueballs declare money/KYC/card state final without evidence.
+ * make Blueballs declare money/KYC/card/custody state final without evidence.
  */
 
 const FUNDS_STATES = new Set([
@@ -40,6 +40,19 @@ function receivingInstrument(result) {
   return result?.result?.instrument ?? result?.result ?? null;
 }
 
+function enforceMoneyFinality(result, prefix) {
+  if (result.outcome === "succeeded" && result.funds_state !== "settled") {
+    return ambiguous(result, `${prefix}_success_requires_settled_funds`);
+  }
+  if (result.outcome === "failed" && result.funds_state === "settled") {
+    return ambiguous(result, `${prefix}_failed_but_funds_settled`);
+  }
+  if (result.outcome === "pending" && result.funds_state === "settled") {
+    return ambiguous(result, `${prefix}_pending_but_funds_settled`);
+  }
+  return result;
+}
+
 /** Return a normalized result. Contract violations are deliberately ambiguous:
  * the remote side may already have acted, so a malformed response is never
  * proof that resubmission or customer refund is safe. */
@@ -68,15 +81,11 @@ export function enforceProviderResultContract(claimed, input) {
   }
 
   if (claimed.capability === "payments.transfer") {
-    if (result.outcome === "succeeded" && result.funds_state !== "settled") {
-      return ambiguous(result, "transfer_success_requires_settled_funds");
-    }
-    if (result.outcome === "failed" && result.funds_state === "settled") {
-      return ambiguous(result, "transfer_failed_but_funds_settled");
-    }
-    if (result.outcome === "pending" && result.funds_state === "settled") {
-      return ambiguous(result, "transfer_pending_but_funds_settled");
-    }
+    result = enforceMoneyFinality(result, "transfer");
+  }
+
+  if (claimed.capability === "custody.transfer") {
+    result = enforceMoneyFinality(result, "custody_transfer");
   }
 
   if (claimed.capability === "identity.verification") {
@@ -117,6 +126,13 @@ export function enforceProviderResultContract(claimed, input) {
       if (!hasReference) {
         return ambiguous(result, "card_success_requires_reference");
       }
+    }
+  }
+
+  if (claimed.capability === "custody.wallet" && result.outcome === "succeeded") {
+    const wallet = result.result ?? {};
+    if (typeof wallet.address !== "string" || wallet.address.trim().length < 8) {
+      return ambiguous(result, "custody_wallet_success_requires_address");
     }
   }
 
