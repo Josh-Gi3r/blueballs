@@ -4,11 +4,14 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { BANKING_COLLECTION_TABLES } from "../apps/api/src/schema.js";
 
+const SRC = "apps/api/src";
 const files = [
-  "apps/api/src/lib.js",
-  ...readdirSync("apps/api/src/routes")
+  ...readdirSync(SRC)
     .filter((name) => name.endsWith(".js"))
-    .map((name) => join("apps/api/src/routes", name)),
+    .map((name) => join(SRC, name)),
+  ...readdirSync(join(SRC, "routes"))
+    .filter((name) => name.endsWith(".js"))
+    .map((name) => join(SRC, "routes", name)),
 ];
 
 const referenced = new Set();
