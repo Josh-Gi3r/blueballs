@@ -1,6 +1,6 @@
 /** Final production request contracts consumed by OpenAPI generation/checks. */
 import { REQUEST_BODIES as LEGACY_REQUEST_BODIES } from "./request-contracts.mjs";
-import { KEY_PERMISSIONS } from "../../../apps/api/src/key-permissions.js";
+import { KEY_PERMISSIONS } from "../key-permission-catalog.mjs";
 
 const string = (description, extra = {}) => ({ type: "string", description, ...extra });
 const integer = (description, extra = {}) => ({ type: "integer", description, ...extra });
