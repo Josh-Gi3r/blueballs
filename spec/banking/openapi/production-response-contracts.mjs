@@ -18,6 +18,18 @@ const keyPrincipal = {
   expires: "2026-09-11T00:00:00.000Z",
 };
 
+const receivingDetail = {
+  id: "adt_example",
+  account: "acc_example",
+  rail: "sepa",
+  currency: "EUR",
+  status: "active",
+  type: "iban",
+  iban: "DE02120300000000202051",
+  bic: "BLBLDEB2",
+  created_at: T,
+};
+
 const OVERRIDES = {
   postAuthSignup: {
     description: "Sandbox key issued once",
@@ -68,6 +80,36 @@ const OVERRIDES = {
     description: "API key principal",
     schema: ref("KeyPrincipal"),
     example: keyPrincipal,
+  },
+  postAccountsIdDetails: {
+    description: "Receiving details issued for an account rail",
+    schema: ref("ReceivingDetail"),
+    example: receivingDetail,
+  },
+  getDetailsId: {
+    description: "Receiving details",
+    schema: ref("ReceivingDetail"),
+    example: receivingDetail,
+  },
+  getAccountsIdDetails: {
+    description: "Paginated receiving details collection",
+    schema: {
+      type: "object",
+      additionalProperties: true,
+      required: ["data"],
+      properties: {
+        object: { type: "string", const: "list" },
+        data: { type: "array", items: ref("ReceivingDetail") },
+        has_more: { type: "boolean" },
+        next_cursor: { type: ["string", "null"] },
+      },
+    },
+    example: {
+      object: "list",
+      data: [receivingDetail],
+      has_more: false,
+      next_cursor: receivingDetail.id,
+    },
   },
   postApplicationsIdAttestation: {
     description: "Application attestation",
