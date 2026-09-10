@@ -11,21 +11,39 @@ export class BlueballsBankApi extends DurableObject {
     super(ctx, env);
     this.ready = ctx.blockConcurrencyWhile(async () => {
       setWorkerSql(this.ctx.storage);
-      const [{ FAMILIES }, api, webhookOutbox] = await Promise.all([
+
+      // Provider credentials/vars belong to the Worker environment. Configure
+      // the provider transport before route modules load so production requests
+      // never depend on process.env population behavior.
+      const providerTransport = await import(
+        "../../apps/api/src/provider-transport.js"
+      );
+      providerTransport.configureProviderEnvironment(env);
+
+      const [{ FAMILIES }, api, webhookOutbox, providerOutbox] = await Promise.all([
         import("../../src/endpoints.ts"),
         import("../../apps/api/src/server.js"),
         import("../../apps/api/src/webhook-outbox.js"),
+        import("../../apps/api/src/provider-outbox.js"),
       ]);
       api.registerCatalogue(FAMILIES.flatMap((family) => family.endpoints));
       this.port = api.API_PORT;
       this.webhookOutbox = webhookOutbox;
-      await this.scheduleWebhookAlarm();
+      this.providerOutbox = providerOutbox;
+      await this.scheduleBackgroundAlarm();
     });
   }
 
-  async scheduleWebhookAlarm() {
-    if (!this.webhookOutbox) return;
-    const next = this.webhookOutbox.nextWebhookOutboxAt();
+  nextBackgroundAt() {
+    const candidates = [
+      this.webhookOutbox?.nextWebhookOutboxAt?.() ?? null,
+      this.providerOutbox?.nextProviderOutboxAt?.() ?? null,
+    ].filter((value) => Number.isFinite(value));
+    return candidates.length ? Math.min(...candidates) : null;
+  }
+
+  async scheduleBackgroundAlarm() {
+    const next = this.nextBackgroundAt();
     if (next === null) {
       await this.ctx.storage.deleteAlarm();
       return;
@@ -39,10 +57,10 @@ export class BlueballsBankApi extends DurableObject {
     await this.ready;
     setWorkerSql(this.ctx.storage);
     const response = await handleAsNodeRequest(this.port, request);
-    // Any event/outbox rows created by this request are committed before the
-    // Node-compatible handler resolves, so the alarm can be scheduled from the
-    // durable state here. Delivery itself never runs as an untracked promise.
-    await this.scheduleWebhookAlarm();
+    // Outbox rows are committed before the Node-compatible handler resolves.
+    // Scheduling from durable state here means neither webhook nor provider work
+    // depends on an untracked promise surviving request completion.
+    await this.scheduleBackgroundAlarm();
     return response;
   }
 
@@ -50,9 +68,12 @@ export class BlueballsBankApi extends DurableObject {
     await this.ready;
     setWorkerSql(this.ctx.storage);
     try {
-      await this.webhookOutbox.drainWebhookOutbox();
+      await Promise.all([
+        this.webhookOutbox?.drainWebhookOutbox?.() ?? Promise.resolve([]),
+        this.providerOutbox?.drainProviderOutbox?.() ?? Promise.resolve([]),
+      ]);
     } finally {
-      await this.scheduleWebhookAlarm();
+      await this.scheduleBackgroundAlarm();
     }
   }
 }
