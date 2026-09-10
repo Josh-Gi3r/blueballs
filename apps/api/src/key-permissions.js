@@ -50,13 +50,17 @@ export function permissionFor(method, pattern) {
   return `${domain}:${method === "GET" ? "read" : "write"}`;
 }
 
-export function hasPermission(key, required) {
-  if (!required) return true;
-  const permissions = keyPermissions(key);
+function permissionSetGrants(permissions, required) {
   if (permissions.includes("*")) return true;
   if (permissions.includes(required)) return true;
-  const [domain] = required.split(":");
-  return permissions.includes(`${domain}:*`);
+  const [domain, action] = required.split(":");
+  if (permissions.includes(`${domain}:*`)) return true;
+  // Write is a superset of read inside the same domain.
+  return action === "read" && permissions.includes(`${domain}:write`);
+}
+
+export function hasPermission(key, required) {
+  return !required || permissionSetGrants(keyPermissions(key), required);
 }
 
 export function assertKeyPermission(key, method, pattern) {
@@ -98,15 +102,14 @@ export function childPermissions(parentKey, requested) {
   }
 
   for (const permission of normalized) {
-    if (parent.includes("*")) continue;
-    if (permission === "*") {
-      throw new ApiError("forbidden", 403, "A restricted API key cannot mint an unrestricted key");
+    if (permission === "*" && !parent.includes("*")) {
+      throw new ApiError(
+        "forbidden",
+        403,
+        "A restricted API key cannot mint an unrestricted key",
+      );
     }
-    const [domain] = permission.split(":");
-    if (
-      !parent.includes(permission) &&
-      !parent.includes(`${domain}:*`)
-    ) {
+    if (!permissionSetGrants(parent, permission)) {
       throw new ApiError(
         "forbidden",
         403,
