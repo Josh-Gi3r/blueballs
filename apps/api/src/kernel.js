@@ -33,6 +33,11 @@ import {
   publicResponse,
   validateSuccessfulResponse,
 } from "./response-validation.js";
+import {
+  assertKeyPermission,
+  childPermissions,
+  publicKeyPermissions,
+} from "./key-permissions.js";
 
 migrateBankingSchema();
 
@@ -149,12 +154,17 @@ function auditSourceHash(req) {
     : null;
 }
 
+function persistedKeyById(id, tenantId) {
+  return [...db.keys.values()].find(
+    (candidate) =>
+      candidate.id === id && (!tenantId || candidate.tenant_id === tenantId),
+  );
+}
+
 /**
  * Register a route.
- * Public serialization is centralized here so persistence-only fields never
- * leak merely because a handler returned its stored object directly. When
- * RESPONSE_CONTRACT_VALIDATION=true every successful catalogued response is
- * checked against the same schema used to generate OpenAPI.
+ * Public serialization, command audit metadata and tenant-key authorization are
+ * centralized here so 181 handlers cannot drift into different security rules.
  */
 export const route = (method, pattern, handler, opts = {}) => {
   const key = `${method} ${pattern}`;
@@ -168,6 +178,7 @@ export const route = (method, pattern, handler, opts = {}) => {
     throw new Error(`Invalid access class ${access} for ${key}`);
   }
   const successStatus = opts.created ? 201 : 200;
+
   const publicHandler = async (ctx) => {
     if (currentCommandId()) {
       setCommandContext({
@@ -183,7 +194,57 @@ export const route = (method, pattern, handler, opts = {}) => {
       });
     }
 
-    const result = await handler(ctx);
+    if (ctx.key && access !== "PUBLIC" && access !== "OPERATOR") {
+      assertKeyPermission(ctx.key, method, pattern);
+    }
+
+    // Validate child permissions before the route creates a credential so an
+    // escalation attempt leaves no key row behind.
+    const requestedChildPermissions =
+      method === "POST" && pattern === "/v2/keys" && ctx.key
+        ? childPermissions(ctx.key, ctx.body?.permissions)
+        : null;
+
+    let result = await handler(ctx);
+
+    if (method === "POST" && pattern === "/v2/auth/signup" && result?.id) {
+      const stored = persistedKeyById(result.id, result.tenant_id);
+      if (stored) stored.permissions = ["*"];
+      result = { ...result, permissions: ["*"] };
+    }
+
+    if (
+      method === "POST" &&
+      pattern === "/v2/keys" &&
+      result?.id &&
+      requestedChildPermissions
+    ) {
+      const stored = persistedKeyById(result.id, ctx.key?.tenant_id);
+      if (stored) stored.permissions = requestedChildPermissions;
+      result = { ...result, permissions: requestedChildPermissions };
+    }
+
+    if (method === "GET" && pattern === "/v2/keys" && ctx.key) {
+      result = {
+        ...result,
+        current: {
+          key_id: ctx.key.id,
+          tenant_id: ctx.key.tenant_id,
+          scope: ctx.key.scope,
+          permissions: publicKeyPermissions(ctx.key),
+        },
+        data: Array.isArray(result?.data)
+          ? result.data.map((candidate) => ({
+              ...candidate,
+              permissions: publicKeyPermissions(candidate),
+            }))
+          : [],
+      };
+    }
+
+    if (method === "GET" && pattern === "/v2/keys/:id" && result?.id) {
+      result = { ...result, permissions: publicKeyPermissions(result) };
+    }
 
     // Public signup has no authenticated actor at entry. Once the key exists,
     // attach the newly-created principal to the same atomic audit record.
@@ -204,6 +265,7 @@ export const route = (method, pattern, handler, opts = {}) => {
       ? validateSuccessfulResponse(method, pattern, result)
       : publicResponse(result);
   };
+
   routes.push({
     method,
     pattern,
