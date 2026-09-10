@@ -24,7 +24,20 @@ function inspect(path) {
         .all()
         .map((row) => row.name),
     );
-    return { migrations, tables, indexes };
+    const columns = (table) =>
+      new Set(
+        database
+          .prepare(`PRAGMA table_info("${table}")`)
+          .all()
+          .map((row) => row.name),
+      );
+    return {
+      migrations,
+      tables,
+      indexes,
+      ledgerColumns: columns("ledger"),
+      eventColumns: columns("events"),
+    };
   } finally {
     database.close();
   }
@@ -38,6 +51,7 @@ test("banking startup applies the complete versioned schema and restart is idemp
   assert.deepEqual(first.migrations, [
     { component: "banking", version: 1, name: "initial-banking-schema" },
     { component: "banking", version: 2, name: "durable-webhook-outbox" },
+    { component: "banking", version: 3, name: "command-audit-correlation" },
   ]);
 
   for (const name of BANKING_COLLECTION_TABLES) {
@@ -50,9 +64,13 @@ test("banking startup applies the complete versioned schema and restart is idemp
     "idx_ledger_account_currency_seq",
     "idx_ledger_txn",
     "idx_events_tenant_seq",
+    "idx_ledger_command",
+    "idx_events_command",
   ]) {
     assert.ok(first.indexes.has(name), `missing production index ${name}`);
   }
+  assert.ok(first.ledgerColumns.has("command_id"));
+  assert.ok(first.eventColumns.has("command_id"));
 
   await api.restart();
   const second = inspect(api.databasePath);
