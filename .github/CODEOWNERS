@@ -32,6 +32,5 @@
 /scripts/check-openapi-requests.mjs @Josh-Gi3r
 /scripts/check-openapi-responses.mjs @Josh-Gi3r
 /public/openapi.yaml @Josh-Gi3r
-/.github/workflows/ @Josh-Gi3r
 /SECURITY.md @Josh-Gi3r
 /PRODUCTION-HARDENING.md @Josh-Gi3r
