@@ -47,6 +47,9 @@ jobs:
       - name: Banking API tests
         run: pnpm test:api
 
+      - name: SQLite transaction and migration tests
+        run: pnpm --dir packages/sqlite-compat test:ci
+
       - name: OpenAPI catalogue consistency
         run: node scripts/check-catalogue.mjs
 
