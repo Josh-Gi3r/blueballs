@@ -148,7 +148,8 @@ its product and jurisdictions. See [SECURITY.md](SECURITY.md),
 
 ## Verification
 
-Run the complete local verification suite:
+The repository does not depend on hosted GitHub Actions. The release authority is
+the complete local verification suite:
 
 ```bash
 pnpm verify
@@ -164,11 +165,10 @@ pnpm test:fx
 pnpm test:workers
 ```
 
-The repository also defines mandatory-target GitHub Actions workflows for
-production verification and security analysis. A release is not considered
-verified merely because those workflow files exist: the release commit must have
-actual green check results and satisfy the criteria in
-[PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md).
+A release is considered verified only when the exact release checkout passes the
+local gate and retains the release evidence described in
+[PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md). Hosted CI status, a successful
+frontend build or a generated OpenAPI file is not a substitute for that proof.
 
 Foundry is required for the Solidity test suite. Docker and Wrangler are needed
 only for their respective deployment workflows. See [TESTING.md](TESTING.md)
