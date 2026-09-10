@@ -175,6 +175,19 @@ const MISSING = Symbol("blueballs.missing");
 const requestScope = new AsyncLocalStorage();
 const proxies = new WeakMap();
 
+/** The reference runtime owns one SQLite database and one in-memory resource
+ * cache. Until a deployment shards that state by tenant/database, overlapping
+ * request scopes would be able to observe the same mutable cache and two debits
+ * could both validate against the same pre-commit balance. Serialize complete
+ * request units of work so the single-node runtime provides serializable
+ * financial semantics rather than merely atomic commits. */
+let requestSerial = Promise.resolve();
+function serializeRequest(run) {
+  const current = requestSerial.then(run, run);
+  requestSerial = current.catch(() => {});
+  return current;
+}
+
 function createRequestStore() {
   return {
     snapshots: new Map(),
@@ -238,46 +251,49 @@ function track(value, map, id, root) {
   return proxy;
 }
 
-/** Run one API request as a financial unit of work. All durable mutations are
- *  staged while the handler runs, then flushed inside one synchronous SQLite
- *  transaction. Subscriber side effects (for example outbound webhook delivery)
- *  are triggered only after the database commit succeeds. */
+/** Run one API request as a serializable financial unit of work. All durable
+ * mutations are staged while the handler runs, then flushed inside one
+ * synchronous SQLite transaction. Subscriber side effects (for example
+ * outbound webhook delivery) are triggered only after the database commit
+ * succeeds. */
 export async function inRequestScope(run) {
-  const store = createRequestStore();
-  return requestScope.run(store, async () => {
-    try {
-      const result = await run();
-      sqlite.transactionSync(() => {
-        for (const [map, rows] of store.snapshots)
-          for (const id of rows.keys()) map._persist(id);
-        for (const row of store.ledger) db.ledger._persist(row);
-        for (const evt of store.events) db.events._persist(evt);
-        for (const [tenantId, maximum] of store.eventTrims)
-          db.events._trimTenant(tenantId, maximum);
-      });
+  return serializeRequest(() => {
+    const store = createRequestStore();
+    return requestScope.run(store, async () => {
+      try {
+        const result = await run();
+        sqlite.transactionSync(() => {
+          for (const [map, rows] of store.snapshots)
+            for (const id of rows.keys()) map._persist(id);
+          for (const row of store.ledger) db.ledger._persist(row);
+          for (const evt of store.events) db.events._persist(evt);
+          for (const [tenantId, maximum] of store.eventTrims)
+            db.events._trimTenant(tenantId, maximum);
+        });
 
-      // External side effects are deliberately after commit. A webhook failure
-      // must not roll back money, and an uncommitted event must never escape.
-      for (const evt of store.events) {
-        for (const subscriber of eventSubscribers) {
-          try {
-            subscriber(evt);
-          } catch (error) {
-            console.error("event subscriber failed after commit", error);
+        // External side effects are deliberately after commit. A webhook failure
+        // must not roll back money, and an uncommitted event must never escape.
+        for (const evt of store.events) {
+          for (const subscriber of eventSubscribers) {
+            try {
+              subscriber(evt);
+            } catch (error) {
+              console.error("event subscriber failed after commit", error);
+            }
           }
         }
+        return result;
+      } catch (error) {
+        for (const [map, rows] of store.snapshots)
+          for (const [id, snapshot] of rows) map._restore(id, snapshot);
+        throw error;
+      } finally {
+        store.snapshots.clear();
+        store.ledger.length = 0;
+        store.events.length = 0;
+        store.eventTrims.clear();
       }
-      return result;
-    } catch (error) {
-      for (const [map, rows] of store.snapshots)
-        for (const [id, snapshot] of rows) map._restore(id, snapshot);
-      throw error;
-    } finally {
-      store.snapshots.clear();
-      store.ledger.length = 0;
-      store.events.length = 0;
-      store.eventTrims.clear();
-    }
+    });
   });
 }
 
