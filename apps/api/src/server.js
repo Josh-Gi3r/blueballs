@@ -1,8 +1,8 @@
-/** Blueballs API — reference implementation of spec/conventions.md.
- *  Node stdlib only. `node src/server.js` and you have a working bank API. */
+/** Blueballs API — banking runtime.
+ * Node stdlib only: `node src/server.js` starts the complete banking API. */
 
 import { createServer } from "node:http";
-import { randomBytes, createHash } from "node:crypto";
+import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { hashKey, inRequestScope } from "./lib.js";
 import { FAMILIES } from "../../../src/endpoints.ts";
 import {
@@ -19,12 +19,10 @@ import {
   THIN,
   routes,
   route,
-  isRegistered,
   match,
   need,
   paginate,
   must,
-  ownedBy,
   visibleTo,
   positiveMinor,
   principalId,
@@ -35,9 +33,55 @@ import {
 } from "../../../packages/validation/src/index.js";
 import { convertMinor, rateString } from "./exact-rates.js";
 
-export const API_PORT = Number(process.env.PORT || 5281);
-const VERSION = "2026-08-06";
+function positiveIntegerEnv(name, fallback, { max = Number.MAX_SAFE_INTEGER } = {}) {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isSafeInteger(value) || value < 1 || value > max) {
+    throw new Error(`${name} must be an integer between 1 and ${max}`);
+  }
+  return value;
+}
+
+export const API_PORT = positiveIntegerEnv("PORT", 5281, { max: 65535 });
+const VERSION = "2026-09-10";
 const SOURCE_COMMIT = process.env.BLUEBALLS_GIT_SHA || "development";
+
+export const RATE_LIMIT = positiveIntegerEnv("RATE_LIMIT_PER_MIN", 60, {
+  max: 1_000_000,
+});
+const SOURCE_RATE_LIMIT = positiveIntegerEnv(
+  "SOURCE_RATE_LIMIT_PER_MIN",
+  RATE_LIMIT,
+  { max: 1_000_000 },
+);
+const TENANT_RATE_LIMIT = positiveIntegerEnv(
+  "TENANT_RATE_LIMIT_PER_MIN",
+  RATE_LIMIT,
+  { max: 1_000_000 },
+);
+const BODY_LIMIT_BYTES = positiveIntegerEnv("BODY_LIMIT_BYTES", 1_048_576, {
+  max: 100 * 1024 * 1024,
+});
+const IDEMPOTENCY_TTL_MS = positiveIntegerEnv(
+  "IDEMPOTENCY_TTL_MS",
+  24 * 60 * 60 * 1000,
+  { max: 30 * 24 * 60 * 60 * 1000 },
+);
+const SANDBOX_KEY_LIFETIME_HOURS = positiveIntegerEnv(
+  "SANDBOX_KEY_LIFETIME_HOURS",
+  24,
+  { max: 168 },
+);
+
+const trustProxyRaw = process.env.TRUST_PROXY ?? "false";
+if (!['true', 'false'].includes(trustProxyRaw)) {
+  throw new Error("TRUST_PROXY must be true or false");
+}
+const TRUST_PROXY = trustProxyRaw === "true";
+
+const BODY_METHODS = new Set(["POST", "PATCH", "PUT"]);
+const MUTATION_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+const WINDOW_MS = 60_000;
+const buckets = new Map();
 
 /* ---------------- helpers ---------------- */
 const json = (res, status, body, extra = {}) => {
@@ -55,29 +99,11 @@ const json = (res, status, body, extra = {}) => {
     "x-blueballs-source-commit": SOURCE_COMMIT,
     "x-ratelimit-limit": String(RATE_LIMIT),
     "access-control-allow-headers": "content-type,x-api-key,x-idempotency-key",
-    "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
+    "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
     ...extra,
   });
   res.end(payload);
 };
-
-/** Fixed-window rate limit, counted per key (per source address before a key is
- *  presented). The headers used to be constants — a limit of 60 with 59 always
- *  remaining, and no counter behind either number — so an unlimited signup
- *  endpoint advertised a ceiling that did not exist. */
-export const RATE_LIMIT = Number(process.env.RATE_LIMIT_PER_MIN || 60);
-const SOURCE_RATE_LIMIT = Number(
-  process.env.SOURCE_RATE_LIMIT_PER_MIN || RATE_LIMIT,
-);
-const TENANT_RATE_LIMIT = Number(
-  process.env.TENANT_RATE_LIMIT_PER_MIN || RATE_LIMIT,
-);
-const BODY_LIMIT_BYTES = Number(process.env.BODY_LIMIT_BYTES || 1_048_576);
-if (!Number.isSafeInteger(BODY_LIMIT_BYTES) || BODY_LIMIT_BYTES < 1) {
-  throw new Error("BODY_LIMIT_BYTES must be a positive safe integer");
-}
-const WINDOW_MS = 60_000;
-const buckets = new Map();
 
 function rateLimit(id, limit) {
   const nowMs = Date.now();
@@ -87,7 +113,6 @@ function rateLimit(id, limit) {
     buckets.set(id, bucket);
   }
   bucket.count += 1;
-  // keep the map from growing without bound on a long-lived process
   if (buckets.size > 10_000) {
     for (const [k, b] of buckets) if (b.resetAt <= nowMs) buckets.delete(k);
   }
@@ -144,6 +169,22 @@ const CORS_ORIGINS = new Set(
     .map((v) => v.trim())
     .filter(Boolean),
 );
+for (const origin of CORS_ORIGINS) {
+  let parsed;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    throw new Error(`CORS_ORIGINS contains invalid origin ${origin}`);
+  }
+  if (
+    !["http:", "https:"].includes(parsed.protocol) ||
+    parsed.origin !== origin ||
+    parsed.username ||
+    parsed.password
+  ) {
+    throw new Error(`CORS_ORIGINS must contain exact http(s) origins: ${origin}`);
+  }
+}
 function corsHeaders(req) {
   const origin = req.headers.origin;
   return origin && CORS_ORIGINS.has(origin)
@@ -152,7 +193,7 @@ function corsHeaders(req) {
 }
 
 function sourceAddress(req) {
-  if (process.env.TRUST_PROXY === "true" && req.headers["cf-connecting-ip"]) {
+  if (TRUST_PROXY && req.headers["cf-connecting-ip"]) {
     return String(req.headers["cf-connecting-ip"]);
   }
   return req.socket.remoteAddress || "unknown";
@@ -160,17 +201,18 @@ function sourceAddress(req) {
 
 function auth(req) {
   const key = req.headers["x-api-key"];
-  if (!key)
+  if (!key || Array.isArray(key))
     throw new ApiError(
       "authentication-error",
       401,
       "Send your key in the x-api-key header",
     );
-  const rec = db.keys.get(hashKey(key));
+  const digest = hashKey(key);
+  const rec = db.keys.get(digest);
   if (!rec)
     throw new ApiError("authentication-error", 401, "That key is not valid");
   if (rec.expires && Date.parse(rec.expires) <= Date.now()) {
-    db.keys.delete(hashKey(key));
+    db.keys.delete(digest);
     throw new ApiError(
       "authentication-error",
       401,
@@ -187,9 +229,16 @@ function auth(req) {
   return rec;
 }
 
+function equalHexHash(actualHex, expectedHex) {
+  if (!/^[0-9a-f]{64}$/i.test(expectedHex ?? "")) return false;
+  const actual = Buffer.from(actualHex, "hex");
+  const expected = Buffer.from(expectedHex, "hex");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
 function operatorAuth(req) {
   const supplied = req.headers["x-api-key"];
-  if (!supplied)
+  if (!supplied || Array.isArray(supplied))
     throw new ApiError(
       "authentication-error",
       401,
@@ -202,7 +251,14 @@ function operatorAuth(req) {
       503,
       "Operator API access is not configured",
     );
-  if (hashKey(String(supplied)) !== expectedHash) {
+  if (!/^[0-9a-f]{64}$/i.test(expectedHash)) {
+    throw new ApiError(
+      "service-unavailable",
+      503,
+      "Operator API key hash is misconfigured",
+    );
+  }
+  if (!equalHexHash(hashKey(String(supplied)), expectedHash)) {
     throw new ApiError(
       "forbidden",
       403,
@@ -211,10 +267,6 @@ function operatorAuth(req) {
   }
   return { id: "operator", tenant_id: "operator", scope: "operator" };
 }
-
-const IDEMPOTENCY_TTL_MS = Number(
-  process.env.IDEMPOTENCY_TTL_MS || 24 * 60 * 60 * 1000,
-);
 
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -233,8 +285,23 @@ async function idempotent(
   { req, body, url, route: matchedRoute, key: principal },
   fn,
 ) {
-  const headerKey = req.headers["x-idempotency-key"];
-  if (!headerKey || !principal) return fn();
+  const rawHeader = req.headers["x-idempotency-key"];
+  if (!rawHeader || !principal) return fn();
+  if (Array.isArray(rawHeader) || rawHeader.length > 255) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      "x-idempotency-key must be one non-empty value no longer than 255 characters",
+    );
+  }
+  const headerKey = rawHeader.trim();
+  if (!headerKey) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      "x-idempotency-key must not be empty",
+    );
+  }
   const operation = `${req.method} ${matchedRoute.pattern}`;
   const storageKey = createHash("sha256")
     .update(`${principalId(principal)}\0${operation}\0${headerKey}`)
@@ -287,7 +354,7 @@ route(
   { public: true },
 );
 
-/* ---- auth: SELF-SERVE, no human in the loop ---- */
+/* ---- auth: SELF-SERVE SANDBOX ---- */
 route(
   "POST",
   "/v2/auth/signup",
@@ -299,20 +366,8 @@ route(
       created_at: new Date().toISOString(),
     };
     const secret = "bb_sandbox_" + randomBytes(18).toString("base64url");
-    const lifetimeHours = Number(process.env.SANDBOX_KEY_LIFETIME_HOURS || 24);
-    if (
-      !Number.isFinite(lifetimeHours) ||
-      lifetimeHours <= 0 ||
-      lifetimeHours > 168
-    ) {
-      throw new ApiError(
-        "service-unavailable",
-        503,
-        "Sandbox key lifetime is not configured safely",
-      );
-    }
     const expires = new Date(
-      Date.now() + lifetimeHours * 60 * 60 * 1000,
+      Date.now() + SANDBOX_KEY_LIFETIME_HOURS * 60 * 60 * 1000,
     ).toISOString();
     const rec = {
       id: ksuid("key"),
@@ -385,7 +440,6 @@ route("GET", "/v2/customers/:id", ({ params, key }) =>
   must(db.customers, params.id, "customer", key),
 );
 
-/** Capabilities: which rails this customer can use, and what's outstanding. */
 route("GET", "/v2/customers/:id/capabilities", ({ params, key }) => {
   const c = must(db.customers, params.id, "customer", key);
   const verified = c.status === "completed" && c.decision === "approved";
@@ -400,7 +454,6 @@ route("GET", "/v2/customers/:id/capabilities", ({ params, key }) => {
   };
 });
 
-/** Sandbox shortcut so a developer isn't blocked waiting on KYC. */
 route("POST", "/v2/customers/:id/verify", ({ params, body, key }) => {
   const c = must(db.customers, params.id, "customer", key);
   c.status = "completed";
@@ -446,11 +499,8 @@ route(
   { created: true },
 );
 
-// Fictional Blueballs Bank institution codes — fixed per rail (a real bank has
-// exactly one bank code / routing number), the ACCOUNT part is what must be
-// unique and checksum-valid per customer.
 const EUR_BANK_CODE = "50000888";
-const USD_ROUTING_PREFIX = "05000088"; // 8 digits; abaGenerate appends the valid 9th checksum digit
+const USD_ROUTING_PREFIX = "05000088";
 
 const randomDigits = (n) => {
   let out = "";
@@ -461,7 +511,7 @@ const randomDigits = (n) => {
 
 function detailsFor(cur) {
   if (cur === "EUR") {
-    const bban = EUR_BANK_CODE + randomDigits(10); // 8-digit bank code + 10-digit account = 18-char DE BBAN
+    const bban = EUR_BANK_CODE + randomDigits(10);
     return { type: "iban", iban: ibanGenerate("DE", bban), bic: "BLBLDEB2" };
   }
   if (cur === "GBP") {
@@ -502,7 +552,6 @@ route("GET", "/v2/accounts/:id", ({ params, key }) => {
   };
 });
 
-/** Sandbox funding so transfers can be exercised. */
 route("POST", "/v2/accounts/:id/credit", ({ params, body, key }) => {
   const a = must(db.accounts, params.id, "account", key);
   need(body, ["amount"]);
@@ -557,14 +606,14 @@ route("GET", "/v2/recipients", ({ url, key }) =>
   paginate(visibleTo([...db.recipients.values()], key), url),
 );
 
-/* ---- quotes: an object with an id and an expiry ---- */
+/* ---- quotes ---- */
 route(
   "POST",
   "/v2/quotes",
   ({ body, key }) => {
     need(body, ["from", "to", "amount"]);
-    const from = body.from.toUpperCase(),
-      to = body.to.toUpperCase();
+    const from = body.from.toUpperCase();
+    const to = body.to.toUpperCase();
     if (!RATES[from] || !RATES[to])
       throw new ApiError("validation-error", 400, "Unsupported currency pair");
     const thin = THIN.has(from) || THIN.has(to);
@@ -598,14 +647,12 @@ route("GET", "/v2/quotes/:id", ({ params, key }) => {
   return { ...q, expired: Date.parse(q.expires_at) < Date.now() };
 });
 
-/* ---- transfers: legs + derived status ---- */
+/* ---- transfers ---- */
 route(
   "POST",
   "/v2/transfers",
   async ({ body, key }) => {
     need(body, ["from", "amount", "rail"]);
-    // the debit is scoped to the caller's own account: without this a key could
-    // name any account id and move money out of it
     const acc = must(db.accounts, body.from, "account", key);
     const rail = RAILS[body.rail];
     if (!rail)
@@ -668,7 +715,7 @@ route(
       }
     }
 
-    const minor = toMinor(body.amount);
+    const minor = positiveMinor(body.amount);
     if (minor < toMinor(rail.min))
       throw new ApiError(
         "below-minimum",
@@ -688,7 +735,7 @@ route(
         `Account holds ${fromMinor(balanceOf(acc.id, acc.currency))} ${acc.currency}`,
       );
     }
-    const now = new Date().toISOString();
+    const nowStamp = new Date().toISOString();
     const t = {
       id: ksuid("trf"),
       status: "created",
@@ -707,7 +754,7 @@ route(
         },
       ],
       client_reference_id: body.client_reference_id ?? null,
-      created_at: now,
+      created_at: nowStamp,
       owner: principalId(key),
     };
 
@@ -726,11 +773,6 @@ route(
     db.transfers.set(t.id, t);
     emit("transfer.created", t, { tenantId: t.owner });
     advance(t, "funds_received");
-    // An instant rail has nothing to wait for, so it submits and settles in the
-    // same request. A batch rail does — sepa, ach and wire hand off in a scheduled
-    // window — so the transfer waits at funds_received. That wait is what makes
-    // POST /v2/transfers/:id/cancel a real operation instead of a documented one,
-    // and POST /v2/transfers/:id/settle runs the window on demand.
     if (rail.speed === "seconds") {
       advance(t, "submitted");
       advance(t, "settled");
@@ -754,12 +796,6 @@ function advance(t, status) {
   );
 }
 
-/** Sandbox settlement: run a batch rail's next window now. In production sepa,
- *  ach and wire submit when their window opens; the reference has no clock, so
- *  the caller drives it — the same stand-in POST /v2/accounts/:id/credit makes
- *  for money arriving from outside. The full spine is walked rather than jumped,
- *  so submitted and confirming are both real, observable states in the event
- *  stream instead of labels in a document. */
 route("POST", "/v2/transfers/:id/settle", ({ params, key }) => {
   const t = must(db.transfers, params.id, "transfer", key);
   if (t.status !== "funds_received") {
@@ -769,8 +805,6 @@ route("POST", "/v2/transfers/:id/settle", ({ params, key }) => {
       `Transfer ${t.id} is ${t.status}, not waiting for a rail window`,
     );
   }
-  // Rail closed → a real state, not a generic failure. A customer can instruct a
-  // payment on a Sunday; nobody can make ach run on one.
   const rail = RAILS[t.rail];
   if (!rail.weekend && [0, 6].includes(new Date().getUTCDay())) {
     throw new ApiError(
@@ -795,9 +829,6 @@ route("GET", "/v2/transfers/:id", ({ params, key }) =>
 /* ---- ledger ---- */
 route("GET", "/v2/ledger", ({ url, key }) => {
   const acct = url.searchParams.get("account");
-  // postings are not owned rows; they are scoped by the accounts this key holds.
-  // Internal legs (clearing:, external:, lp:, spread:) belong to no tenant and
-  // are never listed — they would otherwise expose every other tenant's flow.
   const mine = new Set(
     visibleTo([...db.accounts.values()], key).map((a) => a.id),
   );
@@ -851,9 +882,7 @@ route(
   { public: true },
 );
 
-/* ---------------- M2 fan-out: auto-load family route modules ----------------
- * Every file in ./routes/ is imported at boot. A family owns exactly one file
- * and never edits this one, so parallel work cannot collide. */
+/* ---------------- M2 family fan-out ---------------- */
 const FAMILY_MODULES = [
   ["builder.js", () => import("./routes/builder.js")],
   ["business.js", () => import("./routes/business.js")],
@@ -871,10 +900,7 @@ console.log(
   `  loaded ${FAMILY_MODULES.length} family module(s): ${FAMILY_MODULES.map(([file]) => file).join(", ")}`,
 );
 
-/* ---------------- deliberate 501s, derived from the catalogue ----------------
- * Anything in src/endpoints.ts without a real handler answers 501, not 404, so a
- * caller can tell "not built yet" from "wrong URL". Implement a route and its stub
- * disappears automatically — nothing to hand-maintain. */
+/* ---------------- deliberate catalogue 501s ---------------- */
 let stubbed = 0;
 let cataloguedCount = 0;
 export function registerCatalogue(endpoints) {
@@ -910,10 +936,6 @@ export function registerCatalogue(endpoints) {
 }
 registerCatalogue(FAMILIES.flatMap(({ endpoints }) => endpoints));
 
-/* ---------------- site stats: real counts for the marketing site ----------------
- * Not part of the banking catalogue — this exists so the front end can show
- * genuine numbers (accounts open, endpoints live, etc.) instead of invented ones.
- * Public: these are aggregate counts, not any single customer's data. */
 route(
   "GET",
   "/v2/site/stats",
@@ -942,6 +964,7 @@ const server = createServer(async (req, res) => {
     SOURCE_RATE_LIMIT,
   );
   let quotaHeaders = {
+    "x-ratelimit-limit": String(SOURCE_RATE_LIMIT),
     "x-ratelimit-remaining": String(sourceQuota.remaining),
     "x-ratelimit-reset": String(sourceQuota.reset),
     ...cors,
@@ -970,15 +993,14 @@ const server = createServer(async (req, res) => {
         `No route for ${req.method} ${url.pathname}`,
       );
 
-    const body = ["POST", "PATCH", "PUT"].includes(req.method)
-      ? await readBody(req)
-      : {};
+    const body = BODY_METHODS.has(req.method) ? await readBody(req) : {};
     const key =
       hit.r.access === "PUBLIC"
         ? null
         : hit.r.access === "OPERATOR"
           ? operatorAuth(req)
           : auth(req);
+
     if (key && hit.r.access !== "OPERATOR") {
       const tenantQuota = rateLimit(
         `tenant:${principalId(key)}`,
@@ -986,6 +1008,9 @@ const server = createServer(async (req, res) => {
       );
       quotaHeaders = {
         ...quotaHeaders,
+        "x-ratelimit-limit": String(
+          Math.min(SOURCE_RATE_LIMIT, TENANT_RATE_LIMIT),
+        ),
         "x-ratelimit-remaining": String(
           Math.min(sourceQuota.remaining, tenantQuota.remaining),
         ),
@@ -1001,15 +1026,21 @@ const server = createServer(async (req, res) => {
         );
       }
     }
-    const ctx = { params: hit.params, body, url, key, req };
 
-    const result = await inRequestScope(() =>
-      ["POST", "PATCH"].includes(req.method)
+    const ctx = { params: hit.params, body, url, key, req };
+    const invoke = () =>
+      MUTATION_METHODS.has(req.method)
         ? idempotent({ req, body, url, route: hit.r, key }, () =>
             hit.r.handler(ctx),
           )
-        : hit.r.handler(ctx),
-    );
+        : hit.r.handler(ctx);
+
+    // Reads never enter the global financial write queue. Every mutation does,
+    // including PUT and DELETE, so state + ledger + event/outbox + idempotency
+    // commit under one serializable unit of work.
+    const result = MUTATION_METHODS.has(req.method)
+      ? await inRequestScope(invoke)
+      : await invoke();
 
     json(res, hit.r.successStatus, result, {
       ...quotaHeaders,
