@@ -41,6 +41,14 @@ function positiveIntegerEnv(name, fallback, { max = Number.MAX_SAFE_INTEGER } = 
   return value;
 }
 
+function positiveNumberEnv(name, fallback, { max = Number.MAX_VALUE } = {}) {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isFinite(value) || value <= 0 || value > max) {
+    throw new Error(`${name} must be greater than 0 and no greater than ${max}`);
+  }
+  return value;
+}
+
 export const API_PORT = positiveIntegerEnv("PORT", 5281, { max: 65535 });
 const VERSION = "2026-09-10";
 const SOURCE_COMMIT = process.env.BLUEBALLS_GIT_SHA || "development";
@@ -66,14 +74,14 @@ const IDEMPOTENCY_TTL_MS = positiveIntegerEnv(
   24 * 60 * 60 * 1000,
   { max: 30 * 24 * 60 * 60 * 1000 },
 );
-const SANDBOX_KEY_LIFETIME_HOURS = positiveIntegerEnv(
+const SANDBOX_KEY_LIFETIME_HOURS = positiveNumberEnv(
   "SANDBOX_KEY_LIFETIME_HOURS",
   24,
   { max: 168 },
 );
 
 const trustProxyRaw = process.env.TRUST_PROXY ?? "false";
-if (!['true', 'false'].includes(trustProxyRaw)) {
+if (!["true", "false"].includes(trustProxyRaw)) {
   throw new Error("TRUST_PROXY must be true or false");
 }
 const TRUST_PROXY = trustProxyRaw === "true";
@@ -207,12 +215,12 @@ function auth(req) {
       401,
       "Send your key in the x-api-key header",
     );
-  const digest = hashKey(key);
-  const rec = db.keys.get(digest);
+  const rec = db.keys.get(hashKey(key));
   if (!rec)
     throw new ApiError("authentication-error", 401, "That key is not valid");
   if (rec.expires && Date.parse(rec.expires) <= Date.now()) {
-    db.keys.delete(digest);
+    // Rejection is enough; cleanup is deliberately not performed inside a
+    // failed auth request because the request unit of work rolls failures back.
     throw new ApiError(
       "authentication-error",
       401,
@@ -993,54 +1001,55 @@ const server = createServer(async (req, res) => {
         `No route for ${req.method} ${url.pathname}`,
       );
 
+    // Parse the body before entering the serialized state boundary so a slow
+    // client upload cannot block unrelated banking operations.
     const body = BODY_METHODS.has(req.method) ? await readBody(req) : {};
-    const key =
-      hit.r.access === "PUBLIC"
-        ? null
-        : hit.r.access === "OPERATOR"
-          ? operatorAuth(req)
-          : auth(req);
 
-    if (key && hit.r.access !== "OPERATOR") {
-      const tenantQuota = rateLimit(
-        `tenant:${principalId(key)}`,
-        TENANT_RATE_LIMIT,
-      );
-      quotaHeaders = {
-        ...quotaHeaders,
-        "x-ratelimit-limit": String(
-          Math.min(SOURCE_RATE_LIMIT, TENANT_RATE_LIMIT),
-        ),
-        "x-ratelimit-remaining": String(
-          Math.min(sourceQuota.remaining, tenantQuota.remaining),
-        ),
-        "x-ratelimit-reset": String(
-          Math.min(sourceQuota.reset, tenantQuota.reset),
-        ),
-      };
-      if (tenantQuota.exceeded) {
-        throw new ApiError(
-          "rate-limited",
-          429,
-          `Over ${TENANT_RATE_LIMIT} requests per minute for this tenant. Try again shortly.`,
+    // Auth, authorization-visible state and route execution all run inside the
+    // same serialized scope. This prevents any request, including a GET, from
+    // observing a key/resource row that another request has staged but not yet
+    // committed. A future MVCC store can relax this without changing API rules.
+    const result = await inRequestScope(async () => {
+      const key =
+        hit.r.access === "PUBLIC"
+          ? null
+          : hit.r.access === "OPERATOR"
+            ? operatorAuth(req)
+            : auth(req);
+
+      if (key && hit.r.access !== "OPERATOR") {
+        const tenantQuota = rateLimit(
+          `tenant:${principalId(key)}`,
+          TENANT_RATE_LIMIT,
         );
+        quotaHeaders = {
+          ...quotaHeaders,
+          "x-ratelimit-limit": String(
+            Math.min(SOURCE_RATE_LIMIT, TENANT_RATE_LIMIT),
+          ),
+          "x-ratelimit-remaining": String(
+            Math.min(sourceQuota.remaining, tenantQuota.remaining),
+          ),
+          "x-ratelimit-reset": String(
+            Math.min(sourceQuota.reset, tenantQuota.reset),
+          ),
+        };
+        if (tenantQuota.exceeded) {
+          throw new ApiError(
+            "rate-limited",
+            429,
+            `Over ${TENANT_RATE_LIMIT} requests per minute for this tenant. Try again shortly.`,
+          );
+        }
       }
-    }
 
-    const ctx = { params: hit.params, body, url, key, req };
-    const invoke = () =>
-      MUTATION_METHODS.has(req.method)
+      const ctx = { params: hit.params, body, url, key, req };
+      return MUTATION_METHODS.has(req.method)
         ? idempotent({ req, body, url, route: hit.r, key }, () =>
             hit.r.handler(ctx),
           )
         : hit.r.handler(ctx);
-
-    // Reads never enter the global financial write queue. Every mutation does,
-    // including PUT and DELETE, so state + ledger + event/outbox + idempotency
-    // commit under one serializable unit of work.
-    const result = MUTATION_METHODS.has(req.method)
-      ? await inRequestScope(invoke)
-      : await invoke();
+    });
 
     json(res, hit.r.successStatus, result, {
       ...quotaHeaders,
