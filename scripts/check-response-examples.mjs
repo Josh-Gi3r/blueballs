@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { FAMILIES } from "../src/endpoints.ts";
 import { ADAPTER_REQUIRED_OPERATIONS } from "../spec/banking/openapi/contracts.mjs";
-import { responseContractFor } from "../spec/banking/openapi/effective-response-contracts.mjs";
+import { responseContractFor } from "../spec/banking/openapi/production-response-contracts.mjs";
 import { validateSchemaExample } from "../apps/api/src/response-validation.js";
 
 const opId = (verb, path) =>
@@ -24,11 +24,7 @@ for (const family of FAMILIES) {
     });
     const errors = validateSchemaExample(contract.schema, contract.example);
     checked += 1;
-    if (errors.length) {
-      failures.push(
-        `${operationId}: ${errors.slice(0, 5).join("; ")}`,
-      );
-    }
+    if (errors.length) failures.push(`${operationId}: ${errors.slice(0, 5).join("; ")}`);
   }
 }
 
