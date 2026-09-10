@@ -1,12 +1,13 @@
-/** Fail when catalogue operations and success-response contracts drift. */
+/** Fail when catalogue operations and effective production success contracts drift. */
 import { FAMILIES } from "../src/endpoints.ts";
 import {
   PAGINATED_RESPONSE_OPERATIONS,
   RESPONSE_LIST_OPERATIONS,
-  RESPONSE_SCHEMA_OVERRIDES,
   responseContractFor,
-} from "../spec/banking/openapi/response-contracts.mjs";
+} from "../spec/banking/openapi/effective-response-contracts.mjs";
+import { RESPONSE_SCHEMA_OVERRIDES } from "../spec/banking/openapi/response-contracts.mjs";
 import { ADAPTER_REQUIRED_OPERATIONS } from "../spec/banking/openapi/contracts.mjs";
+import { validateSchemaExample } from "../apps/api/src/response-validation.js";
 
 const opId = (verb, path) =>
   verb.toLowerCase() +
@@ -21,12 +22,7 @@ for (const { name: family, endpoints } of FAMILIES) {
   for (const { verb, path } of endpoints) {
     const operationId = opId(verb, path);
     if (ADAPTER_REQUIRED_OPERATIONS.has(operationId)) {
-      operations.set(operationId, {
-        verb,
-        path,
-        family,
-        adapterRequired: true,
-      });
+      operations.set(operationId, { verb, path, family, adapterRequired: true });
       continue;
     }
     const contract = responseContractFor({ operationId, verb, family });
@@ -39,36 +35,27 @@ for (const { name: family, endpoints } of FAMILIES) {
       RESPONSE_LIST_OPERATIONS.has(operationId) &&
       contract.schema?.properties?.data?.type !== "array"
     ) {
-      failures.push(
-        `${operationId}: classified as a collection without an array data envelope`,
-      );
+      failures.push(`${operationId}: classified as a collection without an array data envelope`);
+    }
+    if (contract?.schema && contract.example !== undefined) {
+      const exampleErrors = validateSchemaExample(contract.schema, contract.example);
+      if (exampleErrors.length)
+        failures.push(`${operationId}: example violates contract: ${exampleErrors.slice(0, 3).join("; ")}`);
     }
   }
 }
 
 for (const operationId of RESPONSE_LIST_OPERATIONS) {
-  if (!operations.has(operationId))
-    failures.push(
-      `${operationId}: list contract exists for no catalogue operation`,
-    );
+  if (!operations.has(operationId)) failures.push(`${operationId}: list contract exists for no catalogue operation`);
 }
 for (const operationId of PAGINATED_RESPONSE_OPERATIONS) {
-  if (!RESPONSE_LIST_OPERATIONS.has(operationId))
-    failures.push(
-      `${operationId}: paginated response is not classified as a list`,
-    );
+  if (!RESPONSE_LIST_OPERATIONS.has(operationId)) failures.push(`${operationId}: paginated response is not classified as a list`);
 }
 for (const operationId of Object.keys(RESPONSE_SCHEMA_OVERRIDES)) {
-  if (!operations.has(operationId))
-    failures.push(
-      `${operationId}: response override exists for no catalogue operation`,
-    );
+  if (!operations.has(operationId)) failures.push(`${operationId}: response override exists for no catalogue operation`);
 }
 for (const operationId of ADAPTER_REQUIRED_OPERATIONS) {
-  if (!operations.has(operationId))
-    failures.push(
-      `${operationId}: adapter-required contract exists for no catalogue operation`,
-    );
+  if (!operations.has(operationId)) failures.push(`${operationId}: adapter-required contract exists for no catalogue operation`);
 }
 
 const expectedTransitions = {
@@ -83,14 +70,9 @@ const expectedTransitions = {
   postMandates: "Mandate",
 };
 for (const [operationId, schema] of Object.entries(expectedTransitions)) {
-  const actual = operations
-    .get(operationId)
-    ?.contract.schema?.$ref?.split("/")
-    .at(-1);
+  const actual = operations.get(operationId)?.contract.schema?.$ref?.split("/").at(-1);
   if (actual !== schema)
-    failures.push(
-      `${operationId}: expected ${schema}, got ${actual ?? "inline/none"}`,
-    );
+    failures.push(`${operationId}: expected ${schema}, got ${actual ?? "inline/none"}`);
 }
 
 if (failures.length) {
@@ -101,5 +83,5 @@ if (failures.length) {
 
 const successCount = operations.size - ADAPTER_REQUIRED_OPERATIONS.size;
 console.log(
-  `response contracts: ${successCount} success schemas · ${ADAPTER_REQUIRED_OPERATIONS.size} fail-closed adapter contracts · ${RESPONSE_LIST_OPERATIONS.size} typed collections`,
+  `response contracts: ${successCount} effective success schemas/examples · ${ADAPTER_REQUIRED_OPERATIONS.size} fail-closed adapter contracts · ${RESPONSE_LIST_OPERATIONS.size} typed collections`,
 );
