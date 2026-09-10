@@ -3,6 +3,7 @@ import { createServer } from "node:net";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { recordSuccessfulOperation } from "./operation-coverage.js";
 
 const START_TIMEOUT_MS = 10_000;
 
@@ -62,10 +63,6 @@ export async function createApiFixture({ env = {} } = {}) {
   let child = null;
   let baseUrl = null;
   let logs = "";
-
-  /** allocatePort() closes its probe socket before the child binds, so between
-   * those moments the OS can hand the same ephemeral port to another test.
-   * Retry only bind collisions with a fresh port. */
   const START_ATTEMPTS = 5;
 
   async function start() {
@@ -134,6 +131,7 @@ export async function createApiFixture({ env = {} } = {}) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await response.text();
+    recordSuccessfulOperation(method, path, response.status);
     return {
       status: response.status,
       headers: response.headers,
