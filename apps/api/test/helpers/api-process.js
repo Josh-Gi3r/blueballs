@@ -64,10 +64,8 @@ export async function createApiFixture({ env = {} } = {}) {
   let logs = "";
 
   /** allocatePort() closes its probe socket before the child binds, so between
-   *  those two moments the OS can hand the same ephemeral port to another test
-   *  file running in parallel. That is a race, not a fixed failure: it shows up
-   *  as one intermittently red suite. Retry on a bind collision with a fresh
-   *  port rather than failing the run. */
+   * those moments the OS can hand the same ephemeral port to another test.
+   * Retry only bind collisions with a fresh port. */
   const START_ATTEMPTS = 5;
 
   async function start() {
@@ -98,6 +96,9 @@ export async function createApiFixture({ env = {} } = {}) {
         PORT: String(port),
         DB_PATH: databasePath,
         RATE_LIMIT_PER_MIN: "10000",
+        SOURCE_RATE_LIMIT_PER_MIN: "10000",
+        TENANT_RATE_LIMIT_PER_MIN: "10000",
+        RESPONSE_CONTRACT_VALIDATION: "true",
         ...env,
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -146,7 +147,7 @@ export async function createApiFixture({ env = {} } = {}) {
     });
     if (response.status !== 201) {
       throw new Error(
-        `Signup failed (${response.status}): ${JSON.stringify(response.body)}`,
+        `Signup failed (${response.status}): ${JSON.stringify(response.body)}\n${logs}`,
       );
     }
     return response.body;
