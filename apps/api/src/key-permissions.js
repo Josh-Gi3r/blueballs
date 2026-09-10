@@ -1,27 +1,10 @@
 import { ApiError } from "./lib.js";
+import {
+  KEY_PERMISSION_DOMAINS,
+  KEY_PERMISSIONS,
+} from "../../../spec/banking/key-permission-catalog.mjs";
 
-export const KEY_PERMISSION_DOMAINS = Object.freeze([
-  "keys",
-  "identity",
-  "accounts",
-  "wallets",
-  "payments",
-  "fx",
-  "cards",
-  "lending",
-  "controls",
-  "ledger",
-  "webhooks",
-  "sandbox",
-]);
-
-export const KEY_PERMISSIONS = Object.freeze(
-  KEY_PERMISSION_DOMAINS.flatMap((domain) => [
-    `${domain}:read`,
-    `${domain}:write`,
-    `${domain}:*`,
-  ]),
-);
+export { KEY_PERMISSION_DOMAINS, KEY_PERMISSIONS };
 
 const DOMAIN_RULES = [
   [/^\/v2\/keys(?:\/|$)/, "keys"],
@@ -55,7 +38,6 @@ function permissionSetGrants(permissions, required) {
   if (permissions.includes(required)) return true;
   const [domain, action] = required.split(":");
   if (permissions.includes(`${domain}:*`)) return true;
-  // Write is a superset of read inside the same domain.
   return action === "read" && permissions.includes(`${domain}:write`);
 }
 
