@@ -25,21 +25,17 @@ import {
   subscribeToEvents,
   subscribeToEventsBeforeCommit,
 } from "./lib.js";
-import {
-  BANKING_COLLECTION_TABLE_SET,
-  migrateBankingSchema,
-} from "./schema.js";
+import { BANKING_COLLECTION_TABLE_SET } from "./schema.js";
 import {
   publicResponse,
   validateSuccessfulResponse,
 } from "./response-validation.js";
+import { validateRequestBody } from "./request-validation.js";
 import {
   assertKeyPermission,
   childPermissions,
   publicKeyPermissions,
 } from "./key-permissions.js";
-
-migrateBankingSchema();
 
 export function collection(name) {
   if (!BANKING_COLLECTION_TABLE_SET.has(name)) {
@@ -163,8 +159,9 @@ function persistedKeyById(id, tenantId) {
 
 /**
  * Register a route.
- * Public serialization, command audit metadata and tenant-key authorization are
- * centralized here so 181 handlers cannot drift into different security rules.
+ * Request validation, public serialization, command audit metadata and tenant
+ * authorization are centralized here so 181 handlers cannot drift into
+ * different transport/security rules.
  */
 export const route = (method, pattern, handler, opts = {}) => {
   const key = `${method} ${pattern}`;
@@ -198,8 +195,8 @@ export const route = (method, pattern, handler, opts = {}) => {
       assertKeyPermission(ctx.key, method, pattern);
     }
 
-    // Validate child permissions before the route creates a credential so an
-    // escalation attempt leaves no key row behind.
+    validateRequestBody(method, pattern, ctx.body ?? {});
+
     const requestedChildPermissions =
       method === "POST" && pattern === "/v2/keys" && ctx.key
         ? childPermissions(ctx.key, ctx.body?.permissions)
@@ -246,8 +243,6 @@ export const route = (method, pattern, handler, opts = {}) => {
       result = { ...result, permissions: publicKeyPermissions(result) };
     }
 
-    // Public signup has no authenticated actor at entry. Once the key exists,
-    // attach the newly-created principal to the same atomic audit record.
     if (
       currentCommandId() &&
       access === "PUBLIC" &&
