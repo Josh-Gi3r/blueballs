@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /** Run the repository verification suite and persist machine-readable evidence.
  *
- * This is deliberately local and provider-neutral; Blueballs does not require a
- * hosted CI service to prove a release. `--require-clean` upgrades the run from a
- * development verification to release evidence for an exact commit.
+ * This produces the clean-checkout half of the release proof. A production
+ * release also requires the hosted `Production gate` for the same commit; neither
+ * control substitutes for the other. `--require-clean` upgrades the run from a
+ * development verification to retained evidence for an exact commit.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -73,6 +74,7 @@ const report = {
   passed: !preconditionFailure && verification.status === 0,
   precondition_failure: preconditionFailure,
   api_operation_coverage: operationCoverage,
+  hosted_production_gate_required: true,
 };
 
 mkdirSync(resolve(ROOT, "artifacts"), { recursive: true });
