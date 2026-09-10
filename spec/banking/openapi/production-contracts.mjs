@@ -1,5 +1,6 @@
 /** Final production schema layer consumed by generated OpenAPI and runtime validation. */
 import { EFFECTIVE_SCHEMAS } from "./effective-contracts.mjs";
+import { KEY_PERMISSIONS } from "../../../apps/api/src/key-permissions.js";
 
 const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
 const open = (properties = {}, required = []) => ({
@@ -8,9 +9,39 @@ const open = (properties = {}, required = []) => ({
   properties,
   ...(required.length ? { required } : {}),
 });
+const permissionArray = {
+  type: "array",
+  items: { type: "string", enum: ["*", ...KEY_PERMISSIONS] },
+  minItems: 1,
+};
 
 export const PRODUCTION_SCHEMAS = {
   ...EFFECTIVE_SCHEMAS,
+  KeyPrincipal: open(
+    {
+      id: ref("Identifier"),
+      tenant_id: ref("Identifier"),
+      email: { type: ["string", "null"], format: "email" },
+      scope: { type: "string" },
+      permissions: permissionArray,
+      created_at: ref("Timestamp"),
+      expires: ref("Timestamp"),
+    },
+    ["id", "tenant_id", "scope", "permissions", "created_at"],
+  ),
+  KeySecret: open(
+    {
+      id: ref("Identifier"),
+      tenant_id: ref("Identifier"),
+      key: { type: "string" },
+      scope: { type: "string" },
+      permissions: permissionArray,
+      created_at: ref("Timestamp"),
+      expires: ref("Timestamp"),
+      note: { type: "string" },
+    },
+    ["id", "tenant_id", "key", "scope", "permissions", "created_at", "expires"],
+  ),
   Attestation: open(
     {
       id: ref("Identifier"),
