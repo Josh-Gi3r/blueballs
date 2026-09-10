@@ -189,22 +189,22 @@ route("POST", "/v2/qr/generate", ({ body }) => {
     : "0000";
 
   const merchantAccountInfo = buildTLV([
-    ["00", "com.blueballs.qr"], // GUID — reverse-domain identifies the acquirer template
+    ["00", "com.blueballs.qr"],
     ["01", merchantId],
   ]);
 
   const fields = [
-    ["00", "01"], // payload format indicator — always "01"
-    ["01", dynamic ? "12" : "11"], // point of initiation: 11 static, 12 dynamic
-    ["26", merchantAccountInfo], // merchant account info template
-    ["52", mcc], // merchant category code
-    ["53", numeric], // transaction currency, ISO 4217 numeric
+    ["00", "01"],
+    ["01", dynamic ? "12" : "11"],
+    ["26", merchantAccountInfo],
+    ["52", mcc],
+    ["53", numeric],
   ];
-  if (dynamic) fields.push(["54", body.amount]); // transaction amount — dynamic QR only
+  if (dynamic) fields.push(["54", body.amount]);
   fields.push(["58", country]);
   fields.push(["59", merchantName]);
   fields.push(["60", merchantCity]);
-  if (reference) fields.push(["62", buildTLV([["05", reference]])]); // additional data: reference label
+  if (reference) fields.push(["62", buildTLV([["05", reference]])]);
 
   const withoutCRC = buildTLV(fields) + "6304";
   const payload = withoutCRC + crcHex(withoutCRC);
@@ -249,7 +249,7 @@ route("POST", "/v2/qr/decode", ({ body }) => {
     );
   }
   const crcClaimed = payload.slice(-4).toUpperCase();
-  const message = payload.slice(0, -4); // everything up to and including "6304"
+  const message = payload.slice(0, -4);
   const crcComputed = crcHex(message);
   if (crcComputed !== crcClaimed) {
     throw new ApiError(
@@ -293,7 +293,30 @@ route("POST", "/v2/qr/decode", ({ body }) => {
 });
 
 /* ---- POST /v2/links — shareable payment link ---- */
-const LINK_BASE = "https://pay.blueballs.dev/l/";
+function paymentLinkBase() {
+  const configured =
+    process.env.PAYMENT_LINK_BASE_URL || "https://blueballs.tech/pay/";
+  let parsed;
+  try {
+    parsed = new URL(configured);
+  } catch {
+    throw new Error("PAYMENT_LINK_BASE_URL must be an absolute URL");
+  }
+  const local = ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
+  if (parsed.protocol !== "https:" && !(local && parsed.protocol === "http:")) {
+    throw new Error(
+      "PAYMENT_LINK_BASE_URL must use HTTPS (HTTP is permitted only for localhost development)",
+    );
+  }
+  if (parsed.username || parsed.password || parsed.hash || parsed.search) {
+    throw new Error(
+      "PAYMENT_LINK_BASE_URL must not include credentials, query parameters or a fragment",
+    );
+  }
+  const base = parsed.toString();
+  return base.endsWith("/") ? base : `${base}/`;
+}
+const LINK_BASE = paymentLinkBase();
 
 route(
   "POST",
@@ -308,9 +331,9 @@ route(
         `${currency} is not a supported currency`,
       );
     if (body.amount !== undefined && body.amount !== null)
-      positiveMinor(body.amount); // open-amount links omit this
+      positiveMinor(body.amount);
 
-    const ttlSeconds = Number(body.expires_in_seconds ?? 7 * 24 * 60 * 60); // default 7 days
+    const ttlSeconds = Number(body.expires_in_seconds ?? 7 * 24 * 60 * 60);
     if (!Number.isInteger(ttlSeconds) || ttlSeconds < 1) {
       throw new ApiError(
         "validation-error",
@@ -326,7 +349,7 @@ route(
       amount: body.amount !== undefined ? body.amount : null,
       currency,
       description: body.description ?? null,
-      reusable: !!body.reusable, // single-use unless explicitly reusable
+      reusable: !!body.reusable,
       status: "active",
       expires_at: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
       client_reference_id: body.client_reference_id ?? null,
@@ -375,7 +398,6 @@ route(
         body.max_amount !== undefined && body.max_amount !== null
           ? { amount: body.max_amount, currency }
           : null,
-      // Sandbox self-serve, no human in the loop — same shortcut as /v2/customers/:id/verify.
       status: "active",
       client_reference_id: body.client_reference_id ?? null,
       created_at: now(),
