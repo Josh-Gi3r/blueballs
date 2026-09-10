@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { DatabaseSync } from "../../../packages/sqlite-compat/src/index.js";
 import { migrate } from "../../../packages/sqlite-compat/src/migrations.js";
 
-export const BANKING_COLLECTION_TABLES = Object.freeze([
+const V1_COLLECTION_TABLES = Object.freeze([
   "tenants",
   "keys",
   "customers",
@@ -52,6 +52,11 @@ export const BANKING_COLLECTION_TABLES = Object.freeze([
   "ramps",
 ]);
 
+export const BANKING_COLLECTION_TABLES = Object.freeze([
+  ...V1_COLLECTION_TABLES,
+  "webhookOutbox",
+]);
+
 export const BANKING_COLLECTION_TABLE_SET = new Set(BANKING_COLLECTION_TABLES);
 
 function createJsonCollection(database, table) {
@@ -68,7 +73,9 @@ export const BANKING_SCHEMA_MIGRATIONS = Object.freeze([
     version: 1,
     name: "initial-banking-schema",
     up(database) {
-      for (const table of BANKING_COLLECTION_TABLES) {
+      // Migration v1 is immutable. Do not replace this list with the current
+      // registry: later collections belong in later migrations.
+      for (const table of V1_COLLECTION_TABLES) {
         createJsonCollection(database, table);
       }
 
@@ -91,9 +98,6 @@ export const BANKING_SCHEMA_MIGRATIONS = Object.freeze([
         tenant_id TEXT
       )`);
 
-      // Upgrade pre-versioned databases whose events table predates tenant
-      // ownership. Existing unowned events remain inaccessible because every
-      // authenticated event read filters by tenant_id.
       const eventColumns = database.prepare("PRAGMA table_info(events)").all();
       if (!eventColumns.some((column) => column.name === "tenant_id")) {
         database.exec("ALTER TABLE events ADD COLUMN tenant_id TEXT");
@@ -108,6 +112,13 @@ export const BANKING_SCHEMA_MIGRATIONS = Object.freeze([
       database.exec(
         "CREATE INDEX IF NOT EXISTS idx_events_tenant_seq ON events(tenant_id, seq)",
       );
+    },
+  },
+  {
+    version: 2,
+    name: "durable-webhook-outbox",
+    up(database) {
+      createJsonCollection(database, "webhookOutbox");
     },
   },
 ]);
