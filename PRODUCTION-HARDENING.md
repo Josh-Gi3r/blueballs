@@ -47,19 +47,27 @@ reconciliation state.
 - [ ] Complete Durable Object crash/eviction probes for each financial family,
   not only the shared transaction layer.
 
-### Local release verification
+### Release verification and CI
 
-Blueballs deliberately does not depend on hosted GitHub Actions. The release
-authority is the repository itself.
+The repository-local `pnpm verify` command is the canonical clean-checkout
+release test. GitHub Actions must also run equivalent production gates on every
+pull request and push to `main`. Neither control substitutes for the other: a
+release requires both a green hosted gate and retained verification evidence from
+the exact release checkout.
 
 - [x] Keep the complete cross-surface gate in `pnpm verify`.
 - [x] Make targeted production deploy commands run the same release verification
   before publishing.
 - [x] Keep build-time drift gates for persistence schema, API contracts, runtime
   ownership, key permissions and public examples.
+- [x] Define `.github/workflows/production-gate.yml` for build/contracts, banking
+  API proof, Workers parity, FX/SDK, Solidity fuzz/invariants and container checks.
+- [x] Make the local build fail if the hosted production workflow is missing or
+  materially weakened.
+- [ ] Require the `Production gate` status check on protected `main`.
 - [ ] Produce a clean-checkout verification report for the release commit.
-- [ ] Require maintainer review for changes to ledger, authentication, policy,
-  FX execution, migrations and public contracts.
+- [ ] Require maintainer/CODEOWNERS review for changes to ledger,
+  authentication, policy, FX execution, migrations and public contracts.
 
 ### Executable API contract
 
@@ -79,7 +87,7 @@ authority is the repository itself.
 
 - [ ] `pnpm install --frozen-lockfile` succeeds on the pinned Node 24 runtime.
 - [ ] `pnpm verify` succeeds from a clean checkout.
-- [ ] Both reference Docker images build.
+- [ ] Reference container builds.
 - [ ] Compose topology validates.
 - [ ] Foundry unit, fuzz and invariant suites pass.
 - [ ] Generated contracts and SDK artifacts have no source drift.
@@ -118,12 +126,17 @@ authority is the repository itself.
 
 ### Provider and adapter standard
 
-- [ ] Give every provider boundary a versioned interface contract.
-- [ ] Add adapter conformance suites for identity, accounts, card issuing,
-  payment rails, custody, liquidity, FX execution and reconciliation.
-- [ ] Require deterministic sandbox/fake adapters for every contract.
-- [ ] Treat provider timeouts, duplicate callbacks and ambiguous submission as
-  first-class tested states.
+- [x] Define a provider-neutral canonical gateway envelope with stable job-level
+  idempotency, command correlation and bounded transport behavior.
+- [x] Persist provider work in a durable outbox before local financial state can
+  commit in production mode.
+- [x] Treat timeouts, lease expiry and contradictory transport evidence as
+  ambiguous states requiring reconciliation rather than blind resubmission.
+- [x] Apply capability-specific result checks before provider outcomes can make
+  identity, receiving-detail, card or transfer state final.
+- [ ] Publish versioned provider capability interfaces and conformance fixtures
+  for identity, accounts, card issuing, payment rails, custody/liquidity and FX.
+- [ ] Require deterministic fake adapters for every provider capability contract.
 
 ### Edge routing
 
@@ -142,8 +155,8 @@ authority is the repository itself.
   event/webhook payloads.
 - [x] Persist webhook delivery intent in the financial transaction and retry it
   from a durable outbox with stable delivery IDs.
-- [ ] Extend correlation through every external provider attempt and
-  reconciliation case.
+- [x] Persist provider attempts and reconciliation cases with original command
+  correlation and stable operation IDs.
 - [ ] Add health, readiness and dependency status suitable for orchestration.
 - [ ] Add production metrics for balances, posting failures, stale workflows,
   provider latency, reconciliation backlog and idempotency replays.
@@ -178,6 +191,7 @@ all adapter-required operations proven fail-closed without an adapter
 0 OpenAPI request/response drift
 0 generated SDK drift
 0 unreviewed failing security or invariant tests
+Production gate is green and required on protected main
 pnpm verify passes on the exact release checkout
 release-machine Docker / Foundry / Compose proof retained
 ```
@@ -190,12 +204,13 @@ configured, but that behavior itself must be contract-tested and documented.
 Every release should publish or retain:
 
 - commit SHA;
+- GitHub `Production gate` result for that exact commit;
 - local `pnpm verify` report/output for that exact checkout;
 - API operation coverage report;
 - OpenAPI artifacts;
 - SDK package proof;
 - contract test summary;
-- container image digests;
+- container image digest;
 - dependency inventory/SBOM;
 - migration version;
 - known production limitations and required external adapters.
