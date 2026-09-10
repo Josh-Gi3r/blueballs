@@ -1,6 +1,6 @@
 /** Final production schema layer consumed by generated OpenAPI and runtime validation. */
 import { EFFECTIVE_SCHEMAS } from "./effective-contracts.mjs";
-import { KEY_PERMISSIONS } from "../../../apps/api/src/key-permissions.js";
+import { KEY_PERMISSIONS } from "../key-permission-catalog.mjs";
 
 const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
 const open = (properties = {}, required = []) => ({
