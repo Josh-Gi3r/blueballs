@@ -10,10 +10,8 @@ import {
 } from "../spec/banking/openapi/contracts.mjs";
 import { PRODUCTION_SCHEMAS as SCHEMAS } from "../spec/banking/openapi/production-contracts.mjs";
 import { REQUEST_BODIES } from "../spec/banking/openapi/production-request-contracts.mjs";
-import {
-  PAGINATED_RESPONSE_OPERATIONS,
-  responseContractFor,
-} from "../spec/banking/openapi/production-response-contracts.mjs";
+import { queryParametersFor } from "../spec/banking/openapi/query-contracts.mjs";
+import { responseContractFor } from "../spec/banking/openapi/production-response-contracts.mjs";
 
 const root = new URL("..", import.meta.url);
 const families = FAMILIES;
@@ -83,7 +81,8 @@ for (const [path, ops] of byPath) {
     if (op.access === "PUBLIC") lines.push("      security: []");
     if (op.access === "OPERATOR") lines.push("      security: [{ operatorKey: [] }]");
 
-    if (params.length || PAGINATED_RESPONSE_OPERATIONS.has(operationId)) {
+    const queryParameters = queryParametersFor(operationId);
+    if (params.length || Object.keys(queryParameters).length) {
       lines.push("      parameters:");
       for (const p of params) {
         lines.push(`        - name: "${p}"`);
@@ -91,10 +90,11 @@ for (const [path, ops] of byPath) {
         lines.push("          required: true");
         lines.push("          schema: { type: string }");
       }
-      if (PAGINATED_RESPONSE_OPERATIONS.has(operationId)) {
-        lines.push('        - { name: "limit", in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }');
-        lines.push('        - { name: "starting_after", in: query, required: false, schema: { type: string } }');
-        lines.push('        - { name: "ending_before", in: query, required: false, schema: { type: string } }');
+      for (const [name, definition] of Object.entries(queryParameters)) {
+        lines.push(`        - name: "${name}"`);
+        lines.push("          in: query");
+        lines.push(`          required: ${definition.required}`);
+        lines.push(`          schema: ${inline(definition.schema)}`);
       }
     }
 
