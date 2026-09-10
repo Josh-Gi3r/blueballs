@@ -181,9 +181,6 @@ async function handleRequest(request, env) {
     return env.FX.fetch(internalRequest(target, {}));
   }
 
-  // The banking API's machine-readable contract. It is linked from the
-  // developers page and llms.txt, and used to fall through to the SPA
-  // fallback and serve the homepage as HTML.
   if (url.pathname === "/openapi.yaml") {
     return new Response(BANK_OPENAPI_YAML, {
       headers: {
@@ -211,10 +208,7 @@ async function handleRequest(request, env) {
     ) {
       return Response.json(
         { error: "Too many Builder Agent requests from this source." },
-        {
-          status: 429,
-          headers: { "retry-after": "60" },
-        },
+        { status: 429, headers: { "retry-after": "60" } },
       );
     }
     const apiKey = request.headers.get("x-api-key");
@@ -223,6 +217,10 @@ async function handleRequest(request, env) {
         { error: "A sandbox key is required." },
         { status: 401 },
       );
+
+    // Ask the banking API to authenticate the exact credential. The response's
+    // `current` object identifies the key that authenticated this request; never
+    // infer tenancy from data[0], whose ordering can change after key rotation.
     const accessCheck = await env.API.fetch(
       internalRequest(
         new Request(new URL("/v2/keys", url), {
@@ -238,7 +236,7 @@ async function handleRequest(request, env) {
         headers: accessCheck.headers,
       });
     const principal = await accessCheck.json();
-    const tenantId = principal?.data?.[0]?.tenant_id;
+    const tenantId = principal?.current?.tenant_id;
     if (!tenantId)
       return Response.json(
         { error: "The sandbox key has no active tenant." },
@@ -249,10 +247,7 @@ async function handleRequest(request, env) {
         {
           error: "This sandbox is sending Builder Agent requests too quickly.",
         },
-        {
-          status: 429,
-          headers: { "retry-after": "60" },
-        },
+        { status: 429, headers: { "retry-after": "60" } },
       );
     }
     const digest = await crypto.subtle.digest(
