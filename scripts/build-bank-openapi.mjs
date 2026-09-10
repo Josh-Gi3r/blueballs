@@ -9,7 +9,7 @@ import {
   CREATED_OPERATIONS,
 } from "../spec/banking/openapi/contracts.mjs";
 import { PRODUCTION_SCHEMAS as SCHEMAS } from "../spec/banking/openapi/production-contracts.mjs";
-import { REQUEST_BODIES } from "../spec/banking/openapi/request-contracts.mjs";
+import { REQUEST_BODIES } from "../spec/banking/openapi/production-request-contracts.mjs";
 import {
   PAGINATED_RESPONSE_OPERATIONS,
   responseContractFor,
