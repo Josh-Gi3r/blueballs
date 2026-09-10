@@ -8,15 +8,15 @@
 import { randomBytes } from "node:crypto";
 import {
   ApiError,
-  collection,
+  collection as persistentCollection,
   currentCommandId,
   emit,
   inRequestScope,
   ksuid,
-  now,
   setCommandContext,
   subscribeToEvents,
-} from "./kernel.js";
+} from "./lib.js";
+import { BANKING_COLLECTION_TABLE_SET } from "./schema.js";
 import { publicShape } from "./public-shape.js";
 import {
   providerTransportAvailable,
@@ -40,6 +40,7 @@ const LEASE_MS = numberEnv("BANK_PROVIDER_LEASE_MS", 30_000, 1_000, 300_000);
 const PUMP_MS = numberEnv("BANK_PROVIDER_PUMP_MS", 1_000, 100, 60_000);
 const RETRY_DELAYS_MS = retryDelays();
 const TERMINAL = new Set(["succeeded", "failed", "manual_review"]);
+const now = () => new Date().toISOString();
 
 function numberEnv(name, fallback, min, max) {
   const value = Number(process.env[name] ?? fallback);
@@ -65,6 +66,13 @@ function retryDelays() {
     );
   }
   return values;
+}
+
+function collection(name) {
+  if (!BANKING_COLLECTION_TABLE_SET.has(name)) {
+    throw new Error(`Provider engine requested unversioned collection ${name}`);
+  }
+  return persistentCollection(name);
 }
 
 export const providerOutbox = collection("providerOutbox");
@@ -131,6 +139,10 @@ function openCase(job, reason, details = {}) {
   };
   reconciliationCases.set(record.id, record);
   return record;
+}
+
+export function openProviderReconciliationCase(job, reason, details = {}) {
+  return openCase(job, reason, details);
 }
 
 function resolveCases(job, resolution) {
@@ -275,7 +287,11 @@ async function claim(jobId) {
       });
       emit(
         "provider.operation_manual_review",
-        { id: job.id, resource_type: job.resource_type, resource_id: job.resource_id },
+        {
+          id: job.id,
+          resource_type: job.resource_type,
+          resource_id: job.resource_id,
+        },
         { tenantId: job.owner },
       );
       return null;
@@ -360,7 +376,8 @@ async function finish(claimed, result) {
       attempt.status = result.outcome === "retry" ? "retrying" : result.outcome;
       attempt.outcome = result.outcome;
       attempt.status_code = result.status_code ?? null;
-      attempt.provider_reference = result.provider_reference ?? job.provider_reference ?? null;
+      attempt.provider_reference =
+        result.provider_reference ?? job.provider_reference ?? null;
       attempt.provider_state = result.provider_state ?? null;
       attempt.error_code = result.error_code ?? null;
       attempt.finished_at = stamp;
@@ -399,7 +416,11 @@ async function finish(claimed, result) {
       await invokeHandler(job, result);
       emit(
         "provider.operation_pending",
-        { id: job.id, resource_type: job.resource_type, resource_id: job.resource_id },
+        {
+          id: job.id,
+          resource_type: job.resource_type,
+          resource_id: job.resource_id,
+        },
         { tenantId: job.owner },
       );
       return job;
@@ -410,7 +431,11 @@ async function finish(claimed, result) {
       scheduleFrom(job, retryDelay(job.attempt_count, result.retry_after_ms));
       emit(
         "provider.operation_retrying",
-        { id: job.id, resource_type: job.resource_type, resource_id: job.resource_id },
+        {
+          id: job.id,
+          resource_type: job.resource_type,
+          resource_id: job.resource_id,
+        },
         { tenantId: job.owner },
       );
       return job;
@@ -498,8 +523,21 @@ export function drainProviderOutbox({ limit = 25 } = {}) {
       .slice(0, limit)
       .map((job) => job.id);
     const results = [];
-    for (const id of ids) results.push(await attempt(id));
-    return results.filter(Boolean);
+    for (const id of ids) {
+      try {
+        const result = await attempt(id);
+        if (result) results.push(result);
+      } catch (error) {
+        // The claimed lease remains durable. Its expiry deliberately forces the
+        // next attempt into reconciliation, which is safer than guessing that a
+        // provider-side effect did not happen.
+        console.error(
+          "provider outbox attempt did not finalize; lease will reconcile",
+          error?.code ?? error?.name ?? "provider_attempt_error",
+        );
+      }
+    }
+    return results;
   })().finally(() => {
     draining = null;
   });
@@ -524,8 +562,10 @@ export function nextProviderOutboxAt() {
 export function providerOutboxStatus() {
   const jobs = [...providerOutbox.values()];
   return {
-    pending: jobs.filter((job) => ["pending", "retrying"].includes(job.status)).length,
-    pending_provider: jobs.filter((job) => job.status === "pending_provider").length,
+    pending: jobs.filter((job) => ["pending", "retrying"].includes(job.status))
+      .length,
+    pending_provider: jobs.filter((job) => job.status === "pending_provider")
+      .length,
     ambiguous: jobs.filter((job) => job.status === "ambiguous").length,
     in_flight: jobs.filter((job) => job.status === "in_flight").length,
     failed: jobs.filter((job) => job.status === "failed").length,
@@ -542,7 +582,10 @@ export function providerOutboxStatus() {
 // survives Worker eviction and is never an untracked HTTP-request promise.
 if (!IS_CLOUDFLARE) {
   subscribeToEvents((event) => {
-    if (event.type === "provider.operation_queued" && providerTransportAvailable()) {
+    if (
+      event.type === "provider.operation_queued" &&
+      providerTransportAvailable()
+    ) {
       void drainProviderOutbox();
     }
   });
