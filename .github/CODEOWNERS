@@ -27,10 +27,18 @@
 
 # Public contracts, verification and release gates
 /spec/ @Josh-Gi3r
+/.github/workflows/ @Josh-Gi3r
+/.github/CODEOWNERS @Josh-Gi3r
+/package.json @Josh-Gi3r
+/pnpm-lock.yaml @Josh-Gi3r
 /scripts/verify.mjs @Josh-Gi3r
+/scripts/release-proof.mjs @Josh-Gi3r
+/scripts/check-production-ci.mjs @Josh-Gi3r
 /scripts/check-catalogue.mjs @Josh-Gi3r
 /scripts/check-openapi-requests.mjs @Josh-Gi3r
 /scripts/check-openapi-responses.mjs @Josh-Gi3r
 /public/openapi.yaml @Josh-Gi3r
 /SECURITY.md @Josh-Gi3r
 /PRODUCTION-HARDENING.md @Josh-Gi3r
+/RELEASE.md @Josh-Gi3r
+/TESTING.md @Josh-Gi3r
