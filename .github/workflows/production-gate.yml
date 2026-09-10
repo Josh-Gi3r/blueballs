@@ -41,7 +41,7 @@ jobs:
       - run: node scripts/check-openapi-responses.mjs
       - run: pnpm lint:openapi
 
-  banking-api:
+  banking_api:
     name: Banking API 181-operation proof
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -121,16 +121,16 @@ jobs:
       - run: docker compose -f compose.reference.yml config --quiet
       - run: docker build --pull=false -f Dockerfile.reference -t blueballs/reference:${{ github.sha }} .
 
-  production-gate:
+  production_gate:
     name: Production gate
     if: always()
-    needs: [quality, banking-api, workers, fx, contracts, container]
+    needs: [quality, banking_api, workers, fx, contracts, container]
     runs-on: ubuntu-latest
     steps:
       - name: Require every production check to pass
         env:
           QUALITY: ${{ needs.quality.result }}
-          BANKING: ${{ needs.banking-api.result }}
+          BANKING: ${{ needs.banking_api.result }}
           WORKERS: ${{ needs.workers.result }}
           FX: ${{ needs.fx.result }}
           CONTRACTS: ${{ needs.contracts.result }}
