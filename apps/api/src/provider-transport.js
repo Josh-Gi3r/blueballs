@@ -5,6 +5,7 @@
  * bank, card processor, KYC vendor, custody system or payment rail.
  */
 import { enforceProviderResultContract } from "./provider-result-contract.js";
+import { openProviderPayload } from "./provider-payload-crypto.js";
 
 const PROTOCOL_VERSION = "2026-09-11";
 const MAX_RESPONSE_BYTES = 64 * 1024;
@@ -214,26 +215,54 @@ function responseEvidence(envelope, parsed, response, outcome, errorCode) {
   });
 }
 
+function transportEnvelope(envelope) {
+  const payload = envelope?.payload;
+  if (
+    payload?.format === "A256GCM" ||
+    payload?.format === "PLAINTEXT_TEST_ONLY"
+  ) {
+    return { ...envelope, payload: openProviderPayload(payload) };
+  }
+  return structuredClone(envelope);
+}
+
 /** Send one provider operation. `job_id` is the provider idempotency key for the
  * lifetime of the operation, across submission and reconciliation attempts.
+ * Durable jobs may hold an encrypted payload; plaintext exists only in memory at
+ * this transport boundary and is never written back to the outbox.
  *
  * HTTP status is part of the financial evidence. A non-2xx response can never
  * declare success merely because its JSON body says `outcome: succeeded`.
- * 408/425/5xx are ambiguous; 429 is retryable; other 4xx responses may be
- * terminal only when they do not contradict the capability-specific funds
- * state contract. */
+ */
 export async function sendProviderOperation(envelope) {
+  let wireEnvelope;
+  try {
+    wireEnvelope = transportEnvelope(envelope);
+  } catch (error) {
+    return checked(envelope, {
+      outcome: "retry",
+      provider_reference: envelope.provider_reference ?? null,
+      provider_state: null,
+      funds_state: "not_sent",
+      retry_after_ms: null,
+      error_code: error?.code ?? "provider_payload_decryption_failed",
+      result: null,
+      transport: "local",
+      status_code: null,
+    });
+  }
+
   if (injectedTransport) {
     try {
-      const result = await injectedTransport(structuredClone(envelope));
+      const result = await injectedTransport(structuredClone(wireEnvelope));
       return checked(
-        envelope,
+        wireEnvelope,
         normalizeResult(result, { transport: "injected", status_code: null }),
       );
     } catch {
       return checked(
-        envelope,
-        ambiguousResult(envelope, "custom_transport_ambiguous", {
+        wireEnvelope,
+        ambiguousResult(wireEnvelope, "custom_transport_ambiguous", {
           transport: "injected",
           status_code: null,
         }),
@@ -250,7 +279,7 @@ export async function sendProviderOperation(envelope) {
 
   const body = JSON.stringify({
     protocol_version: PROTOCOL_VERSION,
-    ...envelope,
+    ...wireEnvelope,
   });
   let response;
   try {
@@ -262,15 +291,15 @@ export async function sendProviderOperation(envelope) {
         authorization: `Bearer ${config.token}`,
         "content-type": "application/json",
         "x-blueballs-provider-protocol": PROTOCOL_VERSION,
-        "x-idempotency-key": envelope.job_id,
-        "x-blueballs-command-id": envelope.command_id ?? "",
+        "x-idempotency-key": wireEnvelope.job_id,
+        "x-blueballs-command-id": wireEnvelope.command_id ?? "",
       },
       body,
     });
   } catch {
     return checked(
-      envelope,
-      ambiguousResult(envelope, "transport_ambiguous", {
+      wireEnvelope,
+      ambiguousResult(wireEnvelope, "transport_ambiguous", {
         transport: "http",
         status_code: null,
       }),
@@ -280,8 +309,8 @@ export async function sendProviderOperation(envelope) {
   if (response.status >= 300 && response.status < 400) {
     await response.body?.cancel();
     return checked(
-      envelope,
-      ambiguousResult(envelope, "provider_redirect_rejected", {
+      wireEnvelope,
+      ambiguousResult(wireEnvelope, "provider_redirect_rejected", {
         transport: "http",
         status_code: response.status,
       }),
@@ -293,8 +322,8 @@ export async function sendProviderOperation(envelope) {
     parsed = await readLimitedJson(response);
   } catch {
     return checked(
-      envelope,
-      ambiguousResult(envelope, "provider_protocol_error", {
+      wireEnvelope,
+      ambiguousResult(wireEnvelope, "provider_protocol_error", {
         transport: "http",
         status_code: response.status,
       }),
@@ -304,7 +333,7 @@ export async function sendProviderOperation(envelope) {
   if (response.ok) {
     try {
       return checked(
-        envelope,
+        wireEnvelope,
         normalizeResult(parsed, {
           transport: "http",
           status_code: response.status,
@@ -312,8 +341,8 @@ export async function sendProviderOperation(envelope) {
       );
     } catch {
       return checked(
-        envelope,
-        ambiguousResult(envelope, "provider_protocol_error", {
+        wireEnvelope,
+        ambiguousResult(wireEnvelope, "provider_protocol_error", {
           transport: "http",
           status_code: response.status,
         }),
@@ -323,7 +352,7 @@ export async function sendProviderOperation(envelope) {
 
   if (response.status === 429) {
     return responseEvidence(
-      envelope,
+      wireEnvelope,
       parsed,
       response,
       "retry",
@@ -337,7 +366,7 @@ export async function sendProviderOperation(envelope) {
     response.status === 425
   ) {
     return responseEvidence(
-      envelope,
+      wireEnvelope,
       parsed,
       response,
       "ambiguous",
@@ -349,7 +378,7 @@ export async function sendProviderOperation(envelope) {
   // Never finalize money from that combination; reconcile instead.
   if (parsed.outcome === "succeeded" || parsed.outcome === "pending") {
     return responseEvidence(
-      envelope,
+      wireEnvelope,
       parsed,
       response,
       "ambiguous",
@@ -359,7 +388,7 @@ export async function sendProviderOperation(envelope) {
 
   if (parsed.outcome === "ambiguous") {
     return responseEvidence(
-      envelope,
+      wireEnvelope,
       parsed,
       response,
       "ambiguous",
@@ -368,7 +397,7 @@ export async function sendProviderOperation(envelope) {
   }
 
   return responseEvidence(
-    envelope,
+    wireEnvelope,
     parsed,
     response,
     "failed",
