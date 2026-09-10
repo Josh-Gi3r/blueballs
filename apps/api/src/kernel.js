@@ -29,6 +29,7 @@ import {
   validateSuccessfulResponse,
 } from "./response-validation.js";
 import { validateRequestBody } from "./request-validation.js";
+import { validateQueryParameters } from "./query-validation.js";
 import {
   assertKeyPermission,
   childPermissions,
@@ -224,6 +225,7 @@ export const route = (method, pattern, handler, opts = {}) => {
       assertKeyPermission(ctx.key, method, pattern);
     }
 
+    validateQueryParameters(method, pattern, ctx.url);
     validateRequestBody(method, pattern, ctx.body ?? {});
 
     const requestedChildPermissions =
@@ -233,9 +235,6 @@ export const route = (method, pattern, handler, opts = {}) => {
 
     let result = await handler(ctx);
 
-    // Production-only external side effects are normalized and durably queued
-    // here, before the local transaction can commit or the response can leave.
-    // Missing provider configuration therefore fails the whole local command.
     result = prepareProductionProviderIntent({
       mode: BANK_API_MODE,
       method,
@@ -315,8 +314,9 @@ export const route = (method, pattern, handler, opts = {}) => {
 };
 
 export const isRegistered = (method, pattern) =>
-  routes.some((routeRecord) =>
-    routeRecord.method === method && routeRecord.pattern === pattern,
+  routes.some(
+    (routeRecord) =>
+      routeRecord.method === method && routeRecord.pattern === pattern,
   );
 
 export const match = (method, path) => {
