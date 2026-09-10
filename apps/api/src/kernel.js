@@ -59,6 +59,11 @@ ensureProductionBootstrap({
   env: RUNTIME_ENV,
 });
 
+/** One table must have one in-memory storage view. Creating two PersistentMap
+ * instances for the same table would allow stale caches to overwrite each other
+ * even though SQLite itself is transactional. Route families therefore attach
+ * their first collection instance to the shared db object and every later caller
+ * receives that exact instance. */
 export function collection(name) {
   if (!BANKING_COLLECTION_TABLE_SET.has(name)) {
     throw new Error(
@@ -70,7 +75,10 @@ export function collection(name) {
       "auditRecords is append-only and may only be written by the banking command boundary",
     );
   }
-  return persistentCollection(name);
+  if (db[name]) return db[name];
+  const map = persistentCollection(name);
+  db[name] = map;
+  return map;
 }
 
 export {
