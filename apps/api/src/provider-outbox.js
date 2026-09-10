@@ -18,6 +18,7 @@ import {
 } from "./lib.js";
 import { BANKING_COLLECTION_TABLE_SET } from "./schema.js";
 import { publicShape } from "./public-shape.js";
+import { bankingEnv, bankingFlag } from "./runtime-env.js";
 import {
   providerTransportAvailable,
   sendProviderOperation,
@@ -35,7 +36,7 @@ const DEFAULT_RETRY_DELAYS_MS = [
   12 * 60 * 60_000,
   24 * 60 * 60_000,
 ];
-const IS_CLOUDFLARE = process.env.CLOUDFLARE_WORKER === "true";
+const IS_CLOUDFLARE = bankingFlag("CLOUDFLARE_WORKER", false);
 const LEASE_MS = numberEnv("BANK_PROVIDER_LEASE_MS", 30_000, 1_000, 300_000);
 const PUMP_MS = numberEnv("BANK_PROVIDER_PUMP_MS", 1_000, 100, 60_000);
 const RETRY_DELAYS_MS = retryDelays();
@@ -43,7 +44,7 @@ const TERMINAL = new Set(["succeeded", "failed", "manual_review"]);
 const now = () => new Date().toISOString();
 
 function numberEnv(name, fallback, min, max) {
-  const value = Number(process.env[name] ?? fallback);
+  const value = Number(bankingEnv(name, fallback));
   if (!Number.isSafeInteger(value) || value < min || value > max) {
     throw new Error(`${name} must be an integer between ${min} and ${max}`);
   }
@@ -51,9 +52,11 @@ function numberEnv(name, fallback, min, max) {
 }
 
 function retryDelays() {
-  const raw = process.env.BANK_PROVIDER_RETRY_DELAYS_MS;
+  const raw = bankingEnv("BANK_PROVIDER_RETRY_DELAYS_MS");
   if (!raw) return DEFAULT_RETRY_DELAYS_MS;
-  const values = raw.split(",").map((value) => Number(value.trim()));
+  const values = String(raw)
+    .split(",")
+    .map((value) => Number(value.trim()));
   if (
     values.length === 0 ||
     values.some(
