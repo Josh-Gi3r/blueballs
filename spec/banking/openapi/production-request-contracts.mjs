@@ -61,6 +61,22 @@ export const REQUEST_BODIES = {
     ),
   },
 
+  postTransfers: {
+    required: true,
+    schema: obj(
+      {
+        from: ref("Identifier"),
+        amount: ref("DecimalAmount"),
+        currency: ref("CurrencyCode"),
+        rail: string("Configured payment rail"),
+        recipient: ref("Identifier"),
+        destination: ref("Identifier"),
+        client_reference_id: { type: "string", maxLength: 255 },
+      },
+      ["from", "amount", "rail"],
+    ),
+  },
+
   postFxLp: {
     required: true,
     schema: obj(
