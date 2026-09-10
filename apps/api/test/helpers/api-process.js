@@ -57,7 +57,10 @@ async function terminate(child) {
   }
 }
 
-export async function createApiFixture({ env = {} } = {}) {
+export async function createApiFixture({ env = {}, nodeArgs = [] } = {}) {
+  if (!Array.isArray(nodeArgs) || nodeArgs.some((arg) => typeof arg !== "string")) {
+    throw new TypeError("createApiFixture nodeArgs must be an array of strings");
+  }
   const directory = await mkdtemp(join(tmpdir(), "blueballs-api-test-"));
   const databasePath = join(directory, "blueballs.sqlite");
   let child = null;
@@ -86,7 +89,7 @@ export async function createApiFixture({ env = {} } = {}) {
     const port = await allocatePort();
     baseUrl = `http://127.0.0.1:${port}`;
     logs = "";
-    child = spawn(process.execPath, ["src/server.js"], {
+    child = spawn(process.execPath, [...nodeArgs, "src/server.js"], {
       cwd: new URL("../..", import.meta.url),
       env: {
         ...process.env,
