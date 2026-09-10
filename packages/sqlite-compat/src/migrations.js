@@ -9,6 +9,7 @@
  */
 
 const IDENTIFIER = /^[a-z][a-z0-9_-]{0,63}$/;
+const MIGRATION_NAME = /^[a-z][a-z0-9_]{0,95}$/;
 
 function assertComponent(component) {
   if (!IDENTIFIER.test(component)) {
@@ -20,22 +21,24 @@ function assertComponent(component) {
 
 function normalizeMigrations(migrations) {
   if (!Array.isArray(migrations)) throw new TypeError("migrations must be an array");
-  const seen = new Set();
   let previous = 0;
   return migrations.map((migration) => {
     if (!migration || !Number.isSafeInteger(migration.version) || migration.version < 1) {
       throw new TypeError("every migration needs a positive integer version");
     }
-    if (seen.has(migration.version)) {
-      throw new Error(`duplicate migration version ${migration.version}`);
+    if (migration.version !== previous + 1) {
+      throw new Error(
+        `migrations must be contiguous from version 1; expected ${previous + 1}, found ${migration.version}`,
+      );
     }
-    if (migration.version <= previous) {
-      throw new Error("migrations must be declared in strictly increasing order");
+    if (typeof migration.name !== "string" || !MIGRATION_NAME.test(migration.name)) {
+      throw new TypeError(
+        `migration ${migration.version} needs a stable lowercase snake_case name`,
+      );
     }
     if (typeof migration.up !== "function") {
       throw new TypeError(`migration ${migration.version} needs an up(database) function`);
     }
-    seen.add(migration.version);
     previous = migration.version;
     return migration;
   });
