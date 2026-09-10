@@ -161,14 +161,28 @@ sqlite.exec("PRAGMA journal_mode = WAL");
  * ====================================================================== */
 
 const RAW = Symbol("blueballs.raw");
+const MISSING = Symbol("blueballs.missing");
 
-/** Per-request, not per-process. Five handlers are async — `POST /v2/transfers`
- *  among them — so two requests can interleave at an await, and a shared dirty
- *  set would let one request's commit persist another's half-finished work, or
- *  one request's failure roll back a row a different request had already
- *  changed. AsyncLocalStorage keeps each request's rows to itself. */
+/** Per-request unit of work. Handlers may await external work, so we cannot hold
+ *  a synchronous SQLite transaction open across the handler. Instead every
+ *  durable write is staged in memory and committed together after the handler
+ *  succeeds. If the handler throws, the cache is restored and no ledger/event/
+ *  idempotency/resource row has reached SQLite.
+ *
+ *  This is the financial atomicity boundary:
+ *    resource state + ledger + events + idempotency = one commit.
+ */
 const requestScope = new AsyncLocalStorage();
 const proxies = new WeakMap();
+
+function createRequestStore() {
+  return {
+    snapshots: new Map(),
+    ledger: [],
+    events: [],
+    eventTrims: new Map(),
+  };
+}
 
 function unwrap(value) {
   return value !== null && typeof value === "object" && value[RAW] !== undefined
@@ -177,13 +191,15 @@ function unwrap(value) {
 }
 
 /** Record the row's pre-mutation state once per request, before its first write. */
-function snapshotOnce(store, map, id, root) {
-  let rows = store.get(map);
+function snapshotOnce(store, map, id, root = MISSING) {
+  let rows = store.snapshots.get(map);
   if (!rows) {
     rows = new Map();
-    store.set(map, rows);
+    store.snapshots.set(map, rows);
   }
-  if (!rows.has(id)) rows.set(id, structuredClone(root));
+  if (!rows.has(id)) {
+    rows.set(id, root === MISSING ? MISSING : structuredClone(root));
+  }
 }
 
 /** Recursive so `approval.decisions.push(...)` and `recipient.destinations[0].x = 1`
@@ -222,22 +238,45 @@ function track(value, map, id, root) {
   return proxy;
 }
 
-/** Run a request handler so every row it mutates is persisted when it returns,
- *  and restored if it throws. */
+/** Run one API request as a financial unit of work. All durable mutations are
+ *  staged while the handler runs, then flushed inside one synchronous SQLite
+ *  transaction. Subscriber side effects (for example outbound webhook delivery)
+ *  are triggered only after the database commit succeeds. */
 export async function inRequestScope(run) {
-  const store = new Map();
+  const store = createRequestStore();
   return requestScope.run(store, async () => {
     try {
       const result = await run();
-      for (const [map, rows] of store)
-        for (const id of rows.keys()) map._persist(id);
+      sqlite.transactionSync(() => {
+        for (const [map, rows] of store.snapshots)
+          for (const id of rows.keys()) map._persist(id);
+        for (const row of store.ledger) db.ledger._persist(row);
+        for (const evt of store.events) db.events._persist(evt);
+        for (const [tenantId, maximum] of store.eventTrims)
+          db.events._trimTenant(tenantId, maximum);
+      });
+
+      // External side effects are deliberately after commit. A webhook failure
+      // must not roll back money, and an uncommitted event must never escape.
+      for (const evt of store.events) {
+        for (const subscriber of eventSubscribers) {
+          try {
+            subscriber(evt);
+          } catch (error) {
+            console.error("event subscriber failed after commit", error);
+          }
+        }
+      }
       return result;
     } catch (error) {
-      for (const [map, rows] of store)
+      for (const [map, rows] of store.snapshots)
         for (const [id, snapshot] of rows) map._restore(id, snapshot);
       throw error;
     } finally {
-      store.clear();
+      store.snapshots.clear();
+      store.ledger.length = 0;
+      store.events.length = 0;
+      store.eventTrims.clear();
     }
   });
 }
@@ -268,15 +307,31 @@ class PersistentMap {
   }
   set(id, value) {
     const row = unwrap(value);
+    const store = requestScope.getStore();
+    if (store) {
+      snapshotOnce(
+        store,
+        this,
+        id,
+        this._cache.has(id) ? this._cache.get(id) : MISSING,
+      );
+      this._cache.set(id, row);
+      return this;
+    }
     this._cache.set(id, row);
     this._upsert.run(id, JSON.stringify(row));
-    requestScope.getStore()?.get(this)?.delete(id); // written through; nothing left to flush
     return this;
   }
   delete(id) {
+    const store = requestScope.getStore();
+    if (store) {
+      if (!this._cache.has(id)) return false;
+      snapshotOnce(store, this, id, this._cache.get(id));
+      this._cache.delete(id);
+      return true;
+    }
     const existed = this._cache.delete(id);
     this._del.run(id);
-    requestScope.getStore()?.get(this)?.delete(id);
     return existed;
   }
   /** Write a row the request mutated in place. */
@@ -287,8 +342,10 @@ class PersistentMap {
   }
   /** Put a row back the way it was before the request touched it. */
   _restore(id, snapshot) {
-    proxies.delete(this._cache.get(id));
-    this._cache.set(id, snapshot);
+    const current = this._cache.get(id);
+    if (current && typeof current === "object") proxies.delete(current);
+    if (snapshot === MISSING) this._cache.delete(id);
+    else this._cache.set(id, snapshot);
   }
   // Iteration is tracked too: a handler that mutates a row it reached through
   // values() has changed the same cached object get() would have handed it.
@@ -326,15 +383,30 @@ class PersistentLedger {
       `SELECT amount FROM ledger WHERE account = ? AND currency = ?`,
     );
   }
-  /** Sum one account's rows in SQL rather than walking the whole ledger. Amounts
-   *  are TEXT, so they are summed as BigInt here and never by SQL's REAL SUM(). */
+  /** Sum one account's rows exactly. Pending rows from the current request are
+   *  included so a second posting in the same command sees the first posting
+   *  even though neither has been committed yet. */
   balance(account, currency) {
     let n = 0n;
     for (const r of this._selectAccount.all(account, currency))
       n += BigInt(r.amount);
+    const store = requestScope.getStore();
+    if (store) {
+      for (const r of store.ledger) {
+        if (r.account === account && r.currency === currency) n += r.amount;
+      }
+    }
     return n;
   }
   push(row) {
+    const store = requestScope.getStore();
+    if (store) {
+      store.ledger.push(row);
+      return;
+    }
+    this._persist(row);
+  }
+  _persist(row) {
     this._insert.run(
       row.txn,
       row.at,
@@ -345,7 +417,7 @@ class PersistentLedger {
     );
   }
   _all() {
-    return this._selectAll.all().map((r) => ({
+    const rows = this._selectAll.all().map((r) => ({
       txn: r.txn,
       at: r.at,
       account: r.account,
@@ -353,6 +425,8 @@ class PersistentLedger {
       amount: BigInt(r.amount),
       memo: r.memo,
     }));
+    const store = requestScope.getStore();
+    return store ? rows.concat(store.ledger) : rows;
   }
   filter(fn) {
     return this._all().filter(fn);
@@ -364,7 +438,8 @@ class PersistentLedger {
     return this._all().reduce(fn, init);
   }
   get length() {
-    return sqlite.prepare(`SELECT COUNT(*) c FROM ledger`).get().c;
+    const committed = sqlite.prepare(`SELECT COUNT(*) c FROM ledger`).get().c;
+    return committed + (requestScope.getStore()?.ledger.length ?? 0);
   }
   [Symbol.iterator]() {
     return this._all()[Symbol.iterator]();
@@ -398,6 +473,14 @@ class PersistentEvents {
     this._selectAll = sqlite.prepare(`SELECT * FROM events ORDER BY seq`);
   }
   push(evt) {
+    const store = requestScope.getStore();
+    if (store) {
+      store.events.push(evt);
+      return;
+    }
+    this._persist(evt);
+  }
+  _persist(evt) {
     this._insert.run(
       evt.id,
       evt.type,
@@ -410,20 +493,31 @@ class PersistentEvents {
     this._shiftOldest.run();
   }
   trimTenant(tenantId, maximum) {
+    const store = requestScope.getStore();
+    if (store) {
+      store.eventTrims.set(tenantId, maximum);
+      return;
+    }
+    this._trimTenant(tenantId, maximum);
+  }
+  _trimTenant(tenantId, maximum) {
     while (this._countTenant.get(tenantId).c > maximum)
       this._shiftTenant.run(tenantId);
   }
   get length() {
-    return sqlite.prepare(`SELECT COUNT(*) c FROM events`).get().c;
+    const committed = sqlite.prepare(`SELECT COUNT(*) c FROM events`).get().c;
+    return committed + (requestScope.getStore()?.events.length ?? 0);
   }
   _all() {
-    return this._selectAll.all().map((r) => ({
+    const rows = this._selectAll.all().map((r) => ({
       id: r.id,
       type: r.type,
       created_at: r.created_at,
       data: JSON.parse(r.data),
       tenant_id: r.tenant_id,
     }));
+    const store = requestScope.getStore();
+    return store ? rows.concat(store.events) : rows;
   }
   [Symbol.iterator]() {
     return this._all()[Symbol.iterator]();
@@ -461,6 +555,10 @@ export function subscribeToEvents(subscriber) {
 
 export function emit(type, data, { tenantId } = {}) {
   if (!tenantId) throw new Error(`Event ${type} requires an explicit tenantId`);
+  const retention = Number(process.env.EVENT_RETENTION_PER_TENANT || 1000);
+  if (!Number.isSafeInteger(retention) || retention < 1) {
+    throw new Error("EVENT_RETENTION_PER_TENANT must be a positive integer");
+  }
   const evt = {
     id: ksuid("evt"),
     type,
@@ -469,12 +567,14 @@ export function emit(type, data, { tenantId } = {}) {
     tenant_id: tenantId,
   };
   db.events.push(evt);
-  const retention = Number(process.env.EVENT_RETENTION_PER_TENANT || 1000);
-  if (!Number.isSafeInteger(retention) || retention < 1) {
-    throw new Error("EVENT_RETENTION_PER_TENANT must be a positive integer");
-  }
   db.events.trimTenant(tenantId, retention);
-  for (const subscriber of eventSubscribers) subscriber(evt);
+
+  // Outside an API request (boot scripts/tests) there is no deferred commit.
+  // Deliver immediately. Inside a request, inRequestScope notifies subscribers
+  // only after the database transaction has committed.
+  if (!requestScope.getStore()) {
+    for (const subscriber of eventSubscribers) subscriber(evt);
+  }
   return evt;
 }
 
@@ -520,17 +620,25 @@ export function post(entries, memo) {
   assertNoOverdraft(entries);
   const txn = ksuid("led");
   const at = new Date().toISOString();
+  const rows = entries.map((e) => ({
+    txn,
+    at,
+    account: e.account,
+    currency: e.currency,
+    amount: e.amount,
+    memo,
+  }));
+
+  // API requests stage ledger rows so the request-level unit of work can commit
+  // them atomically with the resource state, events and idempotency record.
+  if (requestScope.getStore()) {
+    for (const row of rows) db.ledger.push(row);
+    return txn;
+  }
+
+  // Standalone scripts/tests still get balanced-or-nothing ledger posting.
   return sqlite.transactionSync(() => {
-    for (const e of entries) {
-      db.ledger.push({
-        txn,
-        at,
-        account: e.account,
-        currency: e.currency,
-        amount: e.amount,
-        memo,
-      });
-    }
+    for (const row of rows) db.ledger._persist(row);
     return txn;
   });
 }
