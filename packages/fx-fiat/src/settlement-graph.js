@@ -24,6 +24,11 @@ export function normalizeSettlementEdge(edge) {
   const cost = BigInt(String(edge.cost ?? "0"));
   if (cost < 0n) throw new RangeError("cost must be non-negative");
 
+  const fromAsset = required(edge.fromAsset, "fromAsset");
+  const toAsset = required(edge.toAsset, "toAsset");
+  if (fromAsset === toAsset)
+    throw new RangeError("settlement edge must move between different assets");
+
   const atomicGroup = edge.atomicGroup ?? null;
   if (
     edge.finalityClass === "ATOMIC" &&
@@ -35,12 +40,24 @@ export function normalizeSettlementEdge(edge) {
     throw new Error("non-atomic edge cannot declare atomicGroup");
   }
 
+  const settlementWindowMs = edge.settlementWindowMs ?? null;
+  if (
+    settlementWindowMs !== null &&
+    (!Number.isSafeInteger(settlementWindowMs) || settlementWindowMs < 0)
+  ) {
+    throw new RangeError("settlementWindowMs must be a non-negative safe integer");
+  }
+  const metadata = edge.metadata ?? {};
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    throw new TypeError("metadata must be an object");
+  }
+
   return {
     edgeId: required(edge.edgeId, "edgeId"),
     edgeType: edge.edgeType,
     finalityClass: edge.finalityClass,
-    fromAsset: required(edge.fromAsset, "fromAsset"),
-    toAsset: required(edge.toAsset, "toAsset"),
+    fromAsset,
+    toAsset,
     providerId: required(edge.providerId, "providerId"),
     policyAuthorizationId: required(
       edge.policyAuthorizationId,
@@ -52,8 +69,8 @@ export function normalizeSettlementEdge(edge) {
     cost: cost.toString(),
     available: edge.available !== false,
     atomicGroup,
-    settlementWindowMs: edge.settlementWindowMs ?? null,
-    metadata: edge.metadata ?? {},
+    settlementWindowMs,
+    metadata,
   };
 }
 
@@ -141,6 +158,9 @@ export class SettlementGraph {
   analyzeRoute(edgeIds) {
     if (!Array.isArray(edgeIds) || edgeIds.length === 0)
       throw new RangeError("route requires edges");
+    if (new Set(edgeIds).size !== edgeIds.length) {
+      throw new RangeError("route cannot reuse the same settlement edge");
+    }
     const edges = edgeIds.map((edgeId) => {
       const edge = this.edges.get(edgeId);
       if (!edge) throw new Error(`edge not found: ${edgeId}`);
