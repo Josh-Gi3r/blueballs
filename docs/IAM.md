@@ -15,6 +15,28 @@ and are always bound to one tenant.
 Never use a shared unrestricted API key as proof that a particular employee
 approved a treasury action.
 
+### Production bootstrap and credential recovery
+
+A completely fresh production database requires `BANK_BOOTSTRAP_API_KEY` from the
+deployment secret manager. Blueballs creates the first production tenant/admin
+credential and that bootstrap secret should normally be removed after scoped
+machine credentials/IAM have been established.
+
+Revoking every credential does **not** make an existing database “fresh.” On the
+next restart Blueballs refuses to create a second tenant implicitly. Credential
+recovery is explicit:
+
+```text
+BANK_BOOTSTRAP_TENANT_ID=<existing tenant id>
+BANK_BOOTSTRAP_API_KEY=<new high-entropy recovery secret>
+```
+
+The tenant ID must already exist. Recovery attaches the new admin credential to
+that tenant; an unknown ID fails closed. Remove the recovery values again after
+normal credentials have been issued. This prevents an incident-response key
+revocation from silently orphaning money under one tenant while bootstrapping a
+new administrative tenant beside it.
+
 ## Named human actor assertions
 
 An authenticated deployment gateway may attach a short-lived signed human actor
