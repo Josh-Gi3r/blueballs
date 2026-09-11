@@ -44,7 +44,8 @@ Production mode loads one deployment adapter module and keeps the Blueballs API/
 ```bash
 FX_NODE_MODE=production \
 FX_NODE_PRODUCTION_ADAPTER=./deployment/fx-runtime.mjs \
-FX_NODE_API_KEY='replace-with-a-strong-production-key' \
+FX_NODE_API_KEY='replace-with-a-strong-client-execution-key' \
+FX_NODE_OPERATOR_API_KEY='replace-with-a-distinct-strong-finality-key' \
 node apps/fx-node/src/cli.js
 ```
 
@@ -63,7 +64,7 @@ export async function createBlueballsFxProductionRuntime({ env }) {
 }
 ```
 
-Blueballs validates the adapter contract at startup. Production API keys require at least 32 characters, browser CORS defaults to closed, and execution is routed through the supplied adapter rather than changing the FX kernel.
+Blueballs validates the adapter contract at startup. Production client and operator API keys each require at least 32 characters and must be distinct. The client credential can create/reserve/submit market activity; the operator credential alone can record authoritative quote reconciliation, external fiat evidence and final settlement. Browser CORS defaults to closed, and execution is routed through the supplied adapter rather than changing the FX kernel.
 
 See [`spec/fx/ADAPTERS.md`](../../spec/fx/ADAPTERS.md) for the complete provider contract.
 
@@ -94,12 +95,11 @@ The same trade object carries:
 
 ```bash
 curl -X POST http://localhost:8788/v2/fx/reference/trades/preview \
-  -H 'Authorization: Bearer bb_test_local_fx' \
   -H 'content-type: application/json' \
   -d '{"inputAmount":"50000.00"}'
 ```
 
-Preview reads current eligible capacity without reserving it.
+Preview reads current eligible capacity without reserving it and is intentionally public.
 
 ### Reserve
 
@@ -124,6 +124,31 @@ curl -X DELETE \
 ```
 
 Submitted routes enter reconciliation rather than being released back into liquidity.
+
+## Authority boundary
+
+Blueballs separates market/execution authority from finality authority.
+
+Client credential (`FX_NODE_API_KEY`):
+
+```text
+orders
+quotes and reservations
+route reads
+execution submission
+fiat-intent creation / reserve / submit
+```
+
+Operator credential (`FX_NODE_OPERATOR_API_KEY`):
+
+```text
+POST /v2/fx/fiat/attestations
+POST /v2/fx/fiat/intents/:intentId/settle
+POST /v2/fx/ops/quotes/:quoteId/confirmed
+POST /v2/fx/ops/quotes/:quoteId/failed
+```
+
+This keeps a client or integration credential that can submit financial activity from also being able to manufacture authoritative finality.
 
 ## Market scenarios
 
@@ -158,9 +183,11 @@ GET  /v2/fx/reference/settlement-route
 GET  /openapi.yaml
 ```
 
+`GET /health` also returns `source_commit`, giving deploy tooling a direct source-parity check.
+
 ## Monetary engine
 
-The reference composition includes reserve-backed instrument and purpose-bound settlement-receipt models. Reserve assets, outstanding supply, receipts and FX risk capital remain separate accounting categories.
+The reference composition includes reserve-backed instrument and purpose-bound settlement-receipt models. Reserve assets, exact minimum-coverage requirements, outstanding supply, receipt locks and FX risk capital remain separate accounting categories.
 
 ```text
 GET  /v2/fx/reference/monetary/health
@@ -176,7 +203,7 @@ POST /v2/fx/reference/monetary/risk-capital
 GET  /v2/fx/reference/monetary/events
 ```
 
-Pricing and coverage calculations use exact integer arithmetic.
+Pricing, coverage and reserve-allocation calculations use exact integer arithmetic. Receipt allocation can use only reserve above instrument coverage requirements; separately funded risk capital is never counted as issuance backing.
 
 ## Token quote API
 
