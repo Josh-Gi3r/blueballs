@@ -11,7 +11,7 @@ function engineAt(clock = { now: 1_000 }) {
   const engine = new MonetaryEngine({ now: () => clock.now });
   engine.configureInstrument({
     code: "USD",
-    name: "Reference USD-backed stablecoin",
+    name: "USD-backed stablecoin",
     kind: INSTRUMENT_KINDS.STABLECOIN,
     reserveCurrency: "USD",
     decimals: 6,
@@ -76,13 +76,13 @@ test("risk capital remains outside reserve coverage", () => {
   engine.close();
 });
 
-test("obsolete zero-supply reference instruments can be retired but funded instruments cannot", () => {
+test("zero-supply instruments can be retired but funded instruments cannot", () => {
   const engine = engineAt();
   assert.equal(engine.disableInstrument("USD").enabled, false);
   assert.deepEqual(engine.listInstruments(), []);
   engine.configureInstrument({
     code: "USD",
-    name: "Reference USD-backed stablecoin",
+    name: "USD-backed stablecoin",
     kind: INSTRUMENT_KINDS.STABLECOIN,
     reserveCurrency: "USD",
     decimals: 6,
@@ -104,11 +104,55 @@ test("obsolete zero-supply reference instruments can be retired but funded instr
   engine.close();
 });
 
+test("liability terms are immutable while instrument supply is outstanding", () => {
+  const engine = engineAt();
+  const deposit = engine.createReserveDeposit({
+    reserveCurrency: "USD",
+    amount: "100",
+    providerRef: "bank:terms",
+  });
+  engine.settleReserveDeposit(deposit.depositId);
+  engine.mint({
+    instrumentCode: "USD",
+    amount: "50",
+    beneficiaryRef: "wallet:terms",
+  });
+
+  const base = {
+    code: "USD",
+    name: "Renamed USD product",
+    kind: INSTRUMENT_KINDS.STABLECOIN,
+    reserveCurrency: "USD",
+    decimals: 6,
+    minCoverageBps: 10_000,
+    transferable: true,
+    enabled: true,
+  };
+
+  // Display metadata can evolve without changing the liability contract.
+  assert.equal(engine.configureInstrument(base).name, "Renamed USD product");
+
+  for (const mutation of [
+    { reserveCurrency: "EUR" },
+    { decimals: 18 },
+    { minCoverageBps: 11_000 },
+    { transferable: false },
+    { enabled: false },
+    { kind: INSTRUMENT_KINDS.TOKENIZED_DEPOSIT },
+  ]) {
+    assert.throws(
+      () => engine.configureInstrument({ ...base, ...mutation }),
+      { code: "INSTRUMENT_HAS_SUPPLY" },
+    );
+  }
+  engine.close();
+});
+
 test("minimum coverage is enforced with exact ceiling arithmetic", () => {
   const engine = new MonetaryEngine({ now: () => 1_000 });
   engine.configureInstrument({
     code: "EUR",
-    name: "Overcollateralized EUR reference deposit",
+    name: "Overcollateralized EUR deposit",
     kind: INSTRUMENT_KINDS.TOKENIZED_DEPOSIT,
     reserveCurrency: "EUR",
     decimals: 6,
@@ -199,7 +243,7 @@ test("temporary receipts are non-transferable, reserve-backed, expiring and sing
   engine.close();
 });
 
-test("remittance preview uses exact bps decomposition and rejects stale oracle evidence", () => {
+test("remittance preview uses exact bps decomposition and requires fresh independent oracle evidence", () => {
   const oracle = {
     midNumerator: "78",
     midDenominator: "100",
@@ -230,6 +274,7 @@ test("remittance preview uses exact bps decomposition and rejects stale oracle e
   assert.equal(preview.output.amount, "7788300");
   assert.equal(preview.cost.outputAmount, "11700");
   assert.deepEqual(preview.oracle.sourceIds, oracle.sourceIds);
+
   assert.throws(
     () =>
       previewRemittance({
@@ -241,5 +286,29 @@ test("remittance preview uses exact bps decomposition and rejects stale oracle e
         now: 1_100,
       }),
     { code: "ORACLE_STALE" },
+  );
+  assert.throws(
+    () =>
+      previewRemittance({
+        inputAmount: "1",
+        inputCurrency: "BRL",
+        outputCurrency: "EUR",
+        oracle: { ...oracle, observedAt: 1_001 },
+        bps: {},
+        now: 1_000,
+      }),
+    { code: "ORACLE_FUTURE" },
+  );
+  assert.throws(
+    () =>
+      previewRemittance({
+        inputAmount: "1",
+        inputCurrency: "BRL",
+        outputCurrency: "EUR",
+        oracle: { ...oracle, sourceIds: ["bank-a", " bank-a "] },
+        bps: {},
+        now: 1_000,
+      }),
+    { code: "VALIDATION_ERROR" },
   );
 });
