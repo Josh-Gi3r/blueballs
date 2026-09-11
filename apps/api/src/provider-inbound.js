@@ -33,13 +33,12 @@ function fingerprint(body) {
 }
 
 function settlementKey(body) {
-  // Provider references are required to identify one final external settlement.
-  // A gateway with several upstream providers should supply a stable `source` so
-  // references that are only unique inside one provider namespace do not collide.
+  // One upstream provider settlement is one financial fact regardless of which
+  // Blueballs resource/event type a gateway tries to map it onto. `source`
+  // namespaces providers whose reference spaces may legitimately overlap.
   return sha256(
     canonicalProviderInboundBody({
       source: body.source ?? "default",
-      type: body.type,
       provider_reference: body.provider_reference,
     }),
   );
@@ -113,11 +112,11 @@ function compactRecord({
 function priorProviderSettlement(inboundEvents, body, externalSettlementKey) {
   for (const prior of inboundEvents.values()) {
     // New records carry a hashed canonical namespace key. The fallback preserves
-    // protection for pre-key records created by an earlier pre-1.0 binary.
+    // protection for pre-key records created by an earlier pre-1.0 binary while
+    // applying the stronger cross-event-type provider-reference identity.
     const same = prior.settlement_key
       ? prior.settlement_key === externalSettlementKey
-      : prior.type === body.type &&
-        String(prior.provider_reference) === String(body.provider_reference) &&
+      : String(prior.provider_reference) === String(body.provider_reference) &&
         String(prior.source ?? "default") === String(body.source ?? "default");
     if (same) return prior;
   }
@@ -135,9 +134,6 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
     );
   }
 
-  // The generic operator credential protects the private route. The dedicated
-  // provider signature protects the financial evidence itself, giving inbound
-  // money two independent deployment-owned authentication controls.
   verifyProviderInboundBody(body);
 
   const eventId = String(required(body, "event_id"));
@@ -160,6 +156,14 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
   const tenantId = String(required(body, "tenant_id"));
   const resourceId = String(required(body, "resource_id"));
   const providerReference = String(required(body, "provider_reference"));
+  const source = String(body.source ?? "default").trim();
+  if (!/^[A-Za-z0-9._:-]{1,200}$/.test(source)) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      "source must be 1-200 characters using letters, digits, dot, underscore, colon or hyphen",
+    );
+  }
   const providerState = String(body.provider_state ?? "settled").toLowerCase();
   if (providerState !== "settled") {
     throw new ApiError(
@@ -175,15 +179,13 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
     resource_id: resourceId,
     provider_reference: providerReference,
     provider_state: "settled",
+    source,
   };
 
   if (!db.tenants.has(tenantId)) {
     throw new ApiError("not-found", 404, `No tenant ${tenantId}`);
   }
 
-  // Authentication metadata is intentionally excluded from the evidence
-  // fingerprint. The provider-state default is normalized before hashing too, so
-  // omitted `provider_state` and explicit `settled` are the same durable fact.
   const hash = fingerprint(body);
   const prior = inboundEvents.get(eventId);
   if (prior) {
@@ -197,10 +199,6 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
     return { ...prior, replayed: true };
   }
 
-  // Event IDs are transport replay identities. Provider reference identity is a
-  // second, independent money-safety boundary: one settled upstream movement may
-  // not be credited twice merely because a buggy gateway assigned a fresh event
-  // ID on retry.
   const externalSettlementKey = settlementKey(body);
   const priorSettlement = priorProviderSettlement(
     inboundEvents,
@@ -211,7 +209,7 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
     throw new ApiError(
       "conflict",
       409,
-      `Provider settlement ${providerReference} was already applied as event ${priorSettlement.id}`,
+      `Provider settlement ${providerReference} from ${source} was already applied as event ${priorSettlement.id}`,
     );
   }
 
