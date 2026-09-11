@@ -44,6 +44,7 @@ import { ensureProductionBootstrap } from "./production-bootstrap.js";
 import { queueProviderOperation } from "./provider-outbox.js";
 import { prepareProductionProviderIntent } from "./production-provider-intents.js";
 import { applyProviderInboundEvent } from "./provider-inbound.js";
+import { trustedActorFromRequest } from "./trusted-actor.js";
 import {
   bankingFlag,
   bankingRuntimeEnvironment,
@@ -228,15 +229,31 @@ export const route = (method, pattern, handler, opts = {}) => {
   const successStatus = opts.created ? 201 : 200;
 
   const publicHandler = async (ctx) => {
+    const path = ctx.url?.pathname ?? pattern;
+    const actor =
+      ctx.key && access !== "PUBLIC"
+        ? trustedActorFromRequest({
+            req: ctx.req,
+            key: ctx.key,
+            method,
+            path,
+          })
+        : null;
+    ctx.actor = actor;
+
     if (currentCommandId()) {
       setCommandContext({
         operation: key,
         method,
-        path: ctx.url?.pathname ?? pattern,
+        path,
         access,
         tenant_id: ctx.key?.tenant_id ?? null,
-        actor_id: ctx.key?.id ?? null,
-        actor_scope: ctx.key?.scope ?? (access === "PUBLIC" ? "public" : null),
+        actor_id: actor?.subject ?? ctx.key?.id ?? null,
+        // Preserve the machine credential identity in the audit scope when a
+        // deployment IAM gateway asserts a named human actor.
+        actor_scope: actor
+          ? `human:${actor.assurance};credential:${ctx.key.id}`
+          : (ctx.key?.scope ?? (access === "PUBLIC" ? "public" : null)),
         source_hash: auditSourceHash(ctx.req),
         audit: access !== "PUBLIC" || method !== "GET",
       });
@@ -340,7 +357,8 @@ export const route = (method, pattern, handler, opts = {}) => {
 
 // Private provider callback surface. It is intentionally outside /v2 and the
 // public OpenAPI catalogue. Deployments expose it only to their trusted provider
-// gateway/service network and authenticate it with the operator credential.
+// gateway/service network and authenticate it with the operator credential plus
+// the provider-specific HMAC evidence verified by provider-inbound.js.
 const providerInboundEvents = collection("providerInboundEvents");
 route(
   "POST",
