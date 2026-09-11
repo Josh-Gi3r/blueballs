@@ -11,11 +11,23 @@ The canonical node supports a deployment adapter directly:
 ```bash
 FX_NODE_MODE=production \
 FX_NODE_PRODUCTION_ADAPTER=@institution/blueballs-fx-runtime \
-FX_NODE_API_KEY='32-or-more-characters' \
+FX_NODE_API_KEY='32-or-more-character-client-key' \
+FX_NODE_OPERATOR_API_KEY='different-32-or-more-character-operator-key' \
 node apps/fx-node/src/cli.js
 ```
 
 The adapter supplies market/liquidity, quote persistence/lifecycle, fiat evidence and execution. Blueballs validates the complete runtime contract before opening the listener.
+
+Production uses two distinct authority domains:
+
+```text
+client key     order admission, reservation, quote reads, execution submission,
+               fiat-intent creation/reserve/submit
+
+operator key   quote confirmation/failure, fiat attestations, final fiat settlement
+```
+
+Both production secrets require at least 32 characters and must be distinct. This prevents an integration credential that can submit financial activity from also declaring its final outcome.
 
 See [`ADAPTERS.md`](ADAPTERS.md).
 
@@ -32,6 +44,8 @@ Blueballs accepts multiple provider-neutral liquidity classes behind the same ex
 - external venues through deployment adapters.
 
 Each source publishes exact rational economics, available capacity, expiry and policy authority. The router admits only eligible capacity and returns a firm quote only after every selected leg reserves.
+
+Firm static/institutional reservations lock the selected source identity and economics until release, failure or confirmation. Operational availability can still change and will block submission, but a source cannot mutate the economic terms underneath a firm reservation.
 
 ## 3. Connect execution
 
@@ -63,6 +77,8 @@ ISSUER_REDEEM           ASYNC_EXTERNAL
 
 The customer transaction remains one coordinated lifecycle while operators retain exact evidence for every settlement edge.
 
+Canonical reconciliation event IDs are route-and-outcome bound. A confirmation or failure event cannot be replayed across a different route or reused as the opposite outcome.
+
 ## 5. Configure participant policy
 
 `FxPolicyEngine` consumes:
@@ -73,9 +89,11 @@ The customer transaction remains one coordinated lifecycle while operators retai
 - account attribution;
 - permitted assets/corridors;
 - ticket limits;
-- institution policy version.
+- institution policy identity/version/content.
 
-The engine issues short-lived transaction authority bound to those facts. Participant changes or policy-version changes invalidate stale authority automatically.
+The engine issues short-lived transaction authority bound to those facts and the effective policy decision snapshot. Participant or credential changes and any effective policy change invalidate stale authority automatically.
+
+For on-chain AtomicRouter execution, institution authorization is bound to the exact router-domain intent constraints rather than functioning as a transferable bearer hash.
 
 ## 6. Connect price/reference controls
 
@@ -91,22 +109,37 @@ Institutions can layer their own portfolio/risk models on top of the canonical r
 
 Fiat settlement uses explicit intents and evidence rather than being treated as token finality.
 
-Provider adapters supply payment identity, amount/currency, payer/payee reference hashes, settled time, verifier identity, proof reference and final state. Blueballs enforces replay protection and retains evidence for reconciliation.
+Provider adapters supply payment identity, amount/currency, payer/payee reference hashes, settled time, verifier identity, proof reference and final state. Blueballs enforces provider/payment replay protection, rejects evidence claiming future settlement/issuance, and retains evidence for reconciliation.
 
-## 9. Configure custody / key authority
+Only the operator credential can inject authoritative fiat attestations or settle a verified fiat intent through the HTTP surface.
+
+## 9. Configure reserve-backed monetary products
+
+Where the reference monetary engine is used as an implementation model, keep one atomic precision per shared reserve currency and preserve three separate quantities:
+
+```text
+settled reserve
+minimum reserve required by outstanding instrument coverage
+active purpose-bound receipt locks
+```
+
+Free reserve is the remainder after both coverage and receipt locks. FX risk capital is separately funded and is never counted as issuance reserve.
+
+## 10. Configure custody / key authority
 
 The Solidity and provider execution paths are designed around explicit authority:
 
 - EIP-712 maker orders;
 - EIP-712 taker intents;
 - ERC-1271 contract-wallet signatures;
-- institution policy authorization;
+- exact institution policy authorization;
 - nonce and cancellation replay controls;
-- segregated pre-funded vault accounting.
+- segregated pre-funded vault accounting;
+- reentrancy-protected physical token transfer paths.
 
 Deployments can use institution multisig, HSM/MPC/key-custody policy and signer governance appropriate to their operating model.
 
-## 10. Choose persistence and HA topology
+## 11. Choose persistence and HA topology
 
 The self-hosted reference topology uses transactional SQLite/WAL. Cloudflare uses SQLite Durable Objects.
 
@@ -114,7 +147,7 @@ Scale-out keeps one authoritative writer per shard and expands through instituti
 
 See [`../../docs/SCALING.md`](../../docs/SCALING.md) and [`../../docs/PRODUCTION-OPERATIONS.md`](../../docs/PRODUCTION-OPERATIONS.md).
 
-## 11. Run adapter conformance
+## 12. Run adapter conformance
 
 Every production adapter should prove the same core properties:
 
@@ -124,12 +157,13 @@ Every production adapter should prove the same core properties:
 - partial-reservation rollback;
 - expiry/policy revocation;
 - submission ambiguity;
-- confirmation/failure replay;
+- route/outcome-bound confirmation and failure replay;
+- client/operator credential separation;
 - secret/private-data boundaries.
 
 The canonical production-runtime loader is tested in `apps/fx-node/test/production-runtime.test.js` and provider implementations can reuse the node/package suites.
 
-## 12. Run the release profile
+## 13. Run the release profile
 
 From the exact deployment candidate:
 
@@ -142,7 +176,7 @@ The release profile covers banking/FX contracts, Workers, Foundry unit/fuzz/inva
 
 The resulting artifacts bind the evidence to the exact source commit, Git tree and lockfile.
 
-## 13. Operate from canonical evidence
+## 14. Operate from canonical evidence
 
 Production operations should monitor:
 
@@ -151,13 +185,14 @@ Production operations should monitor:
 - quote/reservation age;
 - provider latency/finality;
 - treasury/principal exposure;
+- reserve coverage and receipt locks where monetary instruments are enabled;
 - aggregate balances/control totals;
 - webhook backlog;
 - readiness and financial command failures.
 
 Blueballs exposes the state required to reconcile financial outcomes rather than synthesizing success when a provider or network is ambiguous.
 
-## 14. Extend only through canonical contracts
+## 15. Extend only through canonical contracts
 
 New FX economics, policy, risk, liquidity and settlement behavior belongs in `apps/fx-node`, `packages/fx-*` and `spec/fx`.
 
