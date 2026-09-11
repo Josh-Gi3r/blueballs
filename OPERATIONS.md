@@ -1,7 +1,12 @@
 # Operations Guide
 
-This guide operates the reference stack. Production deployment requires an
-institution-specific security, availability, compliance and recovery design.
+Blueballs core targets production-grade financial operation. A deployment still
+supplies its licences, regulated providers, infrastructure security, jurisdictional
+controls and operating organisation, but the core ships explicit readiness,
+reconciliation, backup/restore and release-evidence contracts.
+
+For the detailed production SRE/DR runbook, RPO/RTO targets, metrics and key
+rotation procedures, see [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## Local stack
 
@@ -14,60 +19,68 @@ pnpm dev
 | Service | Default | Health or entry point |
 | --- | --- | --- |
 | Site | `http://localhost:5280` | `/` |
-| Banking API | `http://localhost:5290` | `/v2` |
+| Banking API | `http://localhost:5290` | `/v2`, `/v2/_health`, `/v2/_ready` |
 | Canonical FX node | `http://127.0.0.1:8788` | `/health` |
 
-The development launcher stops the other processes if one exits. The local FX
-credential is a browser-safe test value; never reuse it outside the reference
-sandbox.
+The development launcher stops the other processes if one exits. Local/test
+credentials are fixtures only; never reuse them outside an isolated sandbox.
 
-## Configuration
+## Banking runtime configuration
 
 Start from [`.env.example`](.env.example). Important boundaries:
 
 - `DB_PATH` chooses the Node banking SQLite file.
+- `BANK_API_MODE=production` disables sandbox-only money/KYC/card shortcuts.
+- `BANK_BOOTSTRAP_*` performs controlled first-tenant/key bootstrap on a fresh
+  production database.
 - `RATE_LIMIT_PER_MIN`, `SOURCE_RATE_LIMIT_PER_MIN` and
   `TENANT_RATE_LIMIT_PER_MIN` bound API traffic.
 - `BODY_LIMIT_BYTES`, `CORS_ORIGINS` and `TRUST_PROXY` control request ingress.
-- `OPERATOR_API_KEY_HASH` protects operator-class banking routes.
+- `OPERATOR_API_KEY_HASH` protects operator-class routes.
 - `IDEMPOTENCY_TTL_MS` controls replay-record retention.
+- `BANK_PROVIDER_GATEWAY_URL` + `BANK_PROVIDER_GATEWAY_TOKEN` configure the
+  provider-neutral production adapter boundary.
+- `BANK_PROVIDER_PAYLOAD_KEY(S)` encrypt durable provider payloads before they are
+  persisted.
+- `BANK_PROVIDER_INBOUND_SECRET` signs canonical provider-originated settled
+  financial facts independently of the operator credential.
 - `WEBHOOK_DELIVERY_MODE=disabled` is the safe default. `allowlist` additionally
-  requires `WEBHOOK_ALLOWED_HOSTS`; only exact HTTPS hosts are accepted.
-- `FX_NODE_MODE`, `FX_NODE_HOST`, `FX_NODE_PORT`, `FX_NODE_API_KEY`,
-  `FX_NODE_DATA_DIR` and `FX_NODE_CORS_ORIGINS` configure the canonical FX node.
-- `FX_NODE_API_KEY` protects FX scenario, reservation, release and execution
-  mutations in the Node reference. The Cloudflare equivalent is the secret
-  `FX_API_KEY`. Never put a production value in a `VITE_*` variable.
+  requires `WEBHOOK_ALLOWED_HOSTS`; redirects are never followed.
 
-Secrets belong in the deployment secret store, not JSON configuration, Compose
-files, browser bundles or source control.
+Production secrets belong in a deployment secret manager, not JSON, Compose,
+browser bundles, source control or a committed `.env` file.
 
-The full local launcher deliberately passes its test-only `FX_NODE_API_KEY` to
-the Vite demonstrator. That convenience is acceptable only for the isolated
-reference sandbox; a real operator credential must never be browser-readable.
-`pnpm dev` loads a root `.env` when present. Commands that start an individual
-Node service do not; export the variables first or invoke Node with
-`--env-file=.env`.
+## Health, readiness and operational metrics
+
+Use:
+
+```text
+GET /v2/_health       public liveness
+GET /v2/_ready        public dependency readiness
+GET /v2/_ops/metrics  operator-authenticated operational aggregates
+```
+
+In production, readiness fails closed if required provider transport, provider
+payload encryption or signed provider-inbound authentication is missing.
+
+The operator metrics surface includes aggregate resource/balance controls,
+provider attempt/outbox/reconciliation state, webhook backlog, command failures
+and idempotency replay counts. It never exposes provider payloads or customer
+identity fields.
 
 ## Cloudflare reference deployment
 
 The three configurations are deliberately separate:
 
-- `wrangler.api.jsonc`: banking Worker and `BANK_API` Durable Object;
+- `wrangler.api.jsonc`: banking Worker and `BANK_API` SQLite Durable Object;
 - `wrangler.fx.jsonc`: FX Worker and `FX_API` Durable Object;
 - `wrangler.jsonc`: public site, assets, domain and service bindings.
 
-Run the entire Cloudflare topology locally with one command:
+Run the Cloudflare topology locally with:
 
 ```bash
 pnpm preview:cloudflare
 ```
-
-This starts the site on `http://localhost:5380`, banking on `:5381` and FX on
-`:5382`. The site reports both service bindings as connected. The development
-orchestrator supplies `LOCAL_DEV=true` so production TLS canonicalisation does
-not redirect localhost to itself, and uses `bb_test_local_fx` unless a local
-`FX_API_KEY` is provided. No value is written to a tracked file.
 
 Validate bundles without deployment:
 
@@ -78,33 +91,34 @@ pnpm exec wrangler deploy --dry-run --config wrangler.fx.jsonc
 pnpm exec wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-### Deploy from a commit, never from a working tree
+### Deploy an exact release commit
 
 ```bash
 git status --porcelain    # must be empty
-git rev-parse HEAD        # this is the deployment
-pnpm verify               # must print "All checks green."
+git rev-parse HEAD        # release identity
+pnpm verify               # complete local release proof
 pnpm deploy:cloudflare
 ```
 
-Record the deployed commit in the release notes. Do not deploy from an
-uncommitted working tree.
+Targeted deploy commands use the same release verification guard. APIs should be
+deployed before the public site so service bindings resolve. Record the deployed
+SHA and retain the hosted Production Gate result for the same SHA.
 
 Set Worker secrets out of band, for example:
 
 ```bash
 pnpm exec wrangler secret put FX_API_KEY --config wrangler.fx.jsonc
+pnpm exec wrangler secret put BANK_PROVIDER_GATEWAY_TOKEN --config wrangler.api.jsonc
+pnpm exec wrangler secret put BANK_PROVIDER_PAYLOAD_KEY --config wrangler.api.jsonc
+pnpm exec wrangler secret put BANK_PROVIDER_INBOUND_SECRET --config wrangler.api.jsonc
 ```
 
-Deploy APIs before the site so its service bindings resolve. Durable Object
-migrations are append-only: add a new migration tag for a schema/class change;
-never rewrite an already deployed migration. The current hosted banking sandbox
-uses disposable reference data, so a deliberate namespace/schema cutover is
-preferable to inventing tenant ownership for legacy rows.
+Durable Object class migrations and application-data banking migrations are two
+different layers. Both are append-only. Never rewrite a deployed migration.
 
-Logs are enabled in all three Wrangler configurations. Treat logs as potentially
-sensitive: avoid request bodies, credentials and customer data, and set
-retention/access controls in the owning Cloudflare account.
+Logs are potentially sensitive. Do not log bodies, credentials, PAN data, KYC
+documents or decrypted provider payloads; configure retention/access controls in
+the owning infrastructure.
 
 ## Docker reference stack
 
@@ -113,10 +127,8 @@ docker compose -f compose.reference.yml up --build
 docker compose -f compose.reference.yml ps
 ```
 
-The Compose file builds one reference image and runs the site, banking API and
-FX node. FX state persists in the `fx-data` volume. Banking persistence must be
-explicitly mounted and backed up before any non-disposable use; the supplied
-Compose topology is an evaluation stack, not an HA deployment.
+The Compose topology is a reference deployment, not a multi-writer HA design.
+Do not place independent writable SQLite replicas behind a load balancer.
 
 Stop without deleting data:
 
@@ -124,33 +136,85 @@ Stop without deleting data:
 docker compose -f compose.reference.yml down
 ```
 
-`down -v` deletes the named FX volume and is intentionally destructive.
+`down -v` deletes named volumes and is intentionally destructive.
 
-## Backup and recovery
+## Verified Node/SQLite backup
 
-For Node references, stop writers or use a SQLite-consistent backup mechanism,
-then back up the banking database and the complete `FX_NODE_DATA_DIR`. Restore
-into a new environment, start the same source commit and verify accounts,
-balanced ledger entries, FX policy, reservations and settlement state before
-routing traffic.
+Blueballs ships a consistent online SQLite snapshot command:
 
-For Durable Objects, define an account-level export/backup and restore exercise
-before production use. This repository does not claim cross-region HA or provide
-a one-command production recovery workflow.
+```bash
+pnpm backup:banking -- --db /var/lib/blueballs/blueballs.sqlite \
+  --out /backups/blueballs-$(date -u +%Y%m%dT%H%M%SZ).sqlite
+```
+
+It uses a WAL-safe SQLite snapshot, verifies `PRAGMA integrity_check`, and verifies
+that the backup carries the current Blueballs banking migration version. A failed
+verification removes the invalid snapshot rather than presenting it as a backup.
+
+Backups must be encrypted and copied outside the primary failure domain.
+
+## Verified restore
+
+Fence/stop the target writer before restore:
+
+```bash
+pnpm restore:banking -- --backup /backups/blueballs-....sqlite \
+  --db /var/lib/blueballs/blueballs.sqlite --force
+```
+
+The restore validates the source snapshot, copies to a temporary destination,
+validates the copy again and atomically renames it into place.
+
+After restore, do **not** immediately reopen traffic. Check `_ready`, release SHA,
+schema version, aggregate balances and all provider/webhook reconciliation state.
+External provider side effects that occurred after the snapshot are not rolled
+back with SQLite and must be reconciled explicitly.
+
+## Provider operations
+
+Outbound production work uses a durable provider outbox with stable job-level
+idempotency, attempt leases and explicit reconciliation. See:
+
+- [`docs/PROVIDER-GATEWAY.md`](docs/PROVIDER-GATEWAY.md)
+- [`docs/PROVIDER-CONFORMANCE.md`](docs/PROVIDER-CONFORMANCE.md)
+- [`docs/PROVIDER-INBOUND.md`](docs/PROVIDER-INBOUND.md)
+
+Provider-originated settled credits/deposits require both the private operator
+credential and a dedicated HMAC signature. `event_id` is the durable financial
+idempotency identity.
+
+## Security/release gate
+
+The hosted Production Gate includes:
+
+- frozen dependency install;
+- build/contracts/static drift gates;
+- 181-operation banking proof;
+- Cloudflare Worker runtime/eviction tests;
+- FX packages/SDK;
+- Foundry build/fuzz/invariants;
+- container and Compose validation;
+- tracked-secret scanning;
+- high/critical production dependency audit;
+- CodeQL JavaScript/TypeScript analysis.
+
+Repository-local `pnpm verify` remains a separate required exact-checkout release
+proof. Hosted CI does not replace local release evidence and vice versa.
 
 ## Deployment and rollback
 
-1. Choose one clean candidate commit and run [`TESTING.md`](TESTING.md).
-2. Build both Docker images and run the Compose health checks on a machine with
-   a Docker daemon.
-3. Review generated OpenAPI, SDK package, SBOM, screenshots, production
-   checklist and release boundaries.
-4. Deploy to an isolated preview and exercise the banking quickstart plus FX
-   preview/operator boundaries.
-5. Promote the unchanged artefact. If health, ownership, balances or reservation
-   invariants fail, stop traffic and restore the previous artefact and its
-   compatible data snapshot.
+1. Choose one clean candidate commit.
+2. Run `pnpm install --frozen-lockfile` on Node 24.15.x.
+3. Run `pnpm verify` and retain output.
+4. Require the hosted `Production gate` to be green for the same SHA.
+5. Retain API operation coverage, OpenAPI/SDK proof, SBOM, Foundry results,
+   container digest and migration version.
+6. Deploy to isolated preview/staging and exercise provider reconciliation and
+   banking/FX smoke flows.
+7. Promote the unchanged artifact.
+8. If health/readiness, balances, ownership or provider finality invariants fail,
+   stop traffic and follow the recovery/reconciliation runbook.
 
 Never roll application code backward across an incompatible data migration
-without a tested data rollback. See [`RELEASE.md`](RELEASE.md) for tagging and
-release artifacts.
+without a tested data plan. See [`RELEASE.md`](RELEASE.md) and
+[`PRODUCTION-HARDENING.md`](PRODUCTION-HARDENING.md).
