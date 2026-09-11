@@ -9,7 +9,11 @@
  */
 
 const IDENTIFIER = /^[a-z][a-z0-9_-]{0,63}$/;
-const MIGRATION_NAME = /^[a-z][a-z0-9_]{0,95}$/;
+// Released banking migrations already use stable kebab-case names while package
+// migrations may use snake_case. Both forms are immutable once applied, so the
+// runner accepts the shared lowercase identifier alphabet rather than forcing a
+// rename that would invalidate existing migration history.
+const MIGRATION_NAME = /^[a-z][a-z0-9_-]{0,95}$/;
 
 function assertComponent(component) {
   if (!IDENTIFIER.test(component)) {
@@ -33,7 +37,7 @@ function normalizeMigrations(migrations) {
     }
     if (typeof migration.name !== "string" || !MIGRATION_NAME.test(migration.name)) {
       throw new TypeError(
-        `migration ${migration.version} needs a stable lowercase snake_case name`,
+        `migration ${migration.version} needs a stable lowercase name using letters, digits, _ or -`,
       );
     }
     if (typeof migration.up !== "function") {
