@@ -36,8 +36,9 @@ The architecture starts from financial invariants rather than UI flows: exact mo
 - **Scoped machine credentials and named-human attribution** with request-bound signed actor assertions for IAM/BFF integrations.
 - **Policy-aware FX engine** for private orders, institutional liquidity, treasury/principal capacity, exact pricing, route construction and reservation.
 - **Adapter-driven production FX runtime** for institution-owned liquidity, fiat evidence and execution providers.
+- **Separated FX execution and finality authority** so client/integration credentials can submit activity without being able to manufacture authoritative reconciliation or fiat settlement evidence.
 - **Blueballs AtomicRouter contracts** for institution-authorized signed taker intent, maker-signed liquidity, cancellation, segregated vault accounting and atomic token settlement.
-- **Reference monetary engine** for reserve-backed instruments, settlement receipts and coverage accounting.
+- **Reference monetary engine** for reserve-backed instruments, exact minimum-coverage accounting, settlement receipts and isolated risk capital.
 - **Sandbox Builder and product interfaces** for designing and exercising tenant-isolated financial products.
 - **Node.js/SQLite and Cloudflare Workers/Durable Objects runtimes** using the same banking contracts.
 - **OpenAPI, SDK and conformance contracts** generated and checked against runtime behaviour.
@@ -123,11 +124,12 @@ FX production composition is equally adapter-driven:
 ```bash
 FX_NODE_MODE=production \
 FX_NODE_PRODUCTION_ADAPTER=@institution/blueballs-fx-runtime \
-FX_NODE_API_KEY='32-or-more-characters' \
+FX_NODE_API_KEY='32-or-more-character-client-key' \
+FX_NODE_OPERATOR_API_KEY='different-32-or-more-character-operator-key' \
 node apps/fx-node/src/cli.js
 ```
 
-The deployment adapter supplies live market/liquidity, quote lifecycle, fiat evidence and execution while Blueballs retains the canonical policy, routing and finality contract.
+The deployment adapter supplies live market/liquidity, quote lifecycle, fiat evidence and execution while Blueballs retains the canonical policy, routing and finality contract. Production keeps execution submission and authoritative reconciliation in separate credential domains: the client key creates/reserves/submits activity; the operator key records quote finality and external fiat evidence.
 
 ## Financial invariants
 
@@ -141,8 +143,11 @@ The deployment adapter supplies live market/liquidity, quote lifecycle, fiat evi
 - Provider transport evidence and business finality must agree before money becomes final.
 - Inbound provider settlements require independent signed evidence and replay protection.
 - FX liquidity passes policy before competing on price.
-- A firm FX quote exists only after selected capacity is reserved.
+- A firm FX quote exists only after selected capacity is reserved and its selected economics are protected through submission.
 - Submitted FX routes remain in explicit settlement/reconciliation state until final evidence arrives.
+- FX finality events are route-and-outcome bound; one event cannot be reused for a different route or opposite result.
+- Client execution credentials cannot call operator-only finality/evidence endpoints in production.
+- Reserve-backed monetary instruments preserve exact minimum coverage before any purpose-bound receipt can lock or consume reserve; FX risk capital never counts as issuance backing.
 - Token atomicity is scoped to the actual AtomicRouter transaction; external fiat/provider edges retain their own finality.
 
 ## Verification
