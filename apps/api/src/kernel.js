@@ -46,6 +46,7 @@ import { queueProviderOperation } from "./provider-outbox.js";
 import { prepareProductionProviderIntent } from "./production-provider-intents.js";
 import { applyProviderInboundEvent } from "./provider-inbound.js";
 import { trustedActorFromRequest } from "./trusted-actor.js";
+import { assertResourceLifecycle } from "./resource-lifecycle.js";
 import {
   bankingFlag,
   bankingRuntimeEnvironment,
@@ -288,6 +289,7 @@ export const route = (method, pattern, handler, opts = {}) => {
 
     validateQueryParameters(method, pattern, ctx.url);
     validateRequestBody(method, pattern, ctx.body ?? {});
+    if (ctx.key) assertResourceLifecycle({ method, pattern, ctx, db });
 
     const requestedChildPermissions =
       method === "POST" && pattern === "/v2/keys" && ctx.key
