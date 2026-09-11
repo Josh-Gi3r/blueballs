@@ -121,6 +121,13 @@ test("production wallets use custody provisioning, signed idempotent inbound dep
   });
   assert.equal(customer.status, 201);
 
+  const account = await api.request("POST", "/v2/accounts", {
+    key: BOOTSTRAP_KEY,
+    body: { customer: customer.body.id, currency: "USDC" },
+  });
+  assert.equal(account.status, 201);
+  assert.equal(account.body.balance.amount, "0.00");
+
   const wallet = await api.request("POST", "/v2/wallets", {
     key: BOOTSTRAP_KEY,
     body: {
@@ -189,6 +196,32 @@ test("production wallets use custody provisioning, signed idempotent inbound dep
     key: BOOTSTRAP_KEY,
   });
   assert.equal(funded.body.balance.amount, "100.00");
+
+  // Provider settlement identity is provider/source scoped, not event-type scoped.
+  // The same upstream movement cannot be applied again as an account credit under
+  // a fresh transport event ID after it already funded the custody wallet.
+  const crossTypeReplay = await api.request("POST", "/internal/provider/events", {
+    key: OPERATOR_KEY,
+    body: signedInbound({
+      event_id: "account-credit-reuses-custody-settlement",
+      tenant_id: tenantId,
+      type: "payments.account_credit_settled",
+      resource_id: account.body.id,
+      amount: { amount: "100.00", currency: "USDC" },
+      rail: "provider",
+      provider_reference: depositEvidence.provider_reference,
+      provider_state: "settled",
+    }),
+  });
+  assert.equal(crossTypeReplay.status, 409);
+  assert.match(crossTypeReplay.body.detail, /already applied/);
+
+  const untouchedAccount = await api.request(
+    "GET",
+    `/v2/accounts/${account.body.id}`,
+    { key: BOOTSTRAP_KEY },
+  );
+  assert.equal(untouchedAccount.body.balance.amount, "0.00");
 
   const send = await api.request("POST", `/v2/wallets/${wallet.body.id}/send`, {
     key: BOOTSTRAP_KEY,
