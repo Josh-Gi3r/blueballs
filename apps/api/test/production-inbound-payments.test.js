@@ -69,6 +69,22 @@ test("settled provider account credits are exact, tenant-bound, signed and repla
   });
   assert.equal(balance.body.balance.amount, "125.37");
 
+  // Transport event IDs are not enough for money idempotency. The same settled
+  // upstream movement under a fresh event ID must not be credited twice.
+  const duplicateProviderReference = await api.request(
+    "POST",
+    "/internal/provider/events",
+    {
+      key: OPERATOR_KEY,
+      body: signed({
+        ...evidence,
+        event_id: "account-credit-new-event-id",
+      }),
+    },
+  );
+  assert.equal(duplicateProviderReference.status, 409);
+  assert.match(duplicateProviderReference.body.detail, /already applied/);
+
   const notFinal = await api.request("POST", "/internal/provider/events", {
     key: OPERATOR_KEY,
     body: signed({
@@ -109,6 +125,7 @@ test("settled provider account credits are exact, tenant-bound, signed and repla
       ...evidence,
       event_id: "account-credit-000002",
       amount: { amount: "1.00", currency: "USD" },
+      provider_reference: "bank-credit-wrong-currency",
     }),
   });
   assert.equal(wrongCurrency.status, 400);
@@ -119,6 +136,7 @@ test("settled provider account credits are exact, tenant-bound, signed and repla
       ...evidence,
       event_id: "account-credit-000003",
       tenant_id: "ten_not_this_institution",
+      provider_reference: "bank-credit-unknown-tenant",
     }),
   });
   assert.equal(unknownTenant.status, 404);
