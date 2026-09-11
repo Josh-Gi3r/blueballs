@@ -1,22 +1,18 @@
 # FX page source map
 
 `../FxPage.tsx` is the public `/fx` entry point and renders `FinalFxPage.tsx`.
-That is the only maintained FX page.
+That is the maintained Blueballs FX product page.
 
-The page is split by responsibility:
+The route is split by responsibility:
 
-- `FinalFxPage.tsx` owns state and composes the page;
-- `FinalFxSectionsA.tsx`, `FinalFxSectionsB.tsx`, and `FinalFxSectionsC.tsx`
-  render the product, market, settlement, treasury, lab, and evidence sections;
-- `final-fx-definitions.ts`, `final-fx-engine.ts`, and
-  `final-fx-scenarios.ts` define the website simulation;
-- `FxProductBuilder.tsx` presents the builder-facing configuration surface;
-- the remaining CSS files support only this route.
+- `FinalFxPage.tsx` owns interactive market state and page composition;
+- `FinalFxSectionsA.tsx`, `FinalFxSectionsB.tsx`, and `FinalFxSectionsC.tsx` render the market, routing, privacy, settlement, treasury, scenario and inspector surfaces;
+- `final-fx-definitions.ts`, `final-fx-engine.ts`, and `final-fx-scenarios.ts` provide the deterministic architecture-lab model;
+- `FxProductBuilder.tsx` exposes the builder-facing configuration surface;
+- the remaining CSS files support this route.
 
-The website is a simulation. Runtime FX behavior lives in `apps/fx-node` and
-the `packages/fx-*` modules. Product controls must not be described as live
-pricing, executable liquidity, or settlement evidence unless they are wired to
-that runtime and the response proves those properties.
+The interactive page is designed to make the Blueballs FX architecture visible: policy, source eligibility, exact pricing, reservation, execution planes, treasury controls and mixed finality. Canonical server-side execution lives in `apps/fx-node` and `packages/fx-*`, including adapter-driven production composition.
 
-Superseded page versions are available in Git history rather than duplicated in
-the source tree.
+Market data presented by the architecture lab remains deterministic unless the page is explicitly wired to the runtime/provider data source. Keep that provenance clear while leading the public experience with implemented capabilities rather than internal development status.
+
+Superseded page versions live in Git history rather than parallel source trees.

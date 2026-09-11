@@ -1,6 +1,6 @@
-# Blueballs FX Contracts - Deployment
+# Blueballs FX Contracts — Deployment
 
-This document covers the FX-1 settlement kernel. It does not turn a deployment into a regulated or production-ready financial service.
+This guide covers deployment of the Blueballs atomic token-settlement kernel.
 
 ## Contracts
 
@@ -12,19 +12,21 @@ FxSettlement
 AtomicRouter
 ```
 
+Together they provide segregated token accounting, maker/taker authority, institution policy authorization, cancellation/replay controls and all-or-revert multi-fill token settlement.
+
 ## Trust model
 
-- identity, private orders, policy evaluation, pricing and route construction remain off-chain;
-- participant token balances are held and accounted for by `FxVault`;
+- identity, private orders, policy evaluation, pricing and route construction stay off-chain;
+- participant token balances are segregated and accounted for in `FxVault`;
 - makers sign EIP-712 orders;
-- takers sign EIP-712 intents with max-input and min-output bounds;
-- the institution grants short-lived policy-authorisation hashes;
+- takers sign EIP-712 intents with max-input/min-output bounds;
+- the institution grants short-lived policy-authorization hashes;
 - `AtomicRouter` executes all selected token fills in one transaction;
 - cancellation, nonce replay, signature validity, policy validity and collateral are enforced on-chain.
 
 ## Deployment order
 
-1. Choose the owner / institution-administration address.
+1. Choose the institution owner / governance address.
 2. Choose the exact supported token contracts.
 3. Deploy `FxVault(owner, supportedTokens)`.
 4. Deploy `OrderCancellation()`.
@@ -33,30 +35,21 @@ AtomicRouter
 7. Deploy `AtomicRouter(settlement, policyRegistry)`.
 8. Call `FxVault.bindSettlement(settlement)` from the owner.
 9. Call `FxSettlement.bindRouter(router)` from the owner.
-10. Verify all constructor arguments and bindings on the target network.
+10. Verify constructor arguments, source and bindings on the target network.
 
-The Vault-to-Settlement and Settlement-to-Router bindings are one-time operations. The FX-1 contracts deliberately do not expose an administrative replacement path.
+Vault-to-Settlement and Settlement-to-Router bindings are one-time operations. FX-1 deliberately keeps these core authority links immutable after binding.
 
 ## Supported tokens
 
-Only explicitly allowlisted tokens may be deposited.
+Only explicitly allowlisted tokens can be deposited.
 
-Before production use, evaluate each token for:
+Evaluate each token's transfer behavior, decimals, administrative controls, upgradeability, pausing/blocklist model and issuer/redemption characteristics before adding it to the deployment allowlist.
 
-- transfer fees;
-- rebasing;
-- blocklists and pausing;
-- upgradeability and administrator authority;
-- decimal precision;
-- return-value behaviour;
-- chain-specific token implementation;
-- issuer and redemption risk.
-
-`FxVault.deposit()` credits the actual balance delta received, which prevents a transfer-fee token from creating unbacked accounting credit. That does not make every unusual token economically suitable.
+`FxVault.deposit()` credits the actual physical balance delta received, so transfer-fee behavior cannot create unbacked internal credit.
 
 ## Funding
 
-A maker or taker must approve the Vault and deposit its own supported tokens:
+A maker or taker approves the Vault and deposits its own supported tokens:
 
 ```text
 ERC20.approve(vault, amount)
@@ -72,13 +65,13 @@ physical ERC-20 balance
 surplus above liabilities
 ```
 
-The core solvency condition is:
+The core solvency invariant is:
 
 ```text
 physical balance >= total liabilities
 ```
 
-The owner may rescue only genuine surplus above recorded liabilities.
+Institution governance can rescue only physical surplus above recorded liabilities.
 
 ## Maker order
 
@@ -97,7 +90,7 @@ epoch
 salt
 ```
 
-The signed order may be partially filled. Cumulative rounding prevents repeated small fills from collecting more than the signed full-order buy amount.
+Orders can fill partially. Cumulative rounding ensures repeated partial fills cannot collect more than the economics of the full signed order.
 
 Makers can invalidate:
 
@@ -106,20 +99,13 @@ Makers can invalidate:
 
 ## Institution policy authority
 
-Before execution, the institution registers the hash referenced by the taker intent:
+Before execution, the institution registers the authorization hash referenced by the taker intent:
 
 ```text
 PolicyAuthorizationRegistry.authorize(hash, validUntil, epoch)
 ```
 
-The institution can later:
-
-```text
-revoke one authorisation
-advance the minimum policy epoch
-```
-
-Valid maker and taker signatures are insufficient if policy authority is expired, revoked or below the minimum epoch.
+Institution governance can revoke one authorization or advance the minimum policy epoch. Maker and taker signatures alone are insufficient when institution policy authority is expired, revoked or below the active epoch.
 
 ## Taker intent
 
@@ -137,35 +123,41 @@ nonce
 policyAuthorizationHash
 ```
 
-The nonce is consumed on successful execution. A revert rolls back the nonce with every other state change.
+The nonce is consumed on successful execution. A revert rolls the nonce back with every other state change.
 
 ## Route execution
 
 `AtomicRouter.execute(intent, takerSignature, fills)`:
 
-1. validates intent shape and deadline;
-2. validates the institution policy authorisation;
+1. validates intent shape/deadline;
+2. validates institution policy authorization;
 3. validates the taker signature;
 4. rejects a used nonce;
-5. verifies every maker order and signature;
-6. checks cancellation and maker epoch;
-7. moves pre-funded Vault balances for every fill;
-8. enforces aggregate max input and minimum output;
+5. verifies every maker order/signature;
+6. enforces cancellation and maker epoch;
+7. moves pre-funded Vault balances for each fill;
+8. enforces aggregate max-input/min-output bounds;
 9. emits `RouteExecuted`.
 
 If any fill or final bound fails, the entire EVM transaction reverts.
 
-## Controlled proof
+## Withdrawal and incident controls
 
-The repository contains `script/ControlledProof.s.sol`, which:
+`FxVault` can operate with immediate withdrawals or an institution-configured withdrawal delay. The delay is capped by the contract and applies only to participant withdrawals, not settlement `move()` operations.
+
+Pending withdrawals are explicit, cancellable and time-bounded. This provides an incident-response window without introducing an unbounded administrative freeze primitive.
+
+## Controlled execution proof
+
+`script/ControlledProof.s.sol` provides a complete local execution proof:
 
 - deploys proof tokens and the settlement kernel;
 - binds the contracts;
-- funds independent maker and taker accounts;
-- deposits through real JSON-RPC transactions;
+- funds independent maker/taker accounts;
+- deposits through JSON-RPC transactions;
 - signs maker and taker EIP-712 payloads;
 - broadcasts one route;
-- asserts post-settlement balances, backing and nonce consumption.
+- verifies post-settlement balances, backing and nonce consumption.
 
 Run against local Anvil:
 
@@ -175,7 +167,7 @@ make deps
 anvil --host 127.0.0.1 --port 8545
 ```
 
-In another shell, provide funded proof keys and run:
+Then:
 
 ```bash
 RPC_URL=http://127.0.0.1:8545 \
@@ -188,7 +180,21 @@ forge script script/ControlledProof.s.sol:ControlledProof \
   -vvvv
 ```
 
-CI performs this controlled proof with deterministic Anvil accounts.
+## Foundry assurance
+
+The contract gate is:
+
+```bash
+make -C packages/fx-contracts ci
+```
+
+It covers formatting, compilation, unit tests, fuzzing and invariants across router, settlement, vault, withdrawal controls, cancellation, policy authorization and ERC-1271 smart-wallet signatures.
+
+The full Blueballs release gate includes this contract gate through:
+
+```bash
+pnpm verify:release
+```
 
 ## Export ABIs
 
@@ -197,7 +203,7 @@ cd packages/fx-contracts
 make abi
 ```
 
-This writes release ABIs under `packages/fx-contracts/abi/` for:
+Generated ABIs are produced for:
 
 ```text
 FxVault
@@ -207,22 +213,19 @@ FxSettlement
 AtomicRouter
 ```
 
-Release automation packages the generated ABIs with checksums.
+## Institution deployment profile
 
-## Production checklist
+A production contract deployment typically combines:
 
-Before real assets:
+- institution multisig/governance ownership;
+- institution key custody and signer policy;
+- allowlisted token/source review;
+- monitoring of deposits, withdrawals, fills, cancellations, policy changes and solvency;
+- event reconciliation against the institution ledger;
+- controlled limits during initial network rollout;
+- independently reproducible source/constructor verification;
+- the institution's normal application/contract review process.
 
-- freeze and review exact contract source;
-- complete an independent audit;
-- decide whether immutable one-time bindings meet the deployment model;
-- use production-grade multisig or governed institution ownership;
-- use production key custody and signer policies;
-- verify supported token contracts and decimals;
-- configure monitoring for deposits, withdrawals, fills, cancellations, policy changes and solvency;
-- define emergency and reconciliation operations;
-- deploy with tiny limits first;
-- independently verify source and constructor arguments;
-- reconcile on-chain events to the institution ledger.
+KYC/compliance facts, fiat settlement, price discovery and provider reconciliation remain in the surrounding Blueballs policy, fiat, provider and FX runtime layers rather than being duplicated inside the token-settlement contracts.
 
-The contracts do not implement KYC, custody governance, fiat settlement, price discovery or operational reconciliation by themselves.
+See [`../../spec/fx/ADAPTERS.md`](../../spec/fx/ADAPTERS.md), [`../../spec/fx/THREAT-MODEL.md`](../../spec/fx/THREAT-MODEL.md) and [`../../PRODUCTION-HARDENING.md`](../../PRODUCTION-HARDENING.md).

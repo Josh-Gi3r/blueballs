@@ -16,21 +16,59 @@ const publicSource = tracked
   .map((file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8"))
   .join("\n");
 const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+const fxA = readFileSync(
+  new URL("../src/fx/FinalFxSectionsA.tsx", import.meta.url),
+  "utf8",
+);
+const fxC = readFileSync(
+  new URL("../src/fx/FinalFxSectionsC.tsx", import.meta.url),
+  "utf8",
+);
 const worker = readFileSync(
   new URL("../workers/site/index.js", import.meta.url),
   "utf8",
 );
 
-// An open-source project links its source. Every public surface — the React site
-// and the crawler pages the worker serves — must reach the repository, so a
-// visitor or a crawler is never told the source is anywhere but GitHub.
 assert.match(
   publicSource,
   /github\.com\/Josh-Gi3r\/blueballs/,
   "the site must link the source repository",
 );
-assert.doesNotMatch(readme, /page calls the running FX node directly/i);
-assert.match(readme, /browser-facing FX page is a deterministic\s+simulation/i);
+
+assert.match(
+  readme,
+  /open-source operating system for modern financial institutions/i,
+  "README must lead with the Blueballs institution-platform position",
+);
+assert.match(
+  readme,
+  /adapter-driven production FX runtime/i,
+  "README must surface the production FX composition",
+);
+assert.match(
+  fxA,
+  /FX INFRASTRUCTURE · INTERACTIVE MARKET LAB/,
+  "FX hero must present the product as an interactive market lab",
+);
+assert.match(
+  fxC,
+  /ADAPTER-DRIVEN RUNTIME COMPOSITION/,
+  "FX inspector must surface the production runtime architecture",
+);
+
+for (const stale of [
+  /WEBSITE SIMULATION/,
+  /NO MONEY MOVES/,
+  /Review implementation status/i,
+  /NOT CONNECTED/,
+]) {
+  assert.doesNotMatch(
+    `${fxA}\n${fxC}`,
+    stale,
+    `public FX product copy must not regress to stale disclaimer language: ${stale}`,
+  );
+}
+
 assert.match(
   worker,
   /url\.pathname === "\/bulletin"[\s\S]*Response\.redirect\(new URL\("\/developers"[\s\S]*301/,
@@ -39,6 +77,7 @@ assert.doesNotMatch(
   worker.match(/KNOWN_PAGES[\s\S]*?\]\);/)?.[0] ?? "",
   /"\/bulletin"/,
 );
+
 console.log(
-  "page truth: the source repository is linked, FX is labelled simulation, /bulletin is a 301",
+  "page truth: source is linked, Blueballs positioning is capability-led, FX architecture copy is current, /bulletin is a 301",
 );
