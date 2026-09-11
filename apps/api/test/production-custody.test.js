@@ -2,15 +2,19 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import test from "node:test";
+import { signProviderInboundBody } from "../src/provider-inbound-auth.js";
 import { createApiFixture } from "./helpers/api-process.js";
 
 const BOOTSTRAP_KEY = "bb_custody_bootstrap_1234567890abcdef123456";
 const OPERATOR_KEY = "bb_custody_operator_1234567890abcdef123456";
 const PROVIDER_TOKEN = "custody-provider-test-token-123456";
+const INBOUND_SECRET = "custody-inbound-test-secret-0123456789abcdef0123456789abcdef";
 const PAYLOAD_KEY =
   "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const signedInbound = (body) =>
+  signProviderInboundBody(body, { secret: INBOUND_SECRET });
 
 async function listenGateway(handler) {
   const server = createServer(handler);
@@ -48,6 +52,7 @@ async function productionApi(t, gateway) {
       BANK_BOOTSTRAP_API_KEY: BOOTSTRAP_KEY,
       BANK_BOOTSTRAP_EMAIL: "custody-ops@example.test",
       OPERATOR_API_KEY_HASH: sha256(OPERATOR_KEY),
+      BANK_PROVIDER_INBOUND_SECRET: INBOUND_SECRET,
       BANK_PROVIDER_GATEWAY_URL: gateway.url,
       BANK_PROVIDER_GATEWAY_TOKEN: PROVIDER_TOKEN,
       BANK_PROVIDER_ALLOW_INSECURE_LOCALHOST: "true",
@@ -61,13 +66,17 @@ async function productionApi(t, gateway) {
   return api;
 }
 
-test("production wallets use custody provisioning, idempotent inbound deposits and provider-backed sends", async (t) => {
+test("production wallets use custody provisioning, signed idempotent inbound deposits and provider-backed sends", async (t) => {
   const seen = [];
   const gateway = await listenGateway(async (req, res) => {
     const envelope = await bodyOf(req);
     seen.push(envelope);
     assert.equal(req.headers.authorization, `Bearer ${PROVIDER_TOKEN}`);
-    assert.equal(envelope.payload?.format, undefined, "provider sees decrypted payload only");
+    assert.equal(
+      envelope.payload?.format,
+      undefined,
+      "provider sees decrypted payload only",
+    );
 
     if (envelope.capability === "custody.wallet") {
       res.writeHead(200, { "content-type": "application/json" });
@@ -121,7 +130,11 @@ test("production wallets use custody provisioning, idempotent inbound deposits a
     },
   });
   assert.equal(wallet.status, 201);
-  assert.equal(wallet.body.address, null, "production never returns a generated sandbox address");
+  assert.equal(
+    wallet.body.address,
+    null,
+    "production never returns a generated sandbox address",
+  );
   assert.equal(wallet.body.status, "pending_provisioning");
   assert.equal(wallet.body.provider_status, "queued");
 
@@ -133,10 +146,13 @@ test("production wallets use custody provisioning, idempotent inbound deposits a
       ? response.body
       : null;
   }, "custody wallet provisioning");
-  assert.equal(activeWallet.address, "0x1111111111111111111111111111111111111111");
+  assert.equal(
+    activeWallet.address,
+    "0x1111111111111111111111111111111111111111",
+  );
   assert.equal(activeWallet.provider_reference, "custody-wallet-1");
 
-  const depositBody = {
+  const depositEvidence = {
     event_id: "custody-deposit-000001",
     tenant_id: tenantId,
     type: "custody.wallet_deposit_settled",
@@ -148,24 +164,24 @@ test("production wallets use custody provisioning, idempotent inbound deposits a
   };
   const deposit = await api.request("POST", "/internal/provider/events", {
     key: OPERATOR_KEY,
-    body: depositBody,
+    body: signedInbound(depositEvidence),
   });
   assert.equal(deposit.status, 200);
   assert.equal(deposit.body.replayed, undefined);
 
   const replay = await api.request("POST", "/internal/provider/events", {
     key: OPERATOR_KEY,
-    body: depositBody,
+    body: signedInbound(depositEvidence),
   });
   assert.equal(replay.status, 200);
   assert.equal(replay.body.replayed, true);
 
   const conflict = await api.request("POST", "/internal/provider/events", {
     key: OPERATOR_KEY,
-    body: {
-      ...depositBody,
+    body: signedInbound({
+      ...depositEvidence,
       amount: { amount: "101.00", currency: "USDC" },
-    },
+    }),
   });
   assert.equal(conflict.status, 409);
 
