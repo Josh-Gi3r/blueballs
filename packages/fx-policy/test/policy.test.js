@@ -5,9 +5,8 @@ import { FxPolicyEngine } from "../src/index.js";
 
 const NOW = 1_000_000;
 
-function configured() {
-  const engine = new FxPolicyEngine({ now: () => NOW });
-  engine.configurePolicy({
+function basePolicy(overrides = {}) {
+  return {
     policyId: "bank-fx",
     version: 1,
     enabledParticipantTypes: ["CUSTOMER", "INSTITUTIONAL_LP", "BANK_PRINCIPAL"],
@@ -25,7 +24,13 @@ function configured() {
       BANK_PRINCIPAL: "10000000",
     },
     authorizationTtlMs: 60_000,
-  });
+    ...overrides,
+  };
+}
+
+function configured() {
+  const engine = new FxPolicyEngine({ now: () => NOW });
+  engine.configurePolicy(basePolicy());
   return engine;
 }
 
@@ -224,6 +229,64 @@ test("policy version change invalidates previously issued authorization", () => 
     valid: false,
     reason: "POLICY_CHANGED",
   });
+  engine.close();
+});
+
+test("policy content cannot change without a version increase", () => {
+  const engine = configured();
+  addInstitution(engine);
+  const decision = engine.authorize({
+    participantId: "lp-1",
+    action: "PROVIDE_LIQUIDITY",
+    inputAsset: "USD",
+    outputAsset: "EUR",
+    amount: "100",
+  });
+
+  assert.throws(
+    () =>
+      engine.configurePolicy(
+        basePolicy({
+          maxTicketByType: {
+            CUSTOMER: "5000",
+            INSTITUTIONAL_LP: "999999",
+            BANK_PRINCIPAL: "10000000",
+          },
+        }),
+      ),
+    /version must increase/,
+  );
+  assert.equal(
+    engine.verifyAuthorization(decision.authorizationId).valid,
+    true,
+  );
+  engine.close();
+});
+
+test("malformed policy maps and corridors fail before becoming live", () => {
+  const engine = new FxPolicyEngine({ now: () => NOW });
+  assert.throws(
+    () =>
+      engine.configurePolicy(
+        basePolicy({ allowedAssets: ["USD"], allowedCorridors: ["USD/EUR"] }),
+      ),
+    /outside allowedAssets/,
+  );
+  assert.throws(
+    () =>
+      engine.configurePolicy(
+        basePolicy({ maxTicketByType: { CUSTOMER: "0" } }),
+      ),
+    /amount must be positive/,
+  );
+  assert.throws(
+    () =>
+      engine.configurePolicy(
+        basePolicy({ requiredCredentials: { UNKNOWN: ["KYC"] } }),
+      ),
+    /unsupported credential participant type/,
+  );
+  assert.throws(() => engine.currentPolicy(), /not configured/);
   engine.close();
 });
 
