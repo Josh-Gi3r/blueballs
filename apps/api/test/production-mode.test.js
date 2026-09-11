@@ -132,3 +132,21 @@ test("fresh production state refuses to boot without a bootstrap admin secret", 
     /BANK_BOOTSTRAP_API_KEY/,
   );
 });
+
+test("a sandbox database cannot be promoted to production by flipping BANK_API_MODE", async (t) => {
+  const api = await createApiFixture();
+  t.after(() => api.close());
+  await api.signup("sandbox-state@example.test");
+
+  await assert.rejects(
+    () =>
+      api.restart({
+        env: {
+          BANK_API_MODE: "production",
+          BANK_BOOTSTRAP_API_KEY: BOOTSTRAP_KEY,
+          BANK_BOOTSTRAP_EMAIL: "must-not-bootstrap@example.test",
+        },
+      }),
+    /refuses sandbox tenant\/key state/,
+  );
+});
