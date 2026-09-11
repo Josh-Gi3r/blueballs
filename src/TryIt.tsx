@@ -1,12 +1,12 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import {
-  call,
-  signup,
-  ping,
-  getKey,
-  clearKey,
-  sampleBody,
   API_BASE,
+  call,
+  clearKey,
+  getKey,
+  ping,
+  sampleBody,
+  signup,
 } from "./api";
 
 const MONO = "'IBM Plex Mono', monospace";
@@ -18,22 +18,35 @@ const VERB_COLOR: Record<string, string> = {
   DELETE: "#B4453C",
 };
 
-/** Live status pill — proves the API is actually reachable from the page. */
+const inputStyle: CSSProperties = {
+  width: "100%",
+  border: "1px solid #DDE1E8",
+  borderRadius: 10,
+  background: "#F7F8FB",
+  padding: "10px 12px",
+  fontFamily: MONO,
+  fontSize: 11.5,
+  outline: "none",
+  boxSizing: "border-box",
+};
+
 export function ApiStatus() {
   const [up, setUp] = useState<boolean | null>(null);
+
   useEffect(() => {
     let alive = true;
-    const check = () => ping().then((v) => alive && setUp(v));
+    const check = () => ping().then((value) => alive && setUp(value));
     check();
-    const t = setInterval(check, 10000);
+    const timer = setInterval(check, 10000);
     return () => {
       alive = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, []);
+
   const tone = up === null ? "#7A8296" : up ? "#2E7D53" : "#B4453C";
-  const label =
-    up === null ? "CHECKING" : up ? "SANDBOX ONLINE" : "SANDBOX OFFLINE";
+  const label = up === null ? "CHECKING" : up ? "API ONLINE" : "API OFFLINE";
+
   return (
     <span
       style={{
@@ -41,51 +54,54 @@ export function ApiStatus() {
         alignItems: "center",
         gap: 6,
         fontFamily: MONO,
-        fontSize: 10,
-        letterSpacing: "0.12em",
+        fontSize: 9.5,
+        letterSpacing: ".12em",
         color: tone,
         border: `1px solid ${tone}33`,
         background: `${tone}12`,
         borderRadius: 999,
-        padding: "4px 10px",
+        padding: "5px 9px",
         whiteSpace: "nowrap",
       }}
     >
-      <span
-        style={{ width: 6, height: 6, borderRadius: 999, background: tone }}
-      />
+      <span style={{ width: 6, height: 6, borderRadius: 999, background: tone }} />
       {label}
       {up && (
         <span style={{ color: "#7A8296" }}>
-          · {API_BASE.replace("http://", "")}
+          · {(API_BASE || "same-origin").replace("http://", "").replace("https://", "")}
         </span>
       )}
     </span>
   );
 }
 
-/** Self-serve key issuer. Calls the real endpoint; shows the real key. */
 export function KeyIssuer() {
   const [email, setEmail] = useState("");
   const [key, setKeyState] = useState<string | null>(getKey());
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const go = async () => {
-    if (!email.trim()) return;
+  const issue = async () => {
+    if (!email.trim() || busy) return;
     setBusy(true);
-    setErr(null);
-    const r = await signup(email.trim());
+    setError(null);
+    const result = await signup(email.trim());
     setBusy(false);
-    if (r.error) return setErr(r.error);
-    const k = (r.body as any)?.key;
-    if (k) setKeyState(k);
-    else setErr((r.body as any)?.detail ?? "Signup failed");
+    const next = (result.body as any)?.key;
+    if (result.ok && next) {
+      setKeyState(next);
+      return;
+    }
+    setError(
+      result.error ||
+        (result.body as any)?.detail ||
+        `Key issuance failed with HTTP ${result.status}`,
+    );
   };
 
   if (key) {
-    const maskedKey = `${key.slice(0, 12)}${"•".repeat(12)}${key.slice(-4)}`;
+    const masked = `${key.slice(0, 12)}${"•".repeat(12)}${key.slice(-4)}`;
     return (
       <div
         style={{
@@ -99,12 +115,12 @@ export function KeyIssuer() {
           style={{
             fontFamily: MONO,
             fontSize: 9.5,
-            letterSpacing: "0.14em",
+            letterSpacing: ".14em",
             color: "#0647E8",
             marginBottom: 7,
           }}
         >
-          SANDBOX KEY · STORED IN THIS BROWSER
+          SANDBOX KEY · TAB-SCOPED SESSION
         </div>
         <div
           aria-label={revealed ? "Sandbox key revealed" : "Sandbox key masked"}
@@ -115,68 +131,36 @@ export function KeyIssuer() {
             color: "#07144F",
           }}
         >
-          {revealed ? key : maskedKey}
+          {revealed ? key : masked}
         </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 14,
-            marginTop: 10,
-            alignItems: "center",
-          }}
-        >
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10, alignItems: "center" }}>
           <button
-            onClick={() => setRevealed((current) => !current)}
-            style={{
-              fontFamily: MONO,
-              fontSize: 10.5,
-              letterSpacing: "0.08em",
-              color: "#0647E8",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: 0,
-            }}
+            type="button"
+            onClick={() => setRevealed((value) => !value)}
+            style={linkButton}
           >
             {revealed ? "HIDE" : "REVEAL"}
           </button>
           <button
-            onClick={() => {
-              navigator.clipboard?.writeText(key);
-            }}
-            style={{
-              fontFamily: MONO,
-              fontSize: 10.5,
-              letterSpacing: "0.08em",
-              color: "#0647E8",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: 0,
-            }}
+            type="button"
+            onClick={() => navigator.clipboard?.writeText(key)}
+            style={linkButton}
           >
             COPY
           </button>
           <button
+            type="button"
             onClick={() => {
               clearKey();
               setKeyState(null);
+              setRevealed(false);
             }}
-            style={{
-              fontFamily: MONO,
-              fontSize: 10.5,
-              letterSpacing: "0.08em",
-              color: "#7A8296",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: 0,
-            }}
+            style={{ ...linkButton, color: "#7A8296" }}
           >
-            REMOVE FROM BROWSER
+            REMOVE
           </button>
           <span style={{ fontSize: 12, color: "#5B6376" }}>
-            The requests below now use this key.
+            Stored in sessionStorage and cleared when this tab session ends.
           </span>
         </div>
       </div>
@@ -184,19 +168,13 @@ export function KeyIssuer() {
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 8,
-        flexWrap: "wrap",
-        alignItems: "center",
-      }}
-    >
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
       <input
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && go()}
+        onChange={(event) => setEmail(event.target.value)}
+        onKeyDown={(event) => event.key === "Enter" && issue()}
         placeholder="you@example.com"
+        aria-label="Email for sandbox key"
         style={{
           flex: "1 1 220px",
           minWidth: 0,
@@ -209,239 +187,190 @@ export function KeyIssuer() {
         }}
       />
       <button
-        onClick={go}
-        disabled={busy}
+        type="button"
+        onClick={issue}
+        disabled={busy || !email.trim()}
         style={{
           fontSize: 13.5,
-          fontWeight: 500,
+          fontWeight: 600,
           padding: "11px 20px",
           cursor: busy ? "wait" : "pointer",
           border: "1px solid #07144F",
           borderRadius: 10,
           background: "#07144F",
           color: "#fff",
+          opacity: busy || !email.trim() ? .6 : 1,
         }}
       >
-        {busy ? "Issuing…" : "Get a sandbox key"}
+        {busy ? "Issuing…" : "Issue sandbox key"}
       </button>
-      {err && (
-        <div style={{ fontSize: 13, color: "#B4453C", flexBasis: "100%" }}>
-          {err}
+      {error && (
+        <div role="alert" style={{ fontSize: 13, color: "#B4453C", flexBasis: "100%" }}>
+          {error}
         </div>
       )}
     </div>
   );
 }
 
-/** Per-endpoint runner. Fires the real request and shows the real response. */
+const linkButton: CSSProperties = {
+  fontFamily: MONO,
+  fontSize: 10.5,
+  letterSpacing: ".08em",
+  color: "#0647E8",
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  padding: 0,
+};
+
 export function TryIt({ verb, path }: { verb: string; path: string }) {
   const [open, setOpen] = useState(false);
   const [pathInput, setPathInput] = useState(path);
   const [bodyInput, setBodyInput] = useState(() => {
-    const s = sampleBody(verb, path);
-    return s === undefined ? "" : JSON.stringify(s, null, 2);
+    const sample = sampleBody(verb, path);
+    return sample === undefined ? "" : JSON.stringify(sample, null, 2);
   });
-  const [res, setRes] = useState<Awaited<ReturnType<typeof call>> | null>(null);
+  const [result, setResult] = useState<Awaited<ReturnType<typeof call>> | null>(null);
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    setPathInput(path);
+    const sample = sampleBody(verb, path);
+    setBodyInput(sample === undefined ? "" : JSON.stringify(sample, null, 2));
+    setResult(null);
+  }, [verb, path]);
+
   const run = async () => {
-    setBusy(true);
-    let parsed: unknown = undefined;
+    if (busy) return;
+    let body: unknown = undefined;
     if (bodyInput.trim()) {
       try {
-        parsed = JSON.parse(bodyInput);
+        body = JSON.parse(bodyInput);
       } catch {
-        setBusy(false);
-        setRes({
+        setResult({
           ok: false,
           status: 0,
           ms: 0,
           body: null,
-          error: "Request body is not valid JSON",
+          error: "Request body is not valid JSON.",
         });
         return;
       }
     }
-    const r = await call(verb, pathInput, parsed);
-    setRes(r);
+
+    setBusy(true);
+    const response = await call(verb, pathInput.trim(), body);
     setBusy(false);
+    setResult(response);
   };
 
-  const statusColor = !res
-    ? "#7A8296"
-    : res.status === 0
-      ? "#B4453C"
-      : res.status < 300
-        ? "#2E7D53"
-        : res.status < 500
-          ? "#B0761E"
-          : "#B4453C";
-
-  const btn: CSSProperties = {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 5,
-    fontFamily: MONO,
-    fontSize: 10,
-    letterSpacing: "0.08em",
-    cursor: "pointer",
-    border: `1px solid ${open ? "#0868FF" : "#DDE1E8"}`,
-    borderRadius: 7,
-    background: open ? "#0868FF" : "#fff",
-    color: open ? "#fff" : "#0647E8",
-    padding: "4px 10px",
-    whiteSpace: "nowrap",
-    transition: "all .12s ease",
-  };
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{
+          border: "1px solid #D7DBE4",
+          borderRadius: 9,
+          background: "#fff",
+          color: "#0647E8",
+          padding: "8px 11px",
+          fontFamily: MONO,
+          fontSize: 10,
+          letterSpacing: ".08em",
+          cursor: "pointer",
+        }}
+      >
+        TRY REQUEST
+      </button>
+    );
+  }
 
   return (
-    <>
-      <button
-        onClick={() => setOpen(!open)}
-        style={btn}
-        aria-expanded={open}
-        title={
-          open
-            ? "Hide the console"
-            : "Run this endpoint against the hosted sandbox"
-        }
-      >
-        <span
-          style={{
-            fontSize: 8,
-            transform: open ? "rotate(90deg)" : "none",
-            transition: "transform .12s ease",
-            display: "inline-block",
-          }}
-        >
-          ▶
-        </span>
-        {open ? "HIDE" : "TRY"}
-      </button>
-      {open && (
+    <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "70px minmax(0,1fr)", gap: 8 }}>
         <div
           style={{
-            gridColumn: "1 / -1",
-            marginTop: 10,
-            marginBottom: 6,
-            background: "#F7F8FB",
-            border: "1px solid #E7EAF0",
-            borderRadius: 12,
-            padding: 14,
+            ...inputStyle,
+            color: VERB_COLOR[verb] ?? "#07144F",
+            fontWeight: 700,
+            display: "grid",
+            placeItems: "center",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              flexWrap: "wrap",
-              marginBottom: 10,
-            }}
-          >
-            <span
-              style={{
-                fontFamily: MONO,
-                fontSize: 11,
-                color: VERB_COLOR[verb],
-                minWidth: 46,
-              }}
-            >
-              {verb}
-            </span>
-            <input
-              value={pathInput}
-              onChange={(e) => setPathInput(e.target.value)}
-              style={{
-                flex: "1 1 260px",
-                minWidth: 0,
-                fontFamily: MONO,
-                fontSize: 12.5,
-                border: "1px solid #DDE1E8",
-                borderRadius: 8,
-                padding: "8px 10px",
-                background: "#fff",
-                outline: "none",
-              }}
-            />
-            <button
-              onClick={run}
-              disabled={busy}
-              style={{
-                fontSize: 12.5,
-                fontWeight: 500,
-                padding: "8px 18px",
-                cursor: busy ? "wait" : "pointer",
-                border: "1px solid #07144F",
-                borderRadius: 8,
-                background: "#07144F",
-                color: "#fff",
-              }}
-            >
-              {busy ? "Running…" : "Run"}
-            </button>
+          {verb}
+        </div>
+        <input
+          value={pathInput}
+          onChange={(event) => setPathInput(event.target.value)}
+          aria-label="Request path"
+          style={inputStyle}
+        />
+      </div>
+
+      {bodyInput !== "" && (
+        <textarea
+          value={bodyInput}
+          onChange={(event) => setBodyInput(event.target.value)}
+          aria-label="JSON request body"
+          spellCheck={false}
+          rows={7}
+          style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55 }}
+        />
+      )}
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy}
+          style={{
+            border: "1px solid #07144F",
+            borderRadius: 9,
+            background: "#07144F",
+            color: "#fff",
+            padding: "8px 12px",
+            fontWeight: 700,
+            cursor: busy ? "wait" : "pointer",
+          }}
+        >
+          {busy ? "Sending…" : "Send request"}
+        </button>
+        <button type="button" onClick={() => setOpen(false)} style={linkButton}>
+          CLOSE
+        </button>
+        {!getKey() && (
+          <span style={{ fontSize: 11.5, color: "#7A8296" }}>
+            Authenticated operations require a sandbox key above.
+          </span>
+        )}
+      </div>
+
+      {result && (
+        <div
+          style={{
+            borderRadius: 11,
+            padding: 13,
+            background: "#07144F",
+            color: "#E7EAF1",
+            fontFamily: MONO,
+            fontSize: 11,
+            overflowX: "auto",
+          }}
+        >
+          <div style={{ display: "flex", gap: 12, marginBottom: 9, color: result.ok ? "#86E0AA" : "#FF9B91" }}>
+            <strong>HTTP {result.status || "—"}</strong>
+            <span>{result.ms} ms</span>
           </div>
-
-          {bodyInput !== "" && (
-            <textarea
-              value={bodyInput}
-              onChange={(e) => setBodyInput(e.target.value)}
-              rows={Math.min(8, bodyInput.split("\n").length + 1)}
-              spellCheck={false}
-              style={{
-                width: "100%",
-                fontFamily: MONO,
-                fontSize: 12,
-                border: "1px solid #DDE1E8",
-                borderRadius: 8,
-                padding: 10,
-                background: "#fff",
-                outline: "none",
-                resize: "vertical",
-                marginBottom: 10,
-              }}
-            />
-          )}
-
-          {res && (
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  alignItems: "center",
-                  fontFamily: MONO,
-                  fontSize: 10.5,
-                  letterSpacing: "0.08em",
-                  marginBottom: 6,
-                }}
-              >
-                <span style={{ color: "#7A8296" }}>RESPONSE</span>
-                <span style={{ color: statusColor }}>
-                  {res.status === 0 ? "NO RESPONSE" : `HTTP ${res.status}`}
-                </span>
-                <span style={{ color: "#7A8296" }}>{res.ms} MS</span>
-              </div>
-              <pre
-                style={{
-                  margin: 0,
-                  background: "#07144F",
-                  color: "#E4E7EE",
-                  borderRadius: 10,
-                  padding: "14px 16px",
-                  fontFamily: MONO,
-                  fontSize: 12,
-                  lineHeight: 1.7,
-                  overflowX: "auto",
-                  maxHeight: 320,
-                }}
-              >
-                {res.error ? res.error : JSON.stringify(res.body, null, 2)}
-              </pre>
-            </div>
-          )}
+          {result.error && <div style={{ marginBottom: 8 }}>{result.error}</div>}
+          <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            {typeof result.body === "string"
+              ? result.body
+              : JSON.stringify(result.body, null, 2)}
+          </pre>
         </div>
       )}
-    </>
+    </div>
   );
 }
