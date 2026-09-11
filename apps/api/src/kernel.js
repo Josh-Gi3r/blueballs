@@ -255,6 +255,8 @@ export const route = (method, pattern, handler, opts = {}) => {
             key: ctx.key,
             method,
             path,
+            body: ctx.body ?? {},
+            url: ctx.url,
           })
         : null;
     ctx.actor = actor;
