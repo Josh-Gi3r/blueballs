@@ -88,14 +88,19 @@ test("production mode bootstraps explicitly and disables sandbox/reference contr
     ["POST", "/v2/subscriptions", {}],
     ["GET", "/v2/subscriptions"],
     ["POST", "/v2/quotes", {}],
-    ["GET", "/v2/rates"],
     ["POST", "/v2/fx/quote", {}],
-    ["GET", "/v2/fx/depth"],
     ["GET", "/v2/sandbox/scenarios"],
   ];
   for (const [method, path, body] of blocked) {
     await assertSandboxOnly(api, method, path, body);
   }
+
+  // Non-mutating public compatibility data may remain readable as explicitly
+  // indicative/reference information. It is never execution or a lockable quote.
+  const rates = await api.request("GET", "/v2/rates");
+  assert.equal(rates.status, 200);
+  const depth = await api.request("GET", "/v2/fx/depth");
+  assert.equal(depth.status, 200);
 });
 
 test("fresh production state refuses to boot without a bootstrap admin secret", async () => {
