@@ -6,6 +6,11 @@ secrets and release evidence. Institution-specific licences, vendors, SRE toolin
 and jurisdictional procedures remain deployment-owned, but they plug into these
 core operational contracts.
 
+[`PRODUCTION-OPERATIONS.md`](PRODUCTION-OPERATIONS.md) defines the normative HA,
+RPO/RTO and recovery standard. Periodic SQLite snapshots in this runbook are a
+verified recovery mechanism, **not** by themselves an acceptable zero-data-loss
+architecture for acknowledged customer-money commands.
+
 ## Runtime endpoints
 
 The banking runtime exposes three infrastructure endpoints outside the 181-operation
@@ -69,8 +74,8 @@ Do not manually refund a transfer merely because a provider request timed out.
 including when the source runtime uses WAL mode.
 
 ```bash
-pnpm backup:banking -- --db /var/lib/blueballs/blueballs.sqlite \
-  --out /backups/blueballs/blueballs-$(date -u +%Y%m%dT%H%M%SZ).sqlite
+pnpm backup:banking -- --source /var/lib/blueballs/blueballs.sqlite \
+  --destination /backups/blueballs/blueballs-$(date -u +%Y%m%dT%H%M%SZ).sqlite
 ```
 
 The command:
@@ -87,7 +92,7 @@ or backup encryption.
 
 ### Backup policy
 
-A reasonable default for a small institution deployment is:
+A reasonable **secondary snapshot** policy for a small institution deployment is:
 
 - verified database snapshot every 15 minutes;
 - daily immutable copy retained 35 days;
@@ -97,10 +102,13 @@ A reasonable default for a small institution deployment is:
 - restore drill at least monthly before 1.0 certification, then on the operating
   schedule chosen by the institution.
 
-This gives an **RPO target of 15 minutes for snapshot-only Node deployments**.
-Institutions needing a smaller RPO must add storage-level continuous replication
-or WAL-aware backup/PITR appropriate to their infrastructure. Blueballs does not
-pretend periodic snapshots provide zero-data-loss recovery.
+A snapshot-only installation has up to a 15-minute data-loss window and therefore
+does **not** meet the Blueballs reference target for acknowledged ledger/customer-
+money state. A production topology must add synchronous/durable replication,
+continuous WAL/PITR or an equivalent storage guarantee appropriate to its
+infrastructure so an acknowledged financial commit is not intentionally exposed
+to periodic-snapshot data loss. Snapshots remain valuable as independent recovery
+points even when continuous protection exists.
 
 ## Restore
 
@@ -109,7 +117,7 @@ under an active writer is prohibited.
 
 ```bash
 pnpm restore:banking -- --backup /backups/blueballs/blueballs-....sqlite \
-  --db /var/lib/blueballs/blueballs.sqlite --force
+  --destination /var/lib/blueballs/blueballs.sqlite --force
 ```
 
 The restore command validates the backup first, copies to a temporary path,
@@ -123,36 +131,41 @@ After restore:
 3. compare release SHA and schema version;
 4. reconcile aggregate balances with external bank/custody/payment providers;
 5. inspect provider and webhook outboxes for work whose external finality may
-   have occurred after the restored snapshot;
+   have occurred after the restored recovery point;
 6. reconcile every such ambiguous external operation before resuming normal
    processing;
-7. retain restore time, source backup, operator and verification evidence.
+7. retain restore time, source backup/recovery point, operator and verification
+   evidence.
 
 Because external side effects cannot be rolled back with a database snapshot,
 post-restore reconciliation is mandatory.
 
-## RTO / DR targets
+## RPO / RTO and DR
 
-The reference operational targets for a small production deployment are:
+The normative reference objectives are defined in
+[`PRODUCTION-OPERATIONS.md`](PRODUCTION-OPERATIONS.md):
 
-- **RPO:** <=15 minutes with the documented snapshot policy; lower only when the
-  deployment supplies continuous replicated/PITR storage.
-- **RTO:** <=60 minutes for a rehearsed Node restore into pre-provisioned
-  infrastructure.
+- acknowledged ledger/customer-money state targets **no intentional data loss**;
+- provider/webhook outbox and reconciliation evidence has the same durability
+  requirement as the financial command that created it;
+- reference banking recovery target is **RTO <= 30 minutes** for a rehearsed,
+  pre-provisioned topology;
+- derived analytics/search materializations may have looser objectives because
+  they can be rebuilt from authoritative state/events.
 
-These are reference objectives, not guarantees. A deploying institution must set
-and test targets appropriate to its volume, regulatory obligations and provider
-SLAs.
+A deploying institution must declare and test its approved objectives. It must not
+claim a smaller RPO merely because a backup tool exists.
 
 A disaster-recovery exercise should prove:
 
 - primary banking runtime is fenced;
 - infrastructure can be recreated from version-controlled configuration;
 - secrets can be rehydrated from the deployment secret manager;
-- latest verified snapshot restores successfully;
+- latest approved recovery point restores successfully;
 - source commit/schema checks pass;
 - provider/webhook ambiguous work is reconciled;
 - customer-visible balances match external control totals;
+- measured RPO/RTO are within the institution's declared objectives;
 - customer traffic resumes only after readiness and reconciliation approval.
 
 ## Cloudflare Durable Object deployments
@@ -171,7 +184,7 @@ need for recovery evidence or external-provider reconciliation.
 ### Current correctness model
 
 The banking runtime deliberately serializes command units while one mutable
-SQLite-backed storage view owns the institution state. This provides simple,
+SQLite-backed storage view owns an institution/shard state. This provides simple,
 strong financial ordering and prevents dirty reads/double spend.
 
 ### Node reference HA
@@ -181,44 +194,44 @@ would create split-brain financial state.
 
 The supported reference pattern is:
 
-- one active writer;
-- one or more externally replicated/fenced standby environments;
+- one authoritative active writer per shard;
+- one or more replicated/fenced standby environments;
 - health/readiness gating;
-- durable encrypted backup/replication outside the primary host;
+- storage durability/replication that meets the financial RPO target;
 - explicit failover fencing so only one writer can accept commands;
+- provider/webhook pumps active only on the authoritative writer;
 - provider/webhook reconciliation after failover.
 
-For higher write throughput, move to a storage/runtime topology that preserves
-serialized ownership per institution or shard. Never add horizontal writers by
-weakening ledger/idempotency invariants.
+For higher write throughput, move to institution/tenant shards rather than adding
+concurrent writers to one mutable state view. See [`SCALING.md`](SCALING.md).
 
 ### Sharding direction
 
-The natural scale-out boundary is institution/tenant ownership: each shard owns
-its ledger, resource state, idempotency, audit and outboxes. A global API-key/
-routing directory may route authenticated requests to the correct owner, but a
-financial command must execute entirely within one authoritative shard.
-Cross-shard financial workflows require explicit settlement messages/outboxes,
-not distributed mutation of two SQLite caches.
+Each shard owns its ledger, resource state, idempotency, audit and outboxes. A
+principal/routing directory may route authenticated requests to the correct
+owner, but a financial command must execute entirely within one authoritative
+shard. Cross-shard financial workflows use explicit reserve/settle/credit
+orchestration and stable operation IDs, not distributed mutation of two SQLite
+caches.
 
 ## Secret and key rotation
 
 At minimum treat these as secret-manager values:
 
-- production bootstrap credential;
+- production bootstrap/recovery credential;
+- trusted-human actor assertion secret;
 - operator credential/hash source;
 - provider gateway token;
-- provider payload-encryption keys;
+- provider payload/webhook encryption keys;
 - provider inbound HMAC secret;
-- webhook signing secrets;
 - real vendor credentials behind the deployment-owned provider gateway.
 
-### Provider payload-encryption keys
+### Provider payload / webhook encryption keys
 
 Use `BANK_PROVIDER_PAYLOAD_KEYS` with an active key ID. Add the new key, make it
-active, deploy, and retain the old key until no durable provider job references
-its `kid`. Removing an old key too early turns queued/reconciliation work
-undecryptable.
+active, deploy, and retain the old key until no durable provider or webhook row
+references its `kid`. Removing an old key too early makes queued/reconciliation
+work undecryptable.
 
 ### Provider inbound HMAC secret
 
@@ -229,9 +242,14 @@ Do not reuse the generic operator key as the provider-signing secret.
 
 ### API/operator credentials
 
-Issue/revoke secondary tenant API keys through scoped permissions. Operator
-credential rotation is deployment-owned; rotate it in the secret manager and
-restart/roll the runtime before retiring the previous deployment credential.
+Issue/revoke secondary tenant API keys through scoped permissions. If all
+production credentials are revoked, recovery requires an explicit existing
+`BANK_BOOTSTRAP_TENANT_ID`; Blueballs refuses to silently create a new tenant.
+Operator credential rotation is deployment-owned; rotate it in the secret manager
+and restart/roll the runtime before retiring the previous deployment credential.
+
+See [`IAM.md`](IAM.md) and [`PRODUCTION-OPERATIONS.md`](PRODUCTION-OPERATIONS.md)
+for the full actor/rotation model.
 
 ## Security release checks
 
@@ -240,6 +258,7 @@ The hosted Production Gate performs:
 - tracked high-signal secret scanning;
 - production dependency advisory audit at high/critical severity;
 - CodeQL JavaScript/TypeScript analysis;
+- reference-container high/critical vulnerability scan;
 - banking/Worker/FX/contracts/container gates.
 
 An independent application/smart-contract security review is still required
@@ -248,7 +267,7 @@ audit.
 
 ## Release evidence
 
-For every release retain:
+For every production release retain:
 
 - exact commit SHA;
 - green required hosted `Production gate` for that SHA;
@@ -257,11 +276,12 @@ For every release retain:
 - OpenAPI and SDK generation proof;
 - Foundry fuzz/invariant result;
 - Worker eviction/runtime result;
-- container image digest and Compose validation;
+- container image digest, vulnerability scan and Compose validation;
 - dependency inventory/SBOM;
 - security gate result;
 - banking schema version;
-- backup/restore drill evidence for the release line;
+- load/soak result for the intended topology;
+- backup/restore and DR drill evidence;
 - known adapter/external-service limitations.
 
 A release is not production-certified because the website loads or a static spec
