@@ -65,8 +65,12 @@ export class PrincipalRiskBook {
         "SELECT settled_position FROM principal_positions WHERE asset = ?",
       )
       .get(asset);
-    if (existing && abs(BigInt(existing.settled_position)) > limit) {
-      throw new Error("new hard limit is below current settled position");
+    if (existing) {
+      const projected =
+        BigInt(existing.settled_position) + this.activeReservedDelta(asset);
+      if (abs(projected) > limit) {
+        throw new Error("new hard limit is below current projected position");
+      }
     }
 
     this.db
@@ -83,8 +87,9 @@ export class PrincipalRiskBook {
   setSettledPosition(asset, position) {
     const row = this.#positionRow(asset);
     const next = BigInt(position);
-    if (abs(next) > BigInt(row.hard_limit))
-      throw new Error("settled position exceeds hard limit");
+    const projected = next + this.activeReservedDelta(asset);
+    if (abs(projected) > BigInt(row.hard_limit))
+      throw new Error("settled position plus active reservations exceeds hard limit");
     this.db
       .prepare(
         "UPDATE principal_positions SET settled_position = ? WHERE asset = ?",
