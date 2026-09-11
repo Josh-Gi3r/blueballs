@@ -7,31 +7,11 @@
  * remains enforced by provider-inbound.js.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { canonicalProviderInboundBody } from "../../../spec/provider-inbound-signing.mjs";
 import { ApiError } from "./lib.js";
 import { bankingEnv } from "./runtime-env.js";
 
-function stable(value) {
-  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stable(value[key])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
-export function canonicalProviderInboundBody(body) {
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    throw new ApiError(
-      "validation-error",
-      400,
-      "Provider event body must be a JSON object",
-    );
-  }
-  const { authentication: _authentication, ...payload } = body;
-  return stable(payload);
-}
+export { canonicalProviderInboundBody };
 
 function configuredSecret() {
   const secret = String(bankingEnv("BANK_PROVIDER_INBOUND_SECRET", ""));
@@ -68,7 +48,14 @@ function equalHex(actual, expected) {
 }
 
 export function verifyProviderInboundBody(body, nowMs = Date.now()) {
-  const auth = body?.authentication;
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new ApiError(
+      "validation-error",
+      400,
+      "Provider event body must be a JSON object",
+    );
+  }
+  const auth = body.authentication;
   const timestampRaw = auth?.timestamp == null ? null : String(auth.timestamp);
   const signatureRaw = auth?.signature == null ? null : String(auth.signature);
   if (!timestampRaw || !signatureRaw) {
@@ -113,29 +100,4 @@ export function verifyProviderInboundBody(body, nowMs = Date.now()) {
     );
   }
   return true;
-}
-
-/** Deterministic gateway/test helper. */
-export function signProviderInboundBody(
-  body,
-  { secret, timestamp = Math.floor(Date.now() / 1000) },
-) {
-  if (typeof secret !== "string" || secret.length < 32) {
-    throw new TypeError(
-      "provider inbound signing secret must contain at least 32 characters",
-    );
-  }
-  const payload = { ...body };
-  delete payload.authentication;
-  const stamp = String(timestamp);
-  const signature = createHmac("sha256", secret)
-    .update(`${stamp}.${canonicalProviderInboundBody(payload)}`)
-    .digest("hex");
-  return {
-    ...payload,
-    authentication: {
-      timestamp: stamp,
-      signature: `v1=${signature}`,
-    },
-  };
 }
