@@ -1,10 +1,12 @@
-/** Operations that exist to make the public/local sandbox or historical
- * compatibility surfaces executable and must never become an accidental
- * production control plane. Production external effects live behind the
- * provider gateway or canonical FX node instead. */
+/** Explicit runtime-mode boundaries for the banking surface.
+ *
+ * Sandbox exercises product models and operator shortcuts locally. Production
+ * external effects cross provider contracts or the canonical FX runtime. Keeping
+ * the boundary executable prevents a local teaching/control path from becoming
+ * an unintended production authority. */
 export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
   new Set([
-    // Public sandbox/bootstrap shortcuts.
+    // Self-serve sandbox/bootstrap shortcuts.
     "POST /v2/auth/signup",
     "POST /v2/customers/:id/verify",
     "POST /v2/accounts/:id/credit",
@@ -12,24 +14,21 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "POST /v2/transfers/:id/settle",
     "POST /v2/destinations/:id/verify",
 
-    // Closing a production account may require revoking provider-backed receiving
-    // instruments. Cancelling a production transfer may require a provider/rail
-    // cancellation and cannot safely refund local clearing funds after submission
-    // has begun. Until those provider capabilities exist, both fail closed.
+    // Production account closure and transfer cancellation require explicit
+    // downstream revocation/cancellation evidence before local state can change.
     "DELETE /v2/accounts/:id",
     "POST /v2/transfers/:id/cancel",
 
-    // The reference application API stores uploaded base64 document contents
-    // inline. Production deployments must use encrypted/object-store/provider
-    // document handling rather than persist document binaries in these fixtures.
+    // Document payloads use the local inline document model. Production identity
+    // submission itself is provider-backed; document binary storage is delegated
+    // to the deployment's encrypted object/document infrastructure.
     "POST /v2/applications/:id/documents",
     "GET /v2/applications/:id/documents/:did",
     "DELETE /v2/applications/:id/documents/:did",
 
-    // Card issuance itself is provider-backed in production. Network
-    // authorisation/transaction ingestion, controls and disputes are still
-    // reference workflows and must not pretend a local state change reached a
-    // real processor.
+    // Card issuance is provider-backed in production. Network authorisation,
+    // processor controls and disputes stay in the sandbox until their dedicated
+    // real-time processor capability contracts are configured.
     "POST /v2/cards/:id/freeze",
     "POST /v2/cards/:id/unfreeze",
     "PATCH /v2/cards/:id/controls",
@@ -45,9 +44,9 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "GET /v2/disputes",
     "POST /v2/disputes/:id/evidence",
 
-    // Savings/credit economics are reference product models until a deployment
-    // supplies institution-approved rate, accrual/posting and credit-risk
-    // policy rather than caller-configured/reference terms.
+    // Savings and credit are institution policy models. Production deployments
+    // supply approved rate/accrual/credit-risk engines rather than caller-defined
+    // economic terms.
     "POST /v2/vaults",
     "GET /v2/vaults/:id",
     "GET /v2/vaults",
@@ -59,17 +58,17 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "GET /v2/credit",
     "POST /v2/credit/:id/draw",
     "POST /v2/credit/:id/repay",
+    "PATCH /v2/credit/:id/collateral",
 
-    // Reference statements include a plaintext base64 stand-in for PDF exports,
-    // and fee schedules are teaching fixtures. Do not expose them as production
-    // document generation or commercial fee configuration.
+    // Statement rendering and commercial fee configuration are sandbox policy
+    // surfaces; the ledger underneath them remains the canonical financial truth.
     "POST /v2/statements",
     "GET /v2/statements/:id",
     "GET /v2/fees/config",
     "PUT /v2/fees/config",
 
-    // Payment-link and recurring-payment fixtures do not execute through a
-    // connected production collection/mandate provider yet.
+    // Payment-link and recurring-collection execution require a deployment-owned
+    // collection/mandate provider contract.
     "POST /v2/links",
     "GET /v2/links/:id",
     "POST /v2/mandates",
@@ -77,9 +76,8 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "POST /v2/subscriptions",
     "GET /v2/subscriptions",
 
-    // Historical banking-runtime FX compatibility mutations. Public reference
-    // market-data reads remain readable/indicative, but tenant/operator state,
-    // quoting, execution and liquidity controls are sandbox/reference-only.
+    // Banking-runtime FX compatibility mutations. New production FX work uses
+    // the canonical FX node, while public market-data reads remain available.
     "POST /v2/quotes",
     "GET /v2/quotes/:id",
     "POST /v2/quotes/:id/execute",
@@ -104,7 +102,7 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "GET /v2/fx/lp/earnings",
     "POST /v2/fx/lp/:id/withdraw",
 
-    // Builder/reference simulation surfaces.
+    // Institution Builder and deterministic scenario execution.
     "POST /v2/builder/projects",
     "GET /v2/builder/projects",
     "GET /v2/builder/projects/:id",
