@@ -8,151 +8,102 @@ import {
 } from "../workers/site/crawler-pages.js";
 import { canonicalRedirectUrl } from "../workers/site/canonical-url.js";
 
-const worker = readFileSync(
-  new URL("../workers/site/index.js", import.meta.url),
-  "utf8",
-);
-const preview = readFileSync(
-  new URL("./dev-cloudflare.mjs", import.meta.url),
-  "utf8",
-);
-const router = readFileSync(new URL("../src/router.ts", import.meta.url), "utf8");
-const brand = readFileSync(new URL("../src/Brand.tsx", import.meta.url), "utf8");
-const siteRoot = readFileSync(
-  new URL("../src/SiteRoot.tsx", import.meta.url),
-  "utf8",
-);
-const cardsPage = readFileSync(
-  new URL("../src/CardsPage.tsx", import.meta.url),
-  "utf8",
-);
-const cardsVisualPage = readFileSync(
-  new URL("../src/cards/CardsVisualPage.tsx", import.meta.url),
-  "utf8",
-);
+const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+const worker = read("../workers/site/index.js");
+const preview = read("./dev-cloudflare.mjs");
+const router = read("../src/router.ts");
+const siteRoot = read("../src/SiteRoot.tsx");
+const app = read("../src/App.tsx");
+const chrome = read("../src/SiteChrome.tsx");
+const brand = read("../src/Brand.tsx");
+const cardsPage = read("../src/CardsPage.tsx");
+const cardsVisualPage = read("../src/cards/CardsVisualPage.tsx");
 
-assert.match(
-  worker,
-  /KNOWN_PAGES[\s\S]*"\/cards"/,
-  "/cards must be an allowed HTML route",
-);
-assert.match(
-  worker,
-  /KNOWN_PAGES[\s\S]*"\/sandbox"/,
-  "/sandbox must be an allowed HTML route",
-);
-assert.match(
-  worker,
-  /fonts\.googleapis\.com/,
-  "CSP must allow the site's loaded webfonts",
-);
+assert.match(worker, /KNOWN_PAGES[\s\S]*"\/cards"/, "/cards must be an allowed HTML route");
+assert.match(worker, /KNOWN_PAGES[\s\S]*"\/sandbox"/, "/sandbox must be an allowed HTML route");
+assert.match(worker, /fonts\.googleapis\.com/, "CSP must allow the site's loaded webfonts");
 assert.match(worker, /fonts\.gstatic\.com/, "CSP must allow font file origin");
 assert.match(worker, /content-security-policy/, "the site must emit a CSP");
-assert.match(
-  worker,
-  /x-content-type-options/,
-  "the site must disable MIME sniffing",
-);
+assert.match(worker, /x-content-type-options/, "the site must disable MIME sniffing");
 assert.match(worker, /referrer-policy/, "the site must set a referrer policy");
-assert.match(
-  worker,
-  /permissions-policy/,
-  "the site must set a permissions policy",
-);
+assert.match(worker, /permissions-policy/, "the site must set a permissions policy");
 
-// Cross-shell navigation is one location contract: both SiteRoot and page-level
-// route consumers observe the same History API transition through usePath().
+// SiteRoot is the one location owner. Every public shell receives the same
+// navigation callback instead of maintaining an independent route state.
 assert.match(
   router,
   /history\.pushState\([\s\S]*dispatchEvent\(new PopStateEvent\("popstate"\)\)/,
-  "client navigation must broadcast popstate after pushState",
+  "client navigation must broadcast History API changes",
+);
+assert.match(siteRoot, /const \[path, navigate\] = usePath\(\)/, "SiteRoot must own browser location state");
+assert.doesNotMatch(app, /usePath\(/, "App must not create a second router");
+assert.match(
+  siteRoot,
+  /<App path=\{path\} navigate=\{navigate\} \/>/,
+  "App must receive the top-level route contract",
 );
 assert.match(
   siteRoot,
-  /const \[path, navigate\] = usePath\(\)/,
-  "SiteRoot must use the shared browser-location router",
+  /<DirectoryShell page="cards" path=\{path\} navigate=\{navigate\} \/>/,
+  "Cards must receive the top-level route contract",
 );
 assert.match(
   siteRoot,
-  /if \(path === "\/cards"\)[\s\S]{0,120}<DirectoryShell page="cards" navigate=\{navigate\} \/>/,
-  "SiteRoot must own the canonical /cards page",
-);
-assert.match(
-  siteRoot,
-  /if \(path === "\/ecosystem"\)[\s\S]{0,120}<DirectoryShell page="ecosystem" navigate=\{navigate\} \/>/,
-  "SiteRoot must own the canonical /ecosystem page",
-);
-assert.match(
-  siteRoot,
-  /\["Stablecoin FX", "\/fx"\][\s\S]{0,180}\["Developers", "\/developers"\][\s\S]{0,180}\["Cards", "\/cards"\][\s\S]{0,180}\["Providers", "\/ecosystem"\]/,
-  "directory pages must keep the same primary menu sequence as the main site",
-);
-assert.match(
-  brand,
-  /href="\/home"/,
-  "interior brand links must return to the canonical site home",
+  /<DirectoryShell page="ecosystem" path=\{path\} navigate=\{navigate\} \/>/,
+  "Providers must receive the top-level route contract",
 );
 
+// One primary navigation definition renders across Home, product directories and
+// mobile. This prevents the header changing order or behavior between shells.
+assert.match(chrome, /export const PRIMARY_NAV/);
+for (const path of [
+  "/home",
+  "/products",
+  "/fx",
+  "/developers",
+  "/cards",
+  "/ecosystem",
+]) {
+  assert.match(chrome, new RegExp(`"${path.replace("/", "\\/")}"`));
+}
+assert.match(app, /<PrimaryHeader path=\{path\} navigate=\{navigate\} \/>/);
+assert.match(siteRoot, /<PrimaryHeader path=\{path\} navigate=\{navigate\} \/>/);
+assert.match(brand, /href="\/home"/, "interior brand links must return to /home");
+
 // Keep one public Cards implementation and one loaded Cards stylesheet.
-assert.match(
-  cardsPage,
-  /import CardsVisualPage from "\.\/cards\/CardsVisualPage"/,
-  "CardsPage must delegate to the canonical CardsVisualPage",
-);
-assert.match(
-  cardsVisualPage,
-  /import "\.\/cards-visual-page\.css"/,
-  "the canonical Cards page must load its canonical stylesheet",
-);
+assert.match(cardsPage, /import CardsVisualPage from "\.\/cards\/CardsVisualPage"/);
+assert.match(cardsVisualPage, /import "\.\/cards-visual-page\.css"/);
 for (const stalePath of [
   "../src/CardsPage.css",
   "../src/cards/hero-explorer.css",
   "../src/cards/workbench.css",
 ]) {
-  assert.equal(
-    existsSync(new URL(stalePath, import.meta.url)),
-    false,
-    `${stalePath} must stay retired`,
-  );
+  assert.equal(existsSync(new URL(stalePath, import.meta.url)), false, `${stalePath} must stay retired`);
 }
 
-assert.equal(
-  pageMetadata("/cards").title,
-  "Card programme research — Blueballs",
-);
-assert.match(crawlerDocument("/cards"), /not the Blueballs Cards API/i);
-assert.match(crawlerDocument("/cards"), /Not connected/);
+assert.equal(pageMetadata("/cards").title, "Card intelligence and programme architecture — Blueballs");
+assert.match(crawlerDocument("/cards"), /institution-owned Blueballs stack/i);
+assert.doesNotMatch(crawlerDocument("/cards"), /not connected|not the Blueballs Cards API/i);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/cards<\/loc>/);
-assert.equal(
-  pageMetadata("/sandbox").title,
-  "Build a fintech sandbox — Blueballs",
-);
+
+assert.equal(pageMetadata("/sandbox").title, "Build a financial institution sandbox — Blueballs");
 assert.match(crawlerDocument("/sandbox"), /protected double-entry ledger/i);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/sandbox<\/loc>/);
-assert.equal(
-  canonicalRedirectUrl("http://blueballs.tech/sandbox", "blueballs.tech", true),
-  null,
-  "local Wrangler preview must not redirect to itself",
-);
-assert.equal(
-  canonicalRedirectUrl("http://blueballs.tech/v2", "blueballs.tech", true),
-  null,
-  "loopback preview must remain reachable over HTTP",
-);
+
+assert.equal(canonicalRedirectUrl("http://blueballs.tech/sandbox", "blueballs.tech", true), null);
+assert.equal(canonicalRedirectUrl("http://blueballs.tech/v2", "blueballs.tech", true), null);
 assert.equal(
   canonicalRedirectUrl("http://blueballs.tech/sandbox", "blueballs.tech"),
   "https://blueballs.tech/sandbox",
 );
 assert.equal(
-  canonicalRedirectUrl(
-    "https://www.blueballs.tech/sandbox",
-    "www.blueballs.tech",
-  ),
+  canonicalRedirectUrl("https://www.blueballs.tech/sandbox", "www.blueballs.tech"),
   "https://blueballs.tech/sandbox",
 );
 assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
+
 console.log(
-  "site route contract: shared navigation is synchronized and Cards has one canonical public implementation",
+  "site route contract: one top-level router, one primary chrome, one canonical Cards implementation",
 );
