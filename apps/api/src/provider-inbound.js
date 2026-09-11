@@ -79,7 +79,7 @@ function compactRecord({ body, money, resourceType, receivedAt, hash }) {
     resource_id: body.resource_id,
     amount: { amount: money.amount, currency: money.currency },
     provider_reference: body.provider_reference,
-    provider_state: body.provider_state ?? "settled",
+    provider_state: body.provider_state,
     source: body.source ?? null,
     fingerprint: hash,
     received_at: receivedAt,
@@ -123,12 +123,21 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
   const tenantId = String(required(body, "tenant_id"));
   const resourceId = String(required(body, "resource_id"));
   const providerReference = String(required(body, "provider_reference"));
+  const providerState = String(body.provider_state ?? "settled").toLowerCase();
+  if (providerState !== "settled") {
+    throw new ApiError(
+      "provider-not-final",
+      422,
+      `${type} can credit customer money only with provider_state=settled`,
+    );
+  }
   body = {
     ...body,
     type,
     tenant_id: tenantId,
     resource_id: resourceId,
     provider_reference: providerReference,
+    provider_state: "settled",
   };
 
   if (!db.tenants.has(tenantId)) {
@@ -136,8 +145,8 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
   }
 
   // Authentication metadata is intentionally excluded from the evidence
-  // fingerprint. A legitimate retry can carry a fresh timestamp/signature while
-  // still representing the exact same durable provider fact.
+  // fingerprint. The provider-state default is normalized before hashing too, so
+  // omitted `provider_state` and explicit `settled` are the same durable fact.
   const hash = fingerprint(body);
   const prior = inboundEvents.get(eventId);
   if (prior) {
