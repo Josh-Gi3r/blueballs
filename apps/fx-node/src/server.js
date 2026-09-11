@@ -2,8 +2,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 
 // Embedded at build time rather than read from disk: Workers have no
-// filesystem, and the previous fallback served an empty `paths: {}` document in
-// production while the real contract sat unreachable in the repository.
+// filesystem, and the same generated contract is served by every runtime.
 import { OPENAPI_YAML } from "./openapi.generated.js";
 
 function apiError(code, status, message, details = undefined) {
@@ -32,20 +31,22 @@ function errorResponse(error) {
     QUOTE_EXPIRED: 409,
     NOT_FOUND: 404,
     AUTH_REQUIRED: 401,
+    OPERATOR_AUTH_REQUIRED: 401,
     VALIDATION_ERROR: 400,
     RESERVE_REPLAY: 409,
     INVALID_STATE: 409,
     INSTRUMENT_DISABLED: 409,
+    INSTRUMENT_HAS_SUPPLY: 409,
     INSUFFICIENT_SETTLED_RESERVE: 409,
     INSUFFICIENT_SUPPLY: 409,
     COVERAGE_LIMIT: 409,
     ORACLE_STALE: 409,
   };
-  let code = error.code ?? "INTERNAL_ERROR";
-  let status = error.status ?? known[code] ?? 400;
-  const message = error.message ?? "request failed";
+  let code = error?.code ?? "INTERNAL_ERROR";
+  let status = error?.status ?? known[code] ?? 500;
+  let message = error?.message ?? "request failed";
 
-  if (!error.code) {
+  if (!error?.code) {
     if (/not found/i.test(message)) {
       code = "NOT_FOUND";
       status = 404;
@@ -62,7 +63,13 @@ function errorResponse(error) {
     } else if (/required|invalid|must|mismatch|cannot/i.test(message)) {
       code = "VALIDATION_ERROR";
       status = 400;
+    } else {
+      code = "INTERNAL_ERROR";
+      status = 500;
+      message = "internal server error";
     }
+  } else if (status >= 500 && !known[code]) {
+    message = "internal server error";
   }
 
   return {
@@ -71,7 +78,7 @@ function errorResponse(error) {
       error: {
         code,
         message,
-        ...(error.details ? { details: error.details } : {}),
+        ...(status < 500 && error?.details ? { details: error.details } : {}),
       },
     },
   };
@@ -137,6 +144,36 @@ function match(pathname, pattern) {
   );
 }
 
+function isOperatorOperation(method, path) {
+  if (method !== "POST") return false;
+  if (path === "/v2/fx/fiat/attestations") return true;
+  if (/^\/v2\/fx\/fiat\/intents\/[^/]+\/settle$/.test(path)) return true;
+  return /^\/v2\/fx\/ops\/quotes\/[^/]+\/(confirmed|failed)$/.test(path);
+}
+
+function validatedOrigins(origins) {
+  if (!Array.isArray(origins) || origins.some((origin) => typeof origin !== "string")) {
+    throw new TypeError("corsOrigins must be an array of strings");
+  }
+  return origins.map((origin) => {
+    let parsed;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      throw new TypeError(`invalid CORS origin: ${origin}`);
+    }
+    if (
+      !["http:", "https:"].includes(parsed.protocol) ||
+      parsed.origin !== origin ||
+      parsed.username ||
+      parsed.password
+    ) {
+      throw new TypeError(`CORS origin must be an exact HTTP(S) origin: ${origin}`);
+    }
+    return origin;
+  });
+}
+
 export function createFxNodeServer({
   market,
   quotes,
@@ -147,8 +184,10 @@ export function createFxNodeServer({
   monetary = null,
   executionAdapter = null,
   apiKey,
+  operatorApiKey = apiKey,
   publicDepth = false,
   corsOrigins = [],
+  sourceCommit = "development",
   now = () => Date.now(),
 } = {}) {
   if (!market) throw new TypeError("market service required");
@@ -173,16 +212,14 @@ export function createFxNodeServer({
       "monetary must expose the reference monetary engine contract",
     );
   }
-  if (
-    !Array.isArray(corsOrigins) ||
-    corsOrigins.some((origin) => typeof origin !== "string")
-  ) {
-    throw new TypeError("corsOrigins must be an array of strings");
-  }
   if (typeof apiKey !== "string" || apiKey.length < 8)
     throw new TypeError("apiKey of at least 8 characters required");
+  if (typeof operatorApiKey !== "string" || operatorApiKey.length < 8)
+    throw new TypeError("operatorApiKey of at least 8 characters required");
+  if (typeof sourceCommit !== "string" || !sourceCommit)
+    throw new TypeError("sourceCommit must be a non-empty string");
 
-  const allowedOrigins = new Set(corsOrigins);
+  const allowedOrigins = new Set(validatedOrigins(corsOrigins));
 
   function applyCors(req, res) {
     const origin = req.headers.origin;
@@ -198,15 +235,25 @@ export function createFxNodeServer({
     return true;
   }
 
-  function authenticate(req) {
+  function authenticateWith(req, secret, code, message) {
     const authorization = req.headers.authorization;
     if (
       typeof authorization !== "string" ||
-      !secretMatches(authorization, `Bearer ${apiKey}`)
+      !secretMatches(authorization, `Bearer ${secret}`)
     ) {
-      throw apiError("AUTH_REQUIRED", 401, "valid API key required");
+      throw apiError(code, 401, message);
     }
   }
+
+  const authenticate = (req) =>
+    authenticateWith(req, apiKey, "AUTH_REQUIRED", "valid API key required");
+  const authenticateOperator = (req) =>
+    authenticateWith(
+      req,
+      operatorApiKey,
+      "OPERATOR_AUTH_REQUIRED",
+      "valid operator API key required",
+    );
 
   async function submitQuote(quoteId) {
     const privateQuote = quotes.getPrivateQuote(quoteId);
@@ -227,6 +274,10 @@ export function createFxNodeServer({
     try {
       outcome = await executionAdapter.submit(privateQuote, { submissionRef });
     } catch (error) {
+      console.error(
+        "FX execution submission outcome is ambiguous",
+        error?.code ?? error?.name ?? "execution_adapter_error",
+      );
       return {
         status: 202,
         body: {
@@ -234,7 +285,7 @@ export function createFxNodeServer({
           execution: {
             status: "UNKNOWN",
             submissionRef,
-            reason: error.message,
+            reason: "execution outcome unknown; reconcile using submissionRef",
           },
         },
       };
@@ -249,7 +300,7 @@ export function createFxNodeServer({
       throw apiError(
         "EXECUTION_REJECTED",
         409,
-        outcome.reason ?? "execution adapter rejected submission",
+        "execution adapter rejected submission",
       );
     }
     if (status === "UNKNOWN" || status !== "ACCEPTED") {
@@ -260,11 +311,7 @@ export function createFxNodeServer({
           execution: {
             status: "UNKNOWN",
             submissionRef,
-            reason:
-              outcome?.reason ??
-              (status === "UNKNOWN"
-                ? null
-                : `unexpected adapter status: ${status}`),
+            reason: "execution outcome requires reconciliation",
           },
         },
       };
@@ -306,6 +353,7 @@ export function createFxNodeServer({
         return send(res, 200, {
           status: "ok",
           service: "blueballs-fx-node",
+          source_commit: sourceCommit,
           ...(inspector ? { runtime: inspector.status().mode } : {}),
         });
       }
@@ -341,8 +389,8 @@ export function createFxNodeServer({
       }
 
       // Anonymous access is an exact method/path contract, not a path-prefix
-      // bypass. Reads and the stateless preview are public; every reservation,
-      // mutation, resource lookup, release and execution requires the operator key.
+      // bypass. Reads and stateless previews are public. Client mutations use the
+      // integration key; authoritative finality/evidence routes use the operator key.
       const publicReferenceOperations = new Set([
         "GET /v2/fx/reference/status",
         "GET /v2/fx/reference/policy",
@@ -355,8 +403,8 @@ export function createFxNodeServer({
         "GET /v2/fx/reference/monetary/instruments",
         "POST /v2/fx/reference/monetary/remittance/preview",
       ]);
-      if (!publicReferenceOperations.has(`${method} ${path}`))
-        authenticate(req);
+      if (isOperatorOperation(method, path)) authenticateOperator(req);
+      else if (!publicReferenceOperations.has(`${method} ${path}`)) authenticate(req);
 
       if (inspector && method === "GET" && path === "/v2/fx/reference/status") {
         return send(res, 200, inspector.status());
@@ -704,6 +752,12 @@ export function createFxNodeServer({
       throw apiError("NOT_FOUND", 404, "endpoint not found");
     } catch (error) {
       const response = errorResponse(error);
+      if (response.status >= 500) {
+        console.error(
+          "FX node request failed",
+          error?.code ?? error?.name ?? "internal_error",
+        );
+      }
       send(res, response.status, response.body);
     }
   }
