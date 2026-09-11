@@ -33,10 +33,25 @@ test("reference price uses median consensus and rejects outliers", () => {
   });
   assert.equal(result.available, true);
   assert.deepEqual(result.sourceIds, ["a", "b"]);
+  assert.equal(result.confidence, "NORMAL");
   assert.equal(
     result.rejected.some((x) => x.sourceId === "c" && x.reason === "OUTLIER"),
     true,
   );
+});
+
+test("degraded source health propagates into consensus confidence", () => {
+  const engine = new ReferencePriceEngine({ now: () => NOW });
+  const result = engine.consensus({
+    base: "USD",
+    quote: "EUR",
+    observations: [
+      obs("a", "0.9", "0.91", NOW, { status: "OK" }),
+      obs("b", "0.9", "0.91", NOW, { status: "DEGRADED" }),
+    ],
+  });
+  assert.equal(result.available, true);
+  assert.equal(result.confidence, "DEGRADED");
 });
 
 test("stale and inverted observations never enter consensus", () => {
