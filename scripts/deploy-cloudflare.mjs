@@ -78,15 +78,14 @@ if (target === "all" || target === "fx") {
   }
 }
 
-// Every production publication, including a single Worker, must prove the
-// complete repository first. A targeted deploy changes one component of a
-// coupled financial system; allowing it to bypass the release gate would make
-// deploy:api/deploy:fx/deploy:site materially weaker than deploy:cloudflare.
-run("pnpm", ["verify"]);
+// Every publication proves the complete repository from the exact clean checkout.
+// Targeted deploys are still changes to a coupled financial system, so they use
+// the same full release profile as an all-service promotion.
+run("pnpm", ["verify:release"]);
 
 if (target !== "all") {
   console.warn(
-    `Deploying ${target} only. This intentionally creates a temporary mixed-version deployment until the remaining components are promoted from the same commit.`,
+    `Deploying ${target} only. This creates a temporary mixed-version deployment until the remaining components are promoted from the same commit.`,
   );
 }
 
