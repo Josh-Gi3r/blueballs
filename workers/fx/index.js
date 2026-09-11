@@ -27,11 +27,15 @@ export class BlueballsFxApi extends DurableObject {
           scenario: runtime.scenario,
           monetary: runtime.monetary,
           apiKey: env.FX_API_KEY,
-          // Aggregate depth is a published figure by design — the model depends
-          // on counterparties being able to see the curve. Individual orders and
-          // maker identity stay behind the key.
+          // Public-reference worker uses one internal key for authenticated
+          // sandbox mutations. Production CLI deployments require a separate
+          // FX_NODE_OPERATOR_API_KEY for finality/evidence routes.
+          operatorApiKey: env.FX_API_KEY,
+          // Aggregate depth is a published figure by design. Individual orders
+          // and maker identity stay behind authenticated routes.
           publicDepth: true,
           corsOrigins: [],
+          sourceCommit: env.BLUEBALLS_GIT_SHA || "development",
         });
         await node.listen({ port: FX_PORT });
       })();
@@ -54,16 +58,6 @@ export default {
       "x-blueballs-source-commit",
       env.BLUEBALLS_GIT_SHA || "development",
     );
-    if (new URL(request.url).pathname === "/health" && response.ok) {
-      const body = await response.json();
-      return Response.json(
-        { ...body, source_commit: env.BLUEBALLS_GIT_SHA || "development" },
-        {
-          status: response.status,
-          headers,
-        },
-      );
-    }
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
