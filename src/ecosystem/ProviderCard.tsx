@@ -55,34 +55,35 @@ export default function ProviderCard({ provider }: { provider: Provider }) {
         </a>
         <span className="eco-provider-kind">{provider.kind}</span>
       </div>
+
       <p>{provider.provides}</p>
+
       <div className="eco-chip-row">
         {provider.capabilities.map((capability) => (
           <span key={capability}>{capability}</span>
         ))}
       </div>
+
       <div className="eco-provider-access">
         <div>
-          <small>ACCESS</small>
+          <small>ACCESS MODEL</small>
           <b>{provider.access}</b>
         </div>
         <div>
-          <small>SANDBOX</small>
+          <small>DEVELOPER ENVIRONMENT</small>
           <b>{provider.sandbox}</b>
         </div>
         <div>
-          <small>TECHNICAL STATUS</small>
-          <b>{provider.technicalStatus}</b>
+          <small>EVIDENCE AS OF</small>
+          <b>{provider.asOf}</b>
         </div>
       </div>
+
       <div className="eco-provider-modules">
-        <small>RELATIONSHIP · AS OF {provider.asOf}</small>
-        <span>{provider.relationshipStatus}</span>
-      </div>
-      <div className="eco-provider-modules">
-        <small>COULD CONNECT TO</small>
+        <small>BLUEBALLS INTEGRATION SURFACES</small>
         <span>{provider.modules.join(" · ")}</span>
       </div>
+
       <div className="eco-provider-meta">
         <div>
           <small>PRIMARY LAYER</small>
@@ -93,9 +94,10 @@ export default function ProviderCard({ provider }: { provider: Provider }) {
           <b>{provider.regions.join(" · ")}</b>
         </div>
       </div>
+
       <div className="eco-provider-links">
         <a href={provider.docsUrl} target="_blank" rel="noreferrer">
-          Technical docs <span>↗</span>
+          Official docs <span>↗</span>
         </a>
         <a href={provider.url} target="_blank" rel="noreferrer">
           Company <span>↗</span>
