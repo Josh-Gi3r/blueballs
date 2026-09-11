@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.36;
 
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
 import { IERC20Minimal } from "./interfaces/IERC20Minimal.sol";
 
 /// @title Blueballs FX Vault
 /// @notice Segregated token accounting for the FX settlement kernel.
 /// @dev Settlement may only reassign accounted balances. Only account owners withdraw physical tokens.
-contract FxVault {
+contract FxVault is ReentrancyGuard {
     error NotOwner();
     error NotSettlement();
     error SettlementAlreadySet();
@@ -53,24 +55,18 @@ contract FxVault {
     address public settlement;
 
     /// @notice Hard ceiling on the withdrawal delay: ~7 days at 12s blocks.
-    /// @dev The owner may slow withdrawals for incident response but must never be able to
-    ///      stop them. Without this bound `setWithdrawDelayBlocks(type(uint64).max)` would
-    ///      mean no request can ever mature, which is a freeze on user funds however it is
-    ///      described — the vault would be non-custodial in name only, and that same control
-    ///      is what makes an operator an intermediary rather than a protocol.
+    /// @dev Governance may slow withdrawals for incident response, but the bounded
+    ///      ceiling keeps the control finite and observable.
     uint64 public constant MAX_WITHDRAW_DELAY_BLOCKS = 50_400;
 
     /// @notice Blocks that must pass between requesting and executing a user withdrawal.
-    /// @dev Zero means immediate withdrawal (FX-1 default). A deployment that custodies
-    ///      material value can require a delay so a compromised key cannot drain the
-    ///      account before the real owner (or a monitoring system) reacts. The delay never
-    ///      applies to settlement `move`, so it does not affect on-chain trade atomicity,
-    ///      and it is capped so it can never become a withdrawal freeze.
+    /// @dev Zero means immediate withdrawal. The delay never applies to settlement
+    ///      `move`, so token-route atomicity is independent of the withdrawal control.
     uint64 public withdrawDelayBlocks;
 
-    /// @dev Stores the block the request was FILED, never a precomputed maturity block.
-    ///      Maturity is evaluated against the delay in force at execution time, so raising
-    ///      the delay during an incident also extends every request already pending.
+    /// @dev Stores the block the request was filed. Maturity is evaluated against
+    ///      the delay in force at execution time so incident-response changes apply
+    ///      consistently to already-pending requests.
     struct PendingWithdrawal {
         uint256 amount;
         address recipient;
@@ -106,7 +102,7 @@ contract FxVault {
     }
 
     /// @notice Bind the only contract allowed to reassign ledger balances.
-    /// @dev One-time operation. There is deliberately no settlement upgrade path in FX-1.
+    /// @dev One-time operation. Core settlement authority is immutable after binding.
     function bindSettlement(address settlement_) external onlyOwner {
         if (settlement_ == address(0)) revert ZeroAddress();
         if (settlement != address(0)) revert SettlementAlreadySet();
@@ -114,13 +110,8 @@ contract FxVault {
         emit SettlementBound(settlement_);
     }
 
-    /// @notice Configure the withdrawal delay in blocks.
-    /// @dev Only affects the user withdrawal path; it never touches settlement `move`.
-    ///      A change applies to pending requests as well as new ones, because maturity is
-    ///      measured from each request's block against the current delay. Raising the delay
-    ///      therefore also defers requests already filed — deliberate, so that an attacker
-    ///      who pre-files a request under a short delay cannot outrun an incident response.
-    ///      Bounded by MAX_WITHDRAW_DELAY_BLOCKS so the same lever can never freeze funds.
+    /// @notice Configure the bounded withdrawal delay in blocks.
+    /// @dev Only affects participant withdrawals; settlement `move()` is unaffected.
     function setWithdrawDelayBlocks(uint64 blocks_) external onlyOwner {
         if (blocks_ > MAX_WITHDRAW_DELAY_BLOCKS) revert WithdrawDelayTooLong();
         emit WithdrawDelaySet(withdrawDelayBlocks, blocks_);
@@ -142,8 +133,8 @@ contract FxVault {
     }
 
     /// @notice Deposit an allowlisted token and credit exactly the amount physically received.
-    /// @dev Measuring the balance delta prevents unsupported transfer behaviour from creating unbacked credit.
-    function deposit(address token, uint256 amount) external returns (uint256 credited) {
+    /// @dev Balance-delta accounting prevents transfer-fee behavior from creating unbacked credit.
+    function deposit(address token, uint256 amount) external nonReentrant returns (uint256 credited) {
         if (!isSupportedToken[token]) revert UnsupportedToken();
         if (amount == 0) revert ZeroAmount();
 
@@ -164,17 +155,11 @@ contract FxVault {
     }
 
     /// @notice Request a future withdrawal when a delay is configured.
-    /// @dev A pending request does not lock the balance; it only starts the clock. The
-    ///      balance is checked and debited at execution, so a request can never make the
-    ///      vault insolvent, and settlement `move` continues to work against the balance.
+    /// @dev A pending request starts the clock but does not lock settlement balance.
     function requestWithdraw(address token, uint256 amount, address recipient) external {
         if (!isSupportedToken[token]) revert UnsupportedToken();
         if (recipient == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
-
-        // A request must be backed by balance when it is FILED. Without this an account
-        // could pre-file while holding nothing, serve the delay once, and thereafter
-        // deposit and withdraw instantly — the delay would never apply to the funds.
         if (_balances[token][msg.sender] < amount) revert InsufficientBalance();
 
         PendingWithdrawal memory current = pendingWithdrawal[token][msg.sender];
@@ -186,7 +171,7 @@ contract FxVault {
         emit WithdrawRequested(token, msg.sender, recipient, amount, block.number);
     }
 
-    /// @notice Cancel a pending withdrawal request. This is the react-to-compromise primitive.
+    /// @notice Cancel a pending withdrawal request.
     function cancelWithdraw(address token) external {
         if (pendingWithdrawal[token][msg.sender].amount == 0) revert WithdrawNotRequested();
         delete pendingWithdrawal[token][msg.sender];
@@ -194,10 +179,8 @@ contract FxVault {
     }
 
     /// @notice Withdraw accounted balance to a chosen recipient.
-    /// @dev When `withdrawDelayBlocks` is zero the withdrawal is immediate (FX-1 behaviour).
-    ///      When a delay is configured, a matured `requestWithdraw` matching these exact
-    ///      params must exist first.
-    function withdraw(address token, uint256 amount, address recipient) external {
+    /// @dev A configured delay requires a matching matured request.
+    function withdraw(address token, uint256 amount, address recipient) external nonReentrant {
         if (!isSupportedToken[token]) revert UnsupportedToken();
         if (recipient == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
@@ -207,16 +190,10 @@ contract FxVault {
         if (withdrawDelayBlocks != 0) {
             if (req.amount == 0) revert WithdrawNotRequested();
             if (req.amount != amount || req.recipient != recipient) revert WithdrawParamsMismatch();
-            // Maturity is measured against the CURRENT delay, not one frozen at request
-            // time: otherwise a request filed under a short delay stays executable after
-            // the owner raises it, which is exactly when the delay needs to bite.
             if (block.number < req.requestBlock + withdrawDelayBlocks) revert WithdrawNotMatured();
-            // A matured request is not a standing licence to withdraw instantly forever.
             if (_requestExpired(req)) revert WithdrawRequestExpired();
         }
 
-        // Always consume any request, including on the immediate (delay == 0) path, so a
-        // stale entry can neither block future requests nor survive into a later delay.
         if (req.amount != 0) delete pendingWithdrawal[token][msg.sender];
 
         uint256 available = _balances[token][msg.sender];
@@ -257,7 +234,11 @@ contract FxVault {
 
     /// @notice Recover only tokens physically held above all recorded user liabilities.
     /// @dev Accounted participant funds are mathematically excluded from this path.
-    function rescueSurplus(address token, uint256 amount, address recipient) external onlyOwner {
+    function rescueSurplus(address token, uint256 amount, address recipient)
+        external
+        onlyOwner
+        nonReentrant
+    {
         if (!isSupportedToken[token]) revert UnsupportedToken();
         if (recipient == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
@@ -270,8 +251,6 @@ contract FxVault {
     }
 
     /// @notice A request stays valid for one further delay period after it matures.
-    /// @dev Mirrors the two-window design used by production vaults: a request that is
-    ///      never executed goes stale rather than remaining executable indefinitely.
     function _requestExpired(PendingWithdrawal memory req) internal view returns (bool) {
         if (withdrawDelayBlocks == 0) return false;
         return block.number > req.requestBlock + (uint256(withdrawDelayBlocks) * 2);
