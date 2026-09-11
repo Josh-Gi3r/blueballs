@@ -1,8 +1,7 @@
 import { demoFxCall, WEBSITE_FX_DEMO_LABEL } from "./fx/demoRuntime";
 import { createSingleFlight } from "./singleFlight.js";
 
-/** Live client for the Blueballs API. The docs page runs real requests through this. */
-
+/** Browser client for the canonical Blueballs banking and FX HTTP contracts. */
 const IS_PRODUCTION_BUILD = Boolean((import.meta as any).env?.PROD);
 
 export const API_BASE =
@@ -10,9 +9,9 @@ export const API_BASE =
   (IS_PRODUCTION_BUILD ? "" : "http://localhost:5290");
 
 /**
- * When a standalone FX node is configured, the page uses it. A normal static
- * website build has no server process, so it falls back to the embedded seeded
- * demo instead of rendering an empty/offline product.
+ * Production serves FX through the same-origin Worker binding. Local website
+ * development can point at a standalone FX node; when none is configured the
+ * product surface uses the deterministic browser market lab.
  */
 export const FX_NODE_BASE = (import.meta as any).env?.VITE_FX_NODE_BASE || "";
 const REMOTE_FX_CONFIGURED = IS_PRODUCTION_BUILD || Boolean(FX_NODE_BASE);
@@ -20,18 +19,16 @@ export const FX_RUNTIME_MODE: "node" | "demo" = REMOTE_FX_CONFIGURED
   ? "node"
   : "demo";
 export const FX_RUNTIME_LABEL = REMOTE_FX_CONFIGURED
-  ? FX_NODE_BASE || "same-origin Cloudflare FX API"
+  ? FX_NODE_BASE || "same-origin Blueballs FX runtime"
   : WEBSITE_FX_DEMO_LABEL;
 export const fxNodeConfigured = () => true;
 export const fxUsingWebsiteDemo = () => FX_RUNTIME_MODE === "demo";
 
 const KEY_STORAGE = "bb_sandbox_key";
 
-/** Sandbox credentials are tab-scoped. Closing the tab clears the bearer key;
- *  the API also expires it server-side. This avoids turning an exploratory
- *  browser session into a permanent tenant credential. */
+/** Sandbox credentials are tab-scoped and disappear when the tab session ends. */
 export const getKey = () => sessionStorage.getItem(KEY_STORAGE);
-export const setKey = (k: string) => sessionStorage.setItem(KEY_STORAGE, k);
+export const setKey = (key: string) => sessionStorage.setItem(KEY_STORAGE, key);
 export const clearKey = () => sessionStorage.removeItem(KEY_STORAGE);
 
 export type ApiResult = {
@@ -59,9 +56,10 @@ async function requestApi(
       status: 400,
       ms: 0,
       body: null,
-      error: "API paths must stay on this origin under /v2.",
+      error: "Banking API paths must stay under /v2 on the configured origin.",
     };
   }
+
   try {
     const headers: Record<string, string> = {
       "content-type": "application/json",
@@ -69,7 +67,7 @@ async function requestApi(
     const key = getKey();
     if (useKey && key) headers["x-api-key"] = key;
 
-    const res = await fetch(API_BASE + path, {
+    const response = await fetch(API_BASE + path, {
       method,
       headers,
       body:
@@ -78,45 +76,36 @@ async function requestApi(
           : JSON.stringify(body ?? {}),
     });
     const ms = Math.round(performance.now() - started);
-    const text = await res.text();
+    const text = await response.text();
     let parsed: unknown = text;
     try {
       parsed = JSON.parse(text);
     } catch {
-      /* keep raw */
+      // Preserve non-JSON responses for the developer console.
     }
-    return { ok: res.ok, status: res.status, ms, body: parsed };
+    return { ok: response.ok, status: response.status, ms, body: parsed };
   } catch {
     return {
       ok: false,
       status: 0,
       ms: Math.round(performance.now() - started),
       body: null,
-      error: `Could not reach ${API_BASE}. Is the API running?`,
+      error: `Could not reach ${API_BASE || "the same-origin Blueballs API"}.`,
     };
   }
 }
 
-/** Fire a request at the running legacy/general Blueballs API. */
+/** Execute one request against the canonical banking API. */
 export async function call(
   method: string,
   path: string,
   body?: unknown,
   useKey = true,
 ): Promise<ApiResult> {
-  const result = await requestApi(method, path, body, useKey);
-  if (useKey && result.status === 401 && getKey()) {
-    clearKey();
-    const replacement = await provisionKey();
-    if (replacement) return requestApi(method, path, body, true);
-  }
-  return result;
+  return requestApi(method, path, body, useKey);
 }
 
-/**
- * Use the standalone FX node when configured. Otherwise use the embedded
- * browser demo so the public website remains complete and interactive.
- */
+/** Execute one request against the canonical FX HTTP surface. */
 export async function fxCall(
   method: string,
   path: string,
@@ -128,11 +117,12 @@ export async function fxCall(
   }
 
   const started = performance.now();
+  const base = FX_NODE_BASE.replace(/\/$/, "");
   try {
     const headers: Record<string, string> = {
       "content-type": "application/json",
     };
-    const res = await fetch(FX_NODE_BASE.replace(/\/$/, "") + path, {
+    const response = await fetch(base + path, {
       method,
       headers,
       body:
@@ -141,40 +131,39 @@ export async function fxCall(
           : JSON.stringify(body ?? {}),
     });
     const ms = Math.round(performance.now() - started);
-    const text = await res.text();
+    const text = await response.text();
     let parsed: unknown = text;
     try {
       parsed = JSON.parse(text);
     } catch {
-      /* keep raw */
+      // Preserve non-JSON responses for inspection.
     }
-    return { ok: res.ok, status: res.status, ms, body: parsed };
+    return { ok: response.ok, status: response.status, ms, body: parsed };
   } catch {
     return {
       ok: false,
       status: 0,
       ms: Math.round(performance.now() - started),
       body: null,
-      error: `Could not reach ${FX_NODE_BASE}. Is the sandbox FX node running?`,
+      error: `Could not reach ${base || "the same-origin Blueballs FX runtime"}.`,
     };
   }
 }
 
-/** Self-serve signup — no approval step, exactly as documented. */
+/** Issue a self-serve scoped sandbox credential. */
 export async function signup(email: string) {
-  const r = await call("POST", "/v2/auth/signup", { email }, false);
-  const key = (r.body as any)?.key;
+  const result = await call("POST", "/v2/auth/signup", { email }, false);
+  const key = (result.body as any)?.key;
   if (key) setKey(key);
-  return r;
+  return result;
 }
 
-/** Is the API reachable right now? Drives the live/offline badge. */
+/** Public health probe used by the website status indicator. */
 export async function ping(): Promise<boolean> {
-  const r = await call("GET", "/v2", undefined, false);
-  return r.ok;
+  const result = await call("GET", "/v2", undefined, false);
+  return result.ok;
 }
 
-/** Real platform counts when the general API is running. */
 export type SiteStats = {
   accounts: number;
   customers: number;
@@ -184,12 +173,14 @@ export type SiteStats = {
   endpoints_implemented: number;
   endpoints_catalogued: number;
 };
+
+/** Aggregate, non-tenant platform counts exposed by the public site endpoint. */
 export async function getStats(): Promise<SiteStats | null> {
-  const r = await call("GET", "/v2/site/stats", undefined, false);
-  return r.ok ? (r.body as SiteStats) : null;
+  const result = await call("GET", "/v2/site/stats", undefined, false);
+  return result.ok ? (result.body as SiteStats) : null;
 }
 
-/** Sensible example body per endpoint so "Try it" does something meaningful. */
+/** Example request bodies used by the interactive developer catalogue. */
 export function sampleBody(method: string, path: string): unknown | undefined {
   if (method === "GET" || method === "DELETE") return undefined;
   if (path === "/v2/auth/signup") return { email: "you@example.com" };
@@ -219,15 +210,16 @@ export function sampleBody(method: string, path: string): unknown | undefined {
   return {};
 }
 
-/** Silently provisions a sandbox key if the visitor doesn't have one yet, so the
- *  hero FX widget and the quote-latency figure can hit the real API with zero
- *  clicks — same self-serve signup a developer would use, just automatic. */
+/**
+ * Bootstrap a sandbox credential for an explicit sandbox experience. The
+ * marketing/product pages never call this function during ordinary browsing.
+ */
 const provisionKey = createSingleFlight(async (): Promise<string | null> => {
   const existing = getKey();
   if (existing) return existing;
   const email = `visitor-${crypto.randomUUID()}@blueballs.local`;
-  const r = await signup(email);
-  return (r.body as any)?.key ?? null;
+  const result = await signup(email);
+  return (result.body as any)?.key ?? null;
 });
 
 export async function ensureKey(): Promise<string | null> {
