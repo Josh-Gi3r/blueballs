@@ -20,9 +20,9 @@ Together they provide segregated token accounting, maker/taker authority, instit
 - participant token balances are segregated and accounted for in `FxVault`;
 - makers sign EIP-712 orders;
 - takers sign EIP-712 intents with max-input/min-output bounds;
-- the institution grants short-lived policy-authorization hashes;
+- the institution authorizes the exact taker-intent constraints through a router-domain-separated policy hash;
 - `AtomicRouter` executes all selected token fills in one transaction;
-- cancellation, nonce replay, signature validity, policy validity and collateral are enforced on-chain.
+- cancellation, nonce replay, signature validity, intent-bound policy validity and collateral are enforced on-chain.
 
 ## Deployment order
 
@@ -37,7 +37,7 @@ Together they provide segregated token accounting, maker/taker authority, instit
 9. Call `FxSettlement.bindRouter(router)` from the owner.
 10. Verify constructor arguments, source and bindings on the target network.
 
-Vault-to-Settlement and Settlement-to-Router bindings are one-time operations. FX-1 deliberately keeps these core authority links immutable after binding.
+Vault-to-Settlement and Settlement-to-Router bindings are one-time operations. Core settlement authority is immutable after binding.
 
 ## Supported tokens
 
@@ -45,7 +45,7 @@ Only explicitly allowlisted tokens can be deposited.
 
 Evaluate each token's transfer behavior, decimals, administrative controls, upgradeability, pausing/blocklist model and issuer/redemption characteristics before adding it to the deployment allowlist.
 
-`FxVault.deposit()` credits the actual physical balance delta received, so transfer-fee behavior cannot create unbacked internal credit.
+`FxVault.deposit()` credits the actual physical balance delta received, so transfer-fee behavior cannot create unbacked internal credit. Physical token-transfer paths are reentrancy-guarded, and every successful token movement rechecks vault solvency.
 
 ## Funding
 
@@ -99,13 +99,40 @@ Makers can invalidate:
 
 ## Institution policy authority
 
-Before execution, the institution registers the authorization hash referenced by the taker intent:
+Policy authorization is bound to the exact taker intent rather than acting as a bearer credential.
+
+Construct the intended taker constraints with `policyAuthorizationHash = bytes32(0)`, then calculate:
 
 ```text
-PolicyAuthorizationRegistry.authorize(hash, validUntil, epoch)
+AtomicRouter.hashPolicyIntent(intent)
 ```
 
-Institution governance can revoke one authorization or advance the minimum policy epoch. Maker and taker signatures alone are insufficient when institution policy authority is expired, revoked or below the active epoch.
+The returned EIP-712 hash commits to:
+
+```text
+taker
+inputToken
+outputToken
+maxInput
+minOutput
+recipient
+deadline
+nonce
+chain id
+router deployment
+```
+
+Set that returned value as `intent.policyAuthorizationHash`, register it through:
+
+```text
+PolicyAuthorizationRegistry.authorize(policyAuthorizationHash, validUntil, epoch)
+```
+
+and then have the taker sign the final `TakerIntent`.
+
+At execution, `AtomicRouter` recomputes the exact policy hash from the current intent and requires equality before consulting the registry. A valid authorization therefore cannot be copied to another taker, pair, amount bound, recipient, nonce, chain or router deployment.
+
+Institution governance can revoke one authorization or advance the minimum policy epoch. Maker and taker signatures alone are insufficient when institution policy authority is expired, revoked, below the active epoch or does not exactly match the signed intent constraints.
 
 ## Taker intent
 
@@ -130,14 +157,15 @@ The nonce is consumed on successful execution. A revert rolls the nonce back wit
 `AtomicRouter.execute(intent, takerSignature, fills)`:
 
 1. validates intent shape/deadline;
-2. validates institution policy authorization;
-3. validates the taker signature;
-4. rejects a used nonce;
-5. verifies every maker order/signature;
-6. enforces cancellation and maker epoch;
-7. moves pre-funded Vault balances for each fill;
-8. enforces aggregate max-input/min-output bounds;
-9. emits `RouteExecuted`.
+2. recomputes and matches the exact intent-bound policy authorization hash;
+3. validates the registered institution policy authorization;
+4. validates the taker signature;
+5. rejects a used nonce;
+6. verifies every maker order/signature;
+7. enforces cancellation and maker epoch;
+8. moves pre-funded Vault balances for each fill;
+9. enforces aggregate max-input/min-output bounds;
+10. emits `RouteExecuted`.
 
 If any fill or final bound fails, the entire EVM transaction reverts.
 
@@ -145,7 +173,7 @@ If any fill or final bound fails, the entire EVM transaction reverts.
 
 `FxVault` can operate with immediate withdrawals or an institution-configured withdrawal delay. The delay is capped by the contract and applies only to participant withdrawals, not settlement `move()` operations.
 
-Pending withdrawals are explicit, cancellable and time-bounded. This provides an incident-response window without introducing an unbounded administrative freeze primitive.
+Pending withdrawals are explicit, cancellable and time-bounded. This creates a finite incident-response window while keeping participant withdrawal rights encoded directly in the contract.
 
 ## Controlled execution proof
 
@@ -155,6 +183,7 @@ Pending withdrawals are explicit, cancellable and time-bounded. This provides an
 - binds the contracts;
 - funds independent maker/taker accounts;
 - deposits through JSON-RPC transactions;
+- computes and registers the exact intent-bound policy authorization;
 - signs maker and taker EIP-712 payloads;
 - broadcasts one route;
 - verifies post-settlement balances, backing and nonce consumption.
