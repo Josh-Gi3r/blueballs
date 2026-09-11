@@ -4,6 +4,22 @@ function abs(value) {
   return value < 0n ? -value : value;
 }
 
+function finalityCollision(eventId, existing, quoteId, kind) {
+  const error = new Error(
+    `principal event ${eventId} is already bound to ${existing.quote_id}/${existing.kind}`,
+  );
+  error.code = "FINALITY_EVENT_COLLISION";
+  error.status = 409;
+  error.details = {
+    eventId,
+    requestedQuoteId: quoteId,
+    requestedKind: kind,
+    existingQuoteId: existing.quote_id,
+    existingKind: existing.kind,
+  };
+  return error;
+}
+
 export class PrincipalRiskBook {
   constructor({ path = ":memory:", now = () => Date.now(), limits = {} } = {}) {
     this.now = now;
@@ -54,6 +70,27 @@ export class PrincipalRiskBook {
     return this.db.transactionSync(fn);
   }
 
+  #event(eventId, quoteId, kind) {
+    if (eventId === null || eventId === undefined) return { duplicate: false };
+    if (typeof eventId !== "string" || eventId.length === 0)
+      throw new TypeError("eventId required");
+    const previous = this.db
+      .prepare("SELECT quote_id, kind FROM principal_events WHERE event_id = ?")
+      .get(eventId);
+    if (previous) {
+      if (previous.quote_id !== quoteId || previous.kind !== kind) {
+        throw finalityCollision(eventId, previous, quoteId, kind);
+      }
+      return { duplicate: true };
+    }
+    this.db
+      .prepare(
+        "INSERT INTO principal_events(event_id, quote_id, kind, created_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(eventId, quoteId, kind, this.now());
+    return { duplicate: false };
+  }
+
   configureAsset(asset, hardLimit) {
     if (typeof asset !== "string" || asset.length === 0)
       throw new TypeError("asset required");
@@ -89,7 +126,7 @@ export class PrincipalRiskBook {
     const next = BigInt(position);
     const projected = next + this.activeReservedDelta(asset);
     if (abs(projected) > BigInt(row.hard_limit))
-      throw new Error("settled position plus active reservations exceeds hard limit");
+      throw new Error("settled position plus reserved exposure exceeds hard limit");
     this.db
       .prepare(
         "UPDATE principal_positions SET settled_position = ? WHERE asset = ?",
@@ -108,7 +145,7 @@ export class PrincipalRiskBook {
   activeReservedDelta(asset) {
     const rows = this.db
       .prepare(
-        "SELECT delta FROM principal_reservations WHERE asset = ? AND state = 'ACTIVE'",
+        "SELECT delta FROM principal_reservations WHERE asset = ? AND state IN ('ACTIVE', 'SUBMITTED')",
       )
       .all(asset);
     return rows.reduce((sum, row) => sum + BigInt(row.delta), 0n);
@@ -206,6 +243,31 @@ export class PrincipalRiskBook {
     });
   }
 
+  markSubmitted(quoteId) {
+    if (typeof quoteId !== "string" || quoteId.length === 0)
+      throw new TypeError("quoteId required");
+    return this.#transaction(() => {
+      const rows = this.db
+        .prepare(
+          "SELECT state FROM principal_reservations WHERE quote_id = ?",
+        )
+        .all(quoteId);
+      if (rows.length === 0) throw new Error("principal reservation not found");
+      if (rows.every((row) => row.state === "SUBMITTED")) {
+        return { quoteId, duplicate: true };
+      }
+      if (rows.some((row) => row.state !== "ACTIVE")) {
+        throw new Error("principal reservation cannot be submitted from current state");
+      }
+      const result = this.db
+        .prepare(
+          "UPDATE principal_reservations SET state = 'SUBMITTED' WHERE quote_id = ? AND state = 'ACTIVE'",
+        )
+        .run(quoteId);
+      return { quoteId, duplicate: false, rows: Number(result.changes) };
+    });
+  }
+
   release(quoteId, state = "RELEASED") {
     return this.#transaction(() => {
       const active = this.db
@@ -219,6 +281,40 @@ export class PrincipalRiskBook {
         )
         .run(state, quoteId);
       return active.length;
+    });
+  }
+
+  fail({ quoteId, eventId = null, reason = "SETTLEMENT_FAILED" }) {
+    if (typeof quoteId !== "string" || quoteId.length === 0)
+      throw new TypeError("quoteId required");
+    if (typeof reason !== "string" || reason.length === 0)
+      throw new TypeError("reason required");
+    return this.#transaction(() => {
+      if (eventId) {
+        const identity = this.#event(eventId, quoteId, "FAILED");
+        if (identity.duplicate) return { duplicate: true, released: 0 };
+      }
+      const rows = this.db
+        .prepare(
+          "SELECT state FROM principal_reservations WHERE quote_id = ?",
+        )
+        .all(quoteId);
+      if (rows.length === 0) throw new Error("principal reservation not found");
+      if (rows.every((row) => row.state === "FAILED"))
+        return { duplicate: true, released: 0 };
+      if (
+        rows.some(
+          (row) => !["ACTIVE", "SUBMITTED"].includes(row.state),
+        )
+      ) {
+        throw new Error("principal reservation cannot fail from current state");
+      }
+      const result = this.db
+        .prepare(
+          "UPDATE principal_reservations SET state = 'FAILED' WHERE quote_id = ? AND state IN ('ACTIVE', 'SUBMITTED')",
+        )
+        .run(quoteId);
+      return { duplicate: false, released: Number(result.changes), reason };
     });
   }
 
@@ -238,18 +334,16 @@ export class PrincipalRiskBook {
       throw new TypeError("eventId required");
 
     return this.#transaction(() => {
-      const previous = this.db
-        .prepare("SELECT event_id FROM principal_events WHERE event_id = ?")
-        .get(eventId);
-      if (previous) return { duplicate: true };
+      const identity = this.#event(eventId, quoteId, "SETTLED");
+      if (identity.duplicate) return { duplicate: true };
 
       const reservations = this.db
         .prepare(
-          "SELECT * FROM principal_reservations WHERE quote_id = ? AND state = 'ACTIVE'",
+          "SELECT * FROM principal_reservations WHERE quote_id = ? AND state IN ('ACTIVE', 'SUBMITTED')",
         )
         .all(quoteId);
       if (reservations.length === 0)
-        throw new Error("no active principal reservation");
+        throw new Error("no reservable principal exposure for settlement");
 
       for (const reservation of reservations) {
         const row = this.#positionRow(reservation.asset);
@@ -266,14 +360,9 @@ export class PrincipalRiskBook {
 
       this.db
         .prepare(
-          "UPDATE principal_reservations SET state = 'SETTLED' WHERE quote_id = ? AND state = 'ACTIVE'",
+          "UPDATE principal_reservations SET state = 'SETTLED' WHERE quote_id = ? AND state IN ('ACTIVE', 'SUBMITTED')",
         )
         .run(quoteId);
-      this.db
-        .prepare(
-          "INSERT INTO principal_events(event_id, quote_id, kind, created_at) VALUES (?, ?, ?, ?)",
-        )
-        .run(eventId, quoteId, "SETTLED", this.now());
       return { duplicate: false };
     });
   }
