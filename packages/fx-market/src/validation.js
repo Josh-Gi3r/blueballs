@@ -4,6 +4,13 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const BYTES32 = /^0x[0-9a-fA-F]{64}$/;
 const HEX = /^0x(?:[0-9a-fA-F]{2})+$/;
 
+function requireString(value, field) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new TypeError(`${field} is required`);
+  }
+  return value.trim();
+}
+
 export function normalizeAddress(value, field) {
   if (typeof value !== "string" || !ADDRESS.test(value)) {
     throw new TypeError(`${field} must be a 20-byte hex address`);
@@ -26,8 +33,9 @@ export function requireSignature(value) {
 }
 
 export function validateMakerOrder(order) {
-  if (!order || typeof order !== "object")
+  if (!order || typeof order !== "object") {
     throw new TypeError("order is required");
+  }
 
   const normalized = {
     maker: normalizeAddress(order.maker, "order.maker"),
@@ -67,13 +75,17 @@ export function validateMakerOrder(order) {
 }
 
 export function validateAdmission(payload) {
-  if (!payload || typeof payload !== "object")
+  if (!payload || typeof payload !== "object") {
     throw new TypeError("admission payload is required");
+  }
   return {
     orderHash: requireBytes32(payload.orderHash, "orderHash"),
     order: validateMakerOrder(payload.order),
     signature: requireSignature(payload.signature),
-    policyAuthorizationId: String(payload.policyAuthorizationId ?? ""),
+    policyAuthorizationId: requireString(
+      payload.policyAuthorizationId,
+      "policyAuthorizationId",
+    ),
     policySnapshotHash: requireBytes32(
       payload.policySnapshotHash,
       "policySnapshotHash",
