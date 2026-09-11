@@ -27,6 +27,7 @@ if (!existsSync(workflowPath)) {
     ["Solidity fuzz\/invariant gate", /make -C packages\/fx-contracts ci/],
     ["reference container build", /docker build[^\n]*Dockerfile\.reference/],
     ["Compose validation", /docker compose[^\n]*compose\.reference\.yml[^\n]*config/],
+    ["container vulnerability scan", /aquasec\/trivy:[^\s]+ image[\s\S]*--severity HIGH,CRITICAL/],
     ["tracked secret scan", /node scripts\/scan-secrets\.mjs/],
     ["production dependency audit", /pnpm audit --prod --audit-level high/],
     ["CodeQL initialization", /github\/codeql-action\/init@v3/],
