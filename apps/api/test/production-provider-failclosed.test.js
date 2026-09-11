@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { signProviderInboundBody } from "../../../spec/provider-inbound-signing.mjs";
 import { createApiFixture } from "./helpers/api-process.js";
 
 const BOOTSTRAP_KEY = "bb_production_no_provider_test_key_123456789";
+const OPERATOR_KEY = "bb_production_no_provider_operator_123456789";
+const INBOUND_SECRET =
+  "production-no-provider-inbound-secret-0123456789abcdef0123456789abcdef";
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
 function collectionCount(path, table) {
   const database = new DatabaseSync(path);
@@ -14,15 +20,42 @@ function collectionCount(path, table) {
   }
 }
 
+async function fundAccount(api, tenantId, accountId) {
+  const body = signProviderInboundBody(
+    {
+      event_id: "no-provider-funding-000001",
+      tenant_id: tenantId,
+      type: "payments.account_credit_settled",
+      resource_id: accountId,
+      amount: { amount: "200.00", currency: "SGD" },
+      rail: "paynow",
+      provider_reference: "inbound-no-provider-1",
+      provider_state: "settled",
+    },
+    { secret: INBOUND_SECRET },
+  );
+  const response = await api.request("POST", "/internal/provider/events", {
+    key: OPERATOR_KEY,
+    body,
+  });
+  assert.equal(response.status, 200, JSON.stringify(response.body));
+}
+
 test("provider-dependent production commands fail closed and leave no partial local state", async (t) => {
   const api = await createApiFixture({
     env: {
       BANK_API_MODE: "production",
       BANK_BOOTSTRAP_API_KEY: BOOTSTRAP_KEY,
       BANK_BOOTSTRAP_EMAIL: "ops-no-provider@example.test",
+      OPERATOR_API_KEY_HASH: sha256(OPERATOR_KEY),
+      BANK_PROVIDER_INBOUND_SECRET: INBOUND_SECRET,
     },
   });
   t.after(() => api.close());
+
+  const keys = await api.request("GET", "/v2/keys", { key: BOOTSTRAP_KEY });
+  assert.equal(keys.status, 200);
+  const tenantId = keys.body.current.tenant_id;
 
   const customer = await api.request("POST", "/v2/customers", {
     key: BOOTSTRAP_KEY,
@@ -90,25 +123,45 @@ test("provider-dependent production commands fail closed and leave no partial lo
     "failed provider queue must roll back the submitted KYC state",
   );
 
-  const credit = await api.request("POST", "/v2/credit", {
-    key: BOOTSTRAP_KEY,
-    body: { account: account.body.id, limit: "500.00" },
-  });
-  assert.equal(credit.status, 201);
-  const draw = await api.request("POST", `/v2/credit/${credit.body.id}/draw`, {
-    key: BOOTSTRAP_KEY,
-    body: { amount: "200.00" },
-  });
-  assert.equal(draw.status, 200);
+  // Funding is a signed settled provider fact. The absence under test is the
+  // outbound provider adapter, not customer-money provenance.
+  await fundAccount(api, tenantId, account.body.id);
   const beforeTransfer = await api.request(
     "GET",
     `/v2/accounts/${account.body.id}`,
     { key: BOOTSTRAP_KEY },
   );
+  assert.equal(beforeTransfer.body.balance.amount, "200.00");
+
+  const recipient = await api.request("POST", "/v2/recipients", {
+    key: BOOTSTRAP_KEY,
+    body: { name: "No Provider Supplier" },
+  });
+  assert.equal(recipient.status, 201);
+  const destination = await api.request(
+    "POST",
+    `/v2/recipients/${recipient.body.id}/destinations`,
+    {
+      key: BOOTSTRAP_KEY,
+      body: {
+        rail: "paynow",
+        name: "No Provider Supplier",
+        currency: "SGD",
+        proxy: "+6594445555",
+      },
+    },
+  );
+  assert.equal(destination.status, 201);
 
   const transfer = await api.request("POST", "/v2/transfers", {
     key: BOOTSTRAP_KEY,
-    body: { from: account.body.id, amount: "50.00", rail: "paynow" },
+    body: {
+      from: account.body.id,
+      recipient: recipient.body.id,
+      destination: destination.body.id,
+      amount: "50.00",
+      rail: "paynow",
+    },
   });
   assert.equal(transfer.status, 503);
   const afterTransfer = await api.request(
