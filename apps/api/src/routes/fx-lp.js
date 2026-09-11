@@ -1,18 +1,8 @@
-/** Liquidity provision — the same mechanism for a bank and for a person.
+/** Compatibility liquidity provision for the banking API FX surface.
  *
- *  The point of the whole design: anyone verified can supply a corridor and earn a
- *  share of the spread their liquidity produced. A bank is not a different kind of
- *  participant, only a larger one. That is what makes the network compound — every
- *  neobank on the stack is both a consumer of the FX rail and a provider into it.
- *
- *  Yield comes from real flow — the spread a taker actually paid — not from emissions.
- *  If no one trades the corridor, an LP earns nothing. That is correct.
- *
- *  Who is naturally suited to which corridor:
- *    issuer         reserves ARE that currency — near-zero inventory risk
- *    bank           already long its deposit base — monetises exposure it has anyway
- *    person / fund  no native position, must round-trip — the only class that can
- *                   get stuck, which is why they are paid the widest share
+ * Monetary commitments, pool balances and earnings remain exact minor units.
+ * The canonical production FX runtime lives in apps/fx-node; this module keeps
+ * historical banking-API liquidity behavior financially coherent in sandbox mode.
  */
 
 import {
@@ -31,32 +21,20 @@ import {
   must,
   visibleTo,
   principalId,
+  positiveMinor,
 } from "../kernel.js";
 import { isStable } from "../assets.js";
 
 const positions = collection("fxLpPositions");
 const earnings = collection("fxLpEarnings");
 
-/** How a spread is split. The provider takes the majority — they carry the risk.
- *  Everything here is integer basis points: these numbers multiply real money, and
- *  0.70 + 0.10 is not 0.80 in binary floating point. */
 export const SPREAD_SPLIT_BPS = { provider: 7000, operator: 3000 };
 const MAX_SHARE_BPS = 9500;
-
-/** Class only affects the share, never access. Anyone verified can provide. */
 const CLASS_BONUS_BPS = {
-  issuer: 0, // near-zero risk, so no premium
-  bank: 500, // long its deposits already
-  member: 1000, // no native position — paid most for round-trip risk
+  issuer: 0,
+  bank: 500,
+  member: 1000,
 };
-
-/** The class is DERIVED from the verified customer, never taken on trust from the
- *  request. Self-declaration would be free money: `member` pays the most, so every
- *  bank would simply call itself one. Since the premium exists to compensate real
- *  round-trip risk, it has to follow who the customer actually is.
- *
- *  A provider may still declare a class *below* the one they qualify for — an issuer
- *  being honest about holding native reserves — but never above it. */
 const CLASS_RANK = { issuer: 0, bank: 1, member: 2 };
 
 function classFor(customer, declared) {
@@ -66,7 +44,7 @@ function classFor(customer, declared) {
     CLASS_RANK[declared] !== undefined &&
     CLASS_RANK[declared] < CLASS_RANK[derived]
   ) {
-    return declared; // claiming down is allowed
+    return declared;
   }
   return derived;
 }
@@ -74,162 +52,170 @@ function classFor(customer, declared) {
 const shareBpsFor = (klass) =>
   Math.min(MAX_SHARE_BPS, SPREAD_SPLIT_BPS.provider + CLASS_BONUS_BPS[klass]);
 
-/** Positions committed before shares moved to integer basis points are still live in
- *  the store. Read their share through here so an old row can never become NaN
- *  halfway through a payout. */
-const shareBpsOf = (p) =>
-  Number.isInteger(p.share_bps)
-    ? p.share_bps
-    : typeof p.share === "number"
-      ? Math.round(p.share * 10000)
-      : shareBpsFor(p.class ?? "member");
+const shareBpsOf = (position) =>
+  Number.isInteger(position.share_bps)
+    ? position.share_bps
+    : typeof position.share === "number"
+      ? Math.round(position.share * 10000)
+      : shareBpsFor(position.class ?? "member");
 
-const pairKey = (a, b) => `${a}/${b}`;
-/** A corridor is bidirectional — the same pool serves USDC/EURC and EURC/USDC.
- *  Always compare on the normalised form or providers silently never get paid. */
-export const normPair = (p) => p.split("/").sort().join("/");
+export const normPair = (pair) => pair.split("/").sort().join("/");
 
-/** The single account a corridor's committed liquidity lives in.
- *  Normalised, because a corridor is bidirectional: without this, committing
- *  EURC/USDC funded a different account than USDC/EURC while creditProviders()
- *  normalised for the payout, so a provider could be paid out of a pool their
- *  capital was never in. */
 export const poolAccount = (pair, currency) =>
   `lp:${normPair(pair.toUpperCase())}:${currency}`;
 
-/* ---- commit liquidity to a corridor ---- */
 route(
   "POST",
   "/v2/fx/lp",
   ({ body, key }) => {
     need(body, ["account", "currency", "amount", "pair"]);
-    const acc = must(db.accounts, body.account, "account", key);
+    const account = must(db.accounts, body.account, "account", key);
+    if (account.status === "closed") {
+      throw new ApiError("conflict", 409, `Account ${account.id} is closed`);
+    }
 
-    const cus = db.customers.get(acc.customer);
-    if (!cus || cus.decision !== "approved") {
+    const customer = db.customers.get(account.customer);
+    if (!customer || customer.decision !== "approved") {
       throw new ApiError(
         "tier-insufficient",
         403,
-        "Liquidity providers must be verified — that is what makes every fill attributable",
+        "Liquidity providers must be verified before committing funds",
       );
     }
 
-    const cur = String(body.currency).toUpperCase();
-    if (!isStable(cur))
+    const currency = String(body.currency).toUpperCase();
+    if (!isStable(currency)) {
       throw new ApiError(
         "validation-error",
         400,
-        `${cur} is not a stablecoin — ramp fiat first`,
+        `${currency} is not a configured stablecoin`,
       );
+    }
+    if (account.currency !== currency) {
+      throw new ApiError(
+        "validation-error",
+        400,
+        `Account ${account.id} holds ${account.currency}, not ${currency}`,
+      );
+    }
 
     const [a, b] = String(body.pair).toUpperCase().split("/");
-    if (!a || !b || (cur !== a && cur !== b)) {
+    if (!a || !b || a === b || (currency !== a && currency !== b)) {
       throw new ApiError(
         "validation-error",
         400,
-        `Committed currency must be one side of ${body.pair}`,
+        `Committed currency must be one side of a two-asset corridor such as ${currency}/USDC`,
+      );
+    }
+    if (!isStable(a) || !isStable(b)) {
+      throw new ApiError(
+        "validation-error",
+        400,
+        "Compatibility LP corridors support configured stablecoins only",
       );
     }
 
-    const minor = toMinor(body.amount);
-    if (balanceOf(acc.id, cur) < minor) {
+    const minor = positiveMinor(body.amount);
+    const available = balanceOf(account.id, currency);
+    if (available < minor) {
       throw new ApiError(
         "insufficient-balance",
         400,
-        `Account holds ${fromMinor(balanceOf(acc.id, cur))} ${cur}`,
+        `Account holds ${fromMinor(available)} ${currency}`,
       );
     }
 
-    const klass = classFor(cus, body.class);
-
-    // liquidity moves into the corridor's pool account — still the LP's, but committed
-    const pool = poolAccount(`${a}/${b}`, cur);
+    const klass = classFor(customer, body.class);
+    const pool = poolAccount(`${a}/${b}`, currency);
     post(
       [
-        { account: acc.id, currency: cur, amount: -minor },
-        { account: pool, currency: cur, amount: minor },
+        { account: account.id, currency, amount: -minor },
+        { account: pool, currency, amount: minor },
       ],
-      `lp commit ${cur} → ${a}/${b}`,
+      `lp commit ${currency} → ${a}/${b}`,
     );
 
-    const p = {
+    const position = {
       id: ksuid("lpp"),
-      account: acc.id,
-      customer: acc.customer,
+      account: account.id,
+      customer: account.customer,
       class: klass,
       pair: `${a}/${b}`,
-      currency: cur,
-      committed: body.amount,
+      currency,
+      committed: fromMinor(minor),
       share_bps: shareBpsFor(klass),
       status: "active",
       created_at: now(),
       owner: principalId(key),
     };
-    positions.set(p.id, p);
+    positions.set(position.id, position);
     emit(
       "fx.lp.committed",
-      { id: p.id, pair: p.pair, currency: cur },
-      { tenantId: p.owner },
+      { id: position.id, pair: position.pair, currency },
+      { tenantId: position.owner },
     );
 
     return {
-      ...p,
-      share: (p.share_bps / 100).toFixed(0) + "%",
-      earned: { amount: "0.00", currency: cur },
+      ...position,
+      share: `${position.share_bps / 100}%`,
+      earned: { amount: "0.00", currency },
       class_note:
         body.class && body.class !== klass
-          ? `Class is derived from your verified customer record, not the request — you were recorded as ${klass}.`
+          ? `Provider class follows the verified customer record; this position is recorded as ${klass}.`
           : undefined,
-      note: `Earning ${p.share_bps / 100}% of the spread on fills your liquidity provides. Yield comes from real flow — no trades, no earnings.`,
+      note: `This position receives ${position.share_bps / 100}% of attributed spread when pooled liquidity is consumed.`,
     };
   },
   { created: true },
 );
 
-/** Called by the swap engine when a fill consumed pooled liquidity.
- *  Credits the providers pro-rata to what each has committed. */
+/** Credit active positions pro-rata when a fill consumes pooled liquidity. */
 export function creditProviders(pair, currency, spreadMinor, fillId) {
   const active = [...positions.values()].filter(
-    (p) =>
-      p.status === "active" &&
-      normPair(p.pair) === normPair(pair) &&
-      p.currency === currency,
+    (position) =>
+      position.status === "active" &&
+      normPair(position.pair) === normPair(pair) &&
+      position.currency === currency,
   );
   if (!active.length || spreadMinor <= 0n) return [];
 
-  const total = active.reduce((n, p) => n + toMinor(p.committed), 0n);
+  const total = active.reduce(
+    (sum, position) => sum + toMinor(position.committed),
+    0n,
+  );
   if (total <= 0n) return [];
 
   const credited = [];
-  for (const p of active) {
-    // All integer: spread x stake-weight x share, in minor units and basis points.
-    // Any float here would round real money in a way that never reconciles.
-    const gross = (spreadMinor * toMinor(p.committed)) / total;
-    const providerCut = (gross * BigInt(shareBpsOf(p))) / 10000n;
+  for (const position of active) {
+    const gross =
+      (spreadMinor * toMinor(position.committed)) / total;
+    const providerCut =
+      (gross * BigInt(shareBpsOf(position))) / 10000n;
     if (providerCut <= 0n) continue;
 
     post(
       [
         { account: `spread:${pair}`, currency, amount: -providerCut },
-        { account: p.account, currency, amount: providerCut },
+        { account: position.account, currency, amount: providerCut },
       ],
       `lp earning ${fillId}`,
     );
 
-    const e = {
+    const earning = {
       id: ksuid("lpe"),
-      position: p.id,
+      position: position.id,
       fill: fillId,
       pair,
       currency,
       amount: fromMinor(providerCut),
-      share_bps: shareBpsOf(p),
+      share_bps: shareBpsOf(position),
       at: now(),
-      owner: p.owner,
+      owner: position.owner,
     };
-    earnings.set(e.id, e);
-    credited.push(e);
+    earnings.set(earning.id, earning);
+    credited.push(earning);
   }
+
   for (const earning of credited) {
     emit(
       "fx.lp.earned",
@@ -245,20 +231,21 @@ export function creditProviders(pair, currency, spreadMinor, fillId) {
   return credited;
 }
 
-/* ---- positions and what they have earned ---- */
 route("GET", "/v2/fx/lp", ({ key }) => {
   const mine = visibleTo([...positions.values()], key);
   return {
     object: "list",
-    data: mine.map((p) => {
+    data: mine.map((position) => {
       const earned = [...earnings.values()]
-        .filter((e) => e.position === p.id)
-        .reduce((n, e) => n + toMinor(e.amount), 0n);
+        .filter((earning) => earning.position === position.id)
+        .reduce((sum, earning) => sum + toMinor(earning.amount), 0n);
       return {
-        ...p,
-        share: `${shareBpsOf(p) / 100}%`,
-        earned: { amount: fromMinor(earned), currency: p.currency },
-        fills: [...earnings.values()].filter((e) => e.position === p.id).length,
+        ...position,
+        share: `${shareBpsOf(position) / 100}%`,
+        earned: { amount: fromMinor(earned), currency: position.currency },
+        fills: [...earnings.values()].filter(
+          (earning) => earning.position === position.id,
+        ).length,
       };
     }),
   };
@@ -274,76 +261,82 @@ route("GET", "/v2/fx/lp/earnings", ({ key, url }) => {
   };
 });
 
-/* ---- pull liquidity back out ---- */
 route("POST", "/v2/fx/lp/:id/withdraw", ({ params, key }) => {
-  const p = must(positions, params.id, "position", key);
-  if (p.status !== "active")
-    throw new ApiError("conflict", 409, "Already withdrawn");
+  const position = must(positions, params.id, "position", key);
+  if (position.status !== "active") {
+    throw new ApiError("conflict", 409, "Position is not active");
+  }
 
-  const pool = poolAccount(p.pair, p.currency);
-  const available = balanceOf(pool, p.currency);
-  const want = toMinor(p.committed);
-  const give = available < want ? available : want;
+  const pool = poolAccount(position.pair, position.currency);
+  const available = balanceOf(pool, position.currency);
+  const committed = toMinor(position.committed);
 
-  if (give > 0n) {
-    post(
-      [
-        { account: pool, currency: p.currency, amount: -give },
-        { account: p.account, currency: p.currency, amount: give },
-      ],
-      `lp withdraw ${p.id}`,
+  // A position is either returned in full or left active. Marking a partially
+  // returned position withdrawn would silently destroy the remaining LP claim.
+  if (available < committed) {
+    throw new ApiError(
+      "liquidity-in-use",
+      409,
+      `Pool currently has ${fromMinor(available)} ${position.currency} available against ${position.committed} committed; the position remains active until enough same-asset inventory is available`,
     );
   }
 
-  p.status = "withdrawn";
-  p.withdrawn = fromMinor(give);
-  positions.set(p.id, p);
+  post(
+    [
+      { account: pool, currency: position.currency, amount: -committed },
+      { account: position.account, currency: position.currency, amount: committed },
+    ],
+    `lp withdraw ${position.id}`,
+  );
+
+  position.status = "withdrawn";
+  position.withdrawn = fromMinor(committed);
+  position.withdrawn_at = now();
+  positions.set(position.id, position);
   emit(
     "fx.lp.withdrawn",
-    { id: p.id, amount: p.withdrawn },
-    { tenantId: p.owner },
+    { id: position.id, amount: position.withdrawn },
+    { tenantId: position.owner },
   );
 
   return {
-    ...p,
-    returned: { amount: fromMinor(give), currency: p.currency },
-    note:
-      give < want
-        ? "Part of your liquidity is still working in unsettled fills. The rest returns as they settle."
-        : "Liquidity returned in full. Earnings were paid to your account as they were made.",
+    ...position,
+    returned: { amount: fromMinor(committed), currency: position.currency },
   };
 });
 
-/* ---- who is providing what, in aggregate. No identity, same rule as depth. ---- */
 route(
   "GET",
   "/v2/fx/lp/pools",
   () => {
     const byPair = {};
-    for (const p of positions.values()) {
-      if (p.status !== "active") continue;
-      const k = `${p.pair}:${p.currency}`;
-      byPair[k] ??= {
-        pair: p.pair,
-        currency: p.currency,
+    for (const position of positions.values()) {
+      if (position.status !== "active") continue;
+      const key = `${normPair(position.pair)}:${position.currency}`;
+      byPair[key] ??= {
+        pair: normPair(position.pair),
+        currency: position.currency,
         committed: 0n,
         providers: 0,
         classes: new Set(),
       };
-      byPair[k].committed += toMinor(p.committed);
-      byPair[k].providers += 1;
-      byPair[k].classes.add(p.class);
+      byPair[key].committed += toMinor(position.committed);
+      byPair[key].providers += 1;
+      byPair[key].classes.add(position.class);
     }
     return {
       object: "list",
       disclosure: "aggregate",
-      data: Object.values(byPair).map((d) => ({
-        pair: d.pair,
-        currency: d.currency,
-        committed: { amount: fromMinor(d.committed), currency: d.currency },
+      data: Object.values(byPair).map((pool) => ({
+        pair: pool.pair,
+        currency: pool.currency,
+        committed: {
+          amount: fromMinor(pool.committed),
+          currency: pool.currency,
+        },
         providers:
-          d.providers < 3 ? "few" : d.providers < 10 ? "several" : "many",
-        provider_classes: [...d.classes].sort(),
+          pool.providers < 3 ? "few" : pool.providers < 10 ? "several" : "many",
+        provider_classes: [...pool.classes].sort(),
       })),
     };
   },
