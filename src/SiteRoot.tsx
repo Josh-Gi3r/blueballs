@@ -3,30 +3,34 @@ import App from "./App";
 import EcosystemPage from "./EcosystemPage";
 import CardsPage from "./CardsPage";
 import { BrandLockup } from "./Brand";
+import { usePath } from "./router";
 import SandboxPage from "./sandbox/SandboxPage";
 
 const CityLanding = lazy(() => import("./city/CityLanding"));
 
 const MONO = "'IBM Plex Mono', monospace";
-function navigate(path: string) {
-  if (window.location.pathname !== path) window.history.pushState({}, "", path);
-  window.dispatchEvent(new PopStateEvent("popstate"));
-  window.scrollTo(0, 0);
-}
+type Navigate = (path: string) => void;
 
-function DirectoryShell({ page }: { page: "cards" | "ecosystem" }) {
+function DirectoryShell({
+  page,
+  navigate,
+}: {
+  page: "cards" | "ecosystem";
+  navigate: Navigate;
+}) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const go = (path: string) => {
     setMobileNavOpen(false);
     navigate(path);
   };
+  // Keep the public header sequence identical to the main App header.
   const nav = [
     ["Home", "/home"],
     ["Products", "/products"],
     ["Stablecoin FX", "/fx"],
+    ["Developers", "/developers"],
     ["Cards", "/cards"],
     ["Providers", "/ecosystem"],
-    ["Developers", "/developers"],
   ] as const;
   const active = page === "cards" ? "/cards" : "/ecosystem";
   const ticker =
@@ -347,15 +351,12 @@ function DirectoryShell({ page }: { page: "cards" | "ecosystem" }) {
 }
 
 export default function SiteRoot() {
-  const [path, setPath] = useState(() => window.location.pathname);
-  useEffect(() => {
-    const onPop = () => setPath(window.location.pathname);
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  const [path, navigate] = usePath();
+
   useEffect(() => {
     if (path === "/bulletin") navigate("/developers");
-  }, [path]);
+  }, [path, navigate]);
+
   if (path === "/") {
     return (
       <Suspense
@@ -369,8 +370,10 @@ export default function SiteRoot() {
       </Suspense>
     );
   }
-  if (path === "/ecosystem") return <DirectoryShell page="ecosystem" />;
-  if (path === "/cards") return <DirectoryShell page="cards" />;
+  if (path === "/ecosystem")
+    return <DirectoryShell page="ecosystem" navigate={navigate} />;
+  if (path === "/cards")
+    return <DirectoryShell page="cards" navigate={navigate} />;
   if (path === "/sandbox") return <SandboxPage />;
   return <App />;
 }
