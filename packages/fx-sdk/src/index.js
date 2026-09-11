@@ -31,6 +31,13 @@ function normalizedBaseUrl(value) {
   return parsed.toString().replace(/\/$/, "");
 }
 
+function optionalSecret(value, field) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.length === 0)
+    throw new TypeError(`${field} must be a non-empty string when provided`);
+  return value;
+}
+
 function atomicAmount(value, field = "amount") {
   if (typeof value === "bigint") {
     if (value <= 0n) throw new RangeError(`${field} must be positive`);
@@ -43,7 +50,9 @@ function atomicAmount(value, field = "amount") {
     return String(value);
   }
   if (typeof value === "string" && /^[1-9]\d*$/.test(value)) return value;
-  throw new TypeError(`${field} must be a positive integer string, bigint or safe integer`);
+  throw new TypeError(
+    `${field} must be a positive integer string, bigint or safe integer`,
+  );
 }
 
 function requiredString(value, field) {
@@ -53,40 +62,62 @@ function requiredString(value, field) {
 }
 
 export class BlueballsFxClient {
-  constructor({ baseUrl, apiKey, fetchImpl = globalThis.fetch } = {}) {
-    if (apiKey !== undefined && (typeof apiKey !== "string" || apiKey.length === 0))
-      throw new TypeError("apiKey must be a non-empty string when provided");
+  constructor({
+    baseUrl,
+    apiKey,
+    operatorApiKey,
+    fetchImpl = globalThis.fetch,
+  } = {}) {
     if (typeof fetchImpl !== "function")
       throw new TypeError("fetch implementation required");
     this.baseUrl = normalizedBaseUrl(baseUrl);
-    this.apiKey = apiKey;
+    this.apiKey = optionalSecret(apiKey, "apiKey");
+    this.operatorApiKey = optionalSecret(operatorApiKey, "operatorApiKey");
     this.fetch = fetchImpl;
   }
 
-  async #request(path, { method = "GET", body, auth = true } = {}) {
-    if (auth && !this.apiKey) {
+  #credential(auth) {
+    if (auth === false) return null;
+    if (auth === "operator") {
+      if (!this.operatorApiKey) {
+        throw new BlueballsFxError(
+          "FX operator API key required for this finality operation",
+          { code: "OPERATOR_AUTH_REQUIRED", status: 0 },
+        );
+      }
+      return this.operatorApiKey;
+    }
+    if (!this.apiKey) {
       throw new BlueballsFxError("FX API key required for this operation", {
         code: "AUTH_REQUIRED",
         status: 0,
       });
     }
+    return this.apiKey;
+  }
+
+  async #request(path, { method = "GET", body, auth = "client" } = {}) {
+    const credential = this.#credential(auth);
 
     let response;
     try {
       response = await this.fetch(`${this.baseUrl}${path}`, {
         method,
         headers: {
-          ...(auth ? { authorization: `Bearer ${this.apiKey}` } : {}),
+          ...(credential ? { authorization: `Bearer ${credential}` } : {}),
           ...(body !== undefined ? { "content-type": "application/json" } : {}),
         },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       });
     } catch (cause) {
-      throw new BlueballsFxError("FX node request failed before a response arrived", {
-        code: "NETWORK_ERROR",
-        status: 0,
-        cause,
-      });
+      throw new BlueballsFxError(
+        "FX node request failed before a response arrived",
+        {
+          code: "NETWORK_ERROR",
+          status: 0,
+          cause,
+        },
+      );
     }
 
     let payload;
@@ -242,6 +273,34 @@ export class BlueballsFxClient {
     );
   }
 
+  confirmQuote(quoteId, { eventId, fills } = {}) {
+    return this.#request(
+      `/v2/fx/ops/quotes/${encodeURIComponent(requiredString(quoteId, "quoteId"))}/confirmed`,
+      {
+        method: "POST",
+        auth: "operator",
+        body: {
+          eventId: requiredString(eventId, "eventId"),
+          ...(fills === undefined ? {} : { fills }),
+        },
+      },
+    );
+  }
+
+  failQuote(quoteId, { eventId, reason } = {}) {
+    return this.#request(
+      `/v2/fx/ops/quotes/${encodeURIComponent(requiredString(quoteId, "quoteId"))}/failed`,
+      {
+        method: "POST",
+        auth: "operator",
+        body: {
+          ...(eventId === undefined ? {} : { eventId: requiredString(eventId, "eventId") }),
+          reason: requiredString(reason, "reason"),
+        },
+      },
+    );
+  }
+
   createFiatIntent(intent) {
     return this.#request("/v2/fx/fiat/intents", {
       method: "POST",
@@ -271,6 +330,7 @@ export class BlueballsFxClient {
   attestFiat(attestation) {
     return this.#request("/v2/fx/fiat/attestations", {
       method: "POST",
+      auth: "operator",
       body: attestation,
     });
   }
@@ -279,7 +339,11 @@ export class BlueballsFxClient {
       `/v2/fx/fiat/intents/${encodeURIComponent(requiredString(intentId, "intentId"))}/settle`,
       {
         method: "POST",
-        body: eventId === undefined ? {} : { eventId: requiredString(eventId, "eventId") },
+        auth: "operator",
+        body:
+          eventId === undefined
+            ? {}
+            : { eventId: requiredString(eventId, "eventId") },
       },
     );
   }
