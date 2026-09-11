@@ -10,28 +10,46 @@ import { DatabaseSync as NodeDatabaseSync } from "node:sqlite";
 let workerStorage = null;
 
 export function setWorkerSql(storage) {
+  if (
+    !storage ||
+    typeof storage !== "object" ||
+    typeof storage.sql?.exec !== "function" ||
+    typeof storage.transactionSync !== "function"
+  ) {
+    throw new TypeError(
+      "setWorkerSql requires Durable Object storage with sql.exec and transactionSync",
+    );
+  }
   workerStorage = storage;
 }
 
+function assertSynchronous(result) {
+  if (result && typeof result.then === "function") {
+    throw new TypeError("transactionSync callback must be synchronous");
+  }
+  return result;
+}
+
 class WorkerStatement {
-  constructor(sql) {
+  constructor(sql, storage) {
     this.sql = sql;
+    this.storage = storage;
   }
 
   all(...bindings) {
-    return workerStorage.sql.exec(this.sql, ...bindings).toArray();
+    return this.storage.sql.exec(this.sql, ...bindings).toArray();
   }
 
   get(...bindings) {
-    return workerStorage.sql.exec(this.sql, ...bindings).toArray()[0];
+    return this.storage.sql.exec(this.sql, ...bindings).toArray()[0];
   }
 
   iterate(...bindings) {
-    return workerStorage.sql.exec(this.sql, ...bindings);
+    return this.storage.sql.exec(this.sql, ...bindings);
   }
 
   run(...bindings) {
-    const cursor = workerStorage.sql.exec(this.sql, ...bindings);
+    const cursor = this.storage.sql.exec(this.sql, ...bindings);
     cursor.toArray();
     return { changes: cursor.rowsWritten ?? 0, lastInsertRowid: 0 };
   }
@@ -41,10 +59,12 @@ export class DatabaseSync {
   constructor(path, options) {
     if (workerStorage) {
       this.worker = true;
+      this.storage = workerStorage;
       this.native = null;
       return;
     }
     this.worker = null;
+    this.storage = null;
     // node:sqlite on Node 22 rejects an explicit `undefined` options argument
     // ("The \"options\" argument must be an object"), while Node 24 tolerates it.
     // Callers that pass no options must therefore reach the native constructor
@@ -71,11 +91,13 @@ export class DatabaseSync {
         "Durable Object transaction-control SQL is unsupported; use transactionSync(callback)",
       );
     }
-    return workerStorage.sql.exec(sql);
+    return this.storage.sql.exec(sql);
   }
 
   prepare(sql) {
-    return this.native ? this.native.prepare(sql) : new WorkerStatement(sql);
+    return this.native
+      ? this.native.prepare(sql)
+      : new WorkerStatement(sql, this.storage);
   }
 
   transactionSync(callback) {
@@ -84,7 +106,7 @@ export class DatabaseSync {
     if (this.native) {
       this.native.exec("BEGIN IMMEDIATE");
       try {
-        const result = callback();
+        const result = assertSynchronous(callback());
         this.native.exec("COMMIT");
         return result;
       } catch (error) {
@@ -92,7 +114,7 @@ export class DatabaseSync {
         throw error;
       }
     }
-    return workerStorage.transactionSync(callback);
+    return this.storage.transactionSync(() => assertSynchronous(callback()));
   }
 
   close() {
