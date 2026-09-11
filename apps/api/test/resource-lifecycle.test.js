@@ -20,7 +20,7 @@ async function account(api, key, customerId) {
   return response.body;
 }
 
-test("deleted customers cannot receive new products or onboarding records", async (t) => {
+test("deleted customers cannot be mutated or receive new products/onboarding records", async (t) => {
   const api = await createApiFixture();
   t.after(() => api.close());
   const principal = await api.signup("lifecycle-deleted@example.test");
@@ -32,6 +32,7 @@ test("deleted customers cannot receive new products or onboarding records", asyn
   assert.equal(removal.status, 200);
 
   const attempts = [
+    ["PATCH", `/v2/customers/${deleted.id}`, { name: "Zombie Customer" }],
     ["POST", "/v2/accounts", { customer: deleted.id, currency: "EUR" }],
     ["POST", "/v2/wallets", { customer: deleted.id, currency: "EUR" }],
     ["POST", "/v2/applications", { type: "individual", customer: deleted.id }],
@@ -49,7 +50,25 @@ test("deleted customers cannot receive new products or onboarding records", asyn
   }
 });
 
-test("closed accounts cannot back new transfers, cards, details, vaults or credit", async (t) => {
+test("customers with linked financial products cannot be soft deleted", async (t) => {
+  const api = await createApiFixture();
+  t.after(() => api.close());
+  const principal = await api.signup("lifecycle-linked@example.test");
+  const c = await customer(api, principal.key, "Linked Customer");
+  const wallet = await api.request("POST", "/v2/wallets", {
+    key: principal.key,
+    body: { customer: c.id, currency: "EUR" },
+  });
+  assert.equal(wallet.status, 201);
+
+  const removal = await api.request("DELETE", `/v2/customers/${c.id}`, {
+    key: principal.key,
+  });
+  assert.equal(removal.status, 409);
+  assert.match(removal.body.detail, /wallet/i);
+});
+
+test("closed accounts cannot be mutated or back new transfers, cards, details, vaults or credit", async (t) => {
   const api = await createApiFixture();
   t.after(() => api.close());
   const principal = await api.signup("lifecycle-closed@example.test");
@@ -63,6 +82,7 @@ test("closed accounts cannot back new transfers, cards, details, vaults or credi
   assert.equal(closed.body.status, "closed");
 
   const attempts = [
+    ["PATCH", `/v2/accounts/${a.id}`, { label: "Zombie Account" }],
     ["POST", "/v2/transfers", { from: a.id, amount: "1.00", rail: "sepa_instant" }],
     ["POST", "/v2/cards", { customer: c.id, account: a.id, type: "virtual" }],
     ["POST", `/v2/accounts/${a.id}/details`, { rail: "sepa_instant" }],
@@ -80,6 +100,32 @@ test("closed accounts cannot back new transfers, cards, details, vaults or credi
       `${method} ${path} should reject a closed account: ${JSON.stringify(response.body)}`,
     );
   }
+});
+
+test("production transfers require an explicit recipient and destination before reserving money", async (t) => {
+  const key = "bb_lifecycle_production_bootstrap_1234567890abcdef";
+  const api = await createApiFixture({
+    env: {
+      BANK_API_MODE: "production",
+      BANK_BOOTSTRAP_API_KEY: key,
+      BANK_BOOTSTRAP_EMAIL: "lifecycle-production@example.test",
+    },
+  });
+  t.after(() => api.close());
+
+  const c = await customer(api, key, "Production Destination Customer");
+  const a = await api.request("POST", "/v2/accounts", {
+    key,
+    body: { customer: c.id, currency: "SGD" },
+  });
+  assert.equal(a.status, 201);
+
+  const missingDestination = await api.request("POST", "/v2/transfers", {
+    key,
+    body: { from: a.body.id, amount: "1.00", rail: "paynow" },
+  });
+  assert.equal(missingDestination.status, 400);
+  assert.match(missingDestination.body.detail, /recipient and destination/i);
 });
 
 test("lifecycle preconditions preserve tenant isolation as 404", async (t) => {
