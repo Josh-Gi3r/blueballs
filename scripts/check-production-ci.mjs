@@ -27,14 +27,24 @@ if (!existsSync(workflowPath)) {
     ["Solidity fuzz\/invariant gate", /make -C packages\/fx-contracts ci/],
     ["reference container build", /docker build[^\n]*Dockerfile\.reference/],
     ["Compose validation", /docker compose[^\n]*compose\.reference\.yml[^\n]*config/],
+    ["tracked secret scan", /node scripts\/scan-secrets\.mjs/],
+    ["production dependency audit", /pnpm audit --prod --audit-level high/],
+    ["CodeQL initialization", /github\/codeql-action\/init@v3/],
+    ["CodeQL analysis", /github\/codeql-action\/analyze@v3/],
     ["final production gate", /name:\s*Production gate/],
   ];
   for (const [label, pattern] of required) {
     if (!pattern.test(source)) failures.push(`${workflowPath}: missing ${label}`);
   }
 
-  if (!/needs:\s*\[[^\]]*banking_api[^\]]*workers[^\]]*fx[^\]]*contracts[^\]]*container[^\]]*\]/s.test(source)) {
-    failures.push(`${workflowPath}: final gate does not depend on every production test family`);
+  if (
+    !/needs:\s*\[[^\]]*banking_api[^\]]*workers[^\]]*fx[^\]]*contracts[^\]]*container[^\]]*security[^\]]*\]/s.test(
+      source,
+    )
+  ) {
+    failures.push(
+      `${workflowPath}: final gate does not depend on every production test/security family`,
+    );
   }
 }
 
@@ -51,4 +61,6 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log("production CI contract: hosted gate present and locally enforced");
+console.log(
+  "production CI contract: hosted build, runtime, container and security gates present and locally enforced",
+);
