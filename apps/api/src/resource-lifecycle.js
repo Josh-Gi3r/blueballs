@@ -6,6 +6,7 @@
  * closed/deleted resources before the handler can mutate state.
  */
 import { ApiError } from "./lib.js";
+import { bankingEnv } from "./runtime-env.js";
 
 function owned(collection, id, key, noun) {
   const row = collection?.get(id);
@@ -80,6 +81,15 @@ export function assertResourceLifecycle({ method, pattern, ctx, db }) {
 
   if (method === "POST" && pattern === "/v2/transfers") {
     openAccount(db, body.from, key);
+    if (bankingEnv("BANK_API_MODE", "sandbox") === "production") {
+      if (!body.recipient || !body.destination) {
+        throw new ApiError(
+          "validation-error",
+          400,
+          "Production transfers require an explicit tenant-owned recipient and destination; provider submission never guesses where customer money should land",
+        );
+      }
+    }
     return;
   }
 
