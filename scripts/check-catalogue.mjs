@@ -66,8 +66,16 @@ const unknownCreated = [...CREATED_OPERATIONS]
   .filter((operation) => !catalogueOperationIds.has(operation))
   .sort();
 
-// Infrastructure, not product surface — deliberately absent from the reference.
-const INTERNAL = new Set(["GET /v2", "GET /v2/site/stats"]);
+// Infrastructure/operations endpoints are deliberately separate from the
+// 181-operation product API contract. They have their own security and runbook
+// contract and must never be mistaken for customer-facing banking resources.
+const INTERNAL = new Set([
+  "GET /v2",
+  "GET /v2/site/stats",
+  "GET /v2/_health",
+  "GET /v2/_ready",
+  "GET /v2/_ops/metrics",
+]);
 
 const undocumented = [...served]
   .filter((r) => !listed.has(r) && !INTERNAL.has(r))
