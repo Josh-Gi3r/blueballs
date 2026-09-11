@@ -77,20 +77,7 @@ contract SmartWalletSignaturesTest {
         fills[0] =
             FxTypes.MakerFill({ order: order, signature: hex"01", makerSellAmount: 50 ether });
 
-        bytes32 policyHash = keccak256("policy-erc1271-valid");
-        policyRegistry.authorize(policyHash, type(uint64).max, 1);
-        FxTypes.TakerIntent memory intent = FxTypes.TakerIntent({
-            taker: taker,
-            inputToken: address(inputToken),
-            outputToken: address(outputToken),
-            maxInput: 100 ether,
-            minOutput: 50 ether,
-            recipient: recipient,
-            deadline: type(uint64).max,
-            nonce: 1,
-            policyAuthorizationHash: policyHash
-        });
-
+        FxTypes.TakerIntent memory intent = _authorizedIntent(1);
         bytes32 takerDigest = router.hashTakerIntent(intent);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(TAKER_PK, takerDigest);
         bytes memory takerSignature = abi.encodePacked(r, s, v);
@@ -122,20 +109,7 @@ contract SmartWalletSignaturesTest {
         fills[0] =
             FxTypes.MakerFill({ order: order, signature: hex"01", makerSellAmount: 50 ether });
 
-        bytes32 policyHash = keccak256("policy-erc1271-rejected");
-        policyRegistry.authorize(policyHash, type(uint64).max, 1);
-        FxTypes.TakerIntent memory intent = FxTypes.TakerIntent({
-            taker: taker,
-            inputToken: address(inputToken),
-            outputToken: address(outputToken),
-            maxInput: 100 ether,
-            minOutput: 50 ether,
-            recipient: recipient,
-            deadline: type(uint64).max,
-            nonce: 2,
-            policyAuthorizationHash: policyHash
-        });
-
+        FxTypes.TakerIntent memory intent = _authorizedIntent(2);
         bytes32 takerDigest = router.hashTakerIntent(intent);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(TAKER_PK, takerDigest);
         bytes memory takerSignature = abi.encodePacked(r, s, v);
@@ -148,5 +122,21 @@ contract SmartWalletSignaturesTest {
         }
         require(reverted, "unapproved contract-wallet signature accepted");
         require(!router.usedNonce(taker, 2), "nonce survived reverted route");
+    }
+
+    function _authorizedIntent(uint256 nonce) internal returns (FxTypes.TakerIntent memory intent) {
+        intent = FxTypes.TakerIntent({
+            taker: taker,
+            inputToken: address(inputToken),
+            outputToken: address(outputToken),
+            maxInput: 100 ether,
+            minOutput: 50 ether,
+            recipient: recipient,
+            deadline: type(uint64).max,
+            nonce: nonce,
+            policyAuthorizationHash: bytes32(0)
+        });
+        intent.policyAuthorizationHash = router.hashPolicyIntent(intent);
+        policyRegistry.authorize(intent.policyAuthorizationHash, type(uint64).max, 1);
     }
 }
