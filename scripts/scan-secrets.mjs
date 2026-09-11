@@ -6,7 +6,7 @@
  * false-positive lottery.
  */
 import { readFileSync } from "node:fs";
-import { extname } from "node:path";
+import { basename, extname } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const tracked = execFileSync("git", ["ls-files", "-z"], {
@@ -37,7 +37,11 @@ const specialText = new Set([
   ".npmrc",
   ".gitignore",
 ]);
-const allowedEnv = new Set([".env.example", ".env.sample", ".env.template"]);
+const allowedEnvNames = new Set([
+  ".env.example",
+  ".env.sample",
+  ".env.template",
+]);
 const patterns = [
   ["private key material", /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
   ["AWS access key", /AKIA[0-9A-Z]{16}/],
@@ -50,10 +54,11 @@ const patterns = [
 const problems = [];
 for (const path of tracked) {
   if (path === "scripts/scan-secrets.mjs") continue;
-  if (/^\.env(?:\.|$)/.test(path) && !allowedEnv.has(path)) {
+  const name = basename(path);
+  if (/^\.env(?:\.|$)/.test(name) && !allowedEnvNames.has(name)) {
     problems.push(`${path}: tracked environment file is not an approved template`);
   }
-  if (!textExtensions.has(extname(path)) && !specialText.has(path.split("/").at(-1))) {
+  if (!textExtensions.has(extname(path)) && !specialText.has(name)) {
     continue;
   }
   let source;
@@ -72,4 +77,6 @@ if (problems.length) {
   for (const problem of problems) console.error(`  ${problem}`);
   process.exit(1);
 }
-console.log(`tracked secret scan: ${tracked.length} files inspected, no high-signal credentials found`);
+console.log(
+  `tracked secret scan: ${tracked.length} files inspected, no high-signal credentials found`,
+);
