@@ -165,3 +165,36 @@ test("applied migration names are immutable", (t) => {
     /applied migrations are immutable/,
   );
 });
+
+test("migration history gaps are treated as corruption before any repair attempt", (t) => {
+  const database = withDatabase(t);
+  database.exec(`CREATE TABLE blueballs_schema_migrations (
+    component TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    applied_at TEXT NOT NULL,
+    PRIMARY KEY (component, version)
+  )`);
+  database
+    .prepare(
+      "INSERT INTO blueballs_schema_migrations(component, version, name, applied_at) VALUES (?, ?, ?, ?)",
+    )
+    .run("banking-test", 2, "second", new Date().toISOString());
+
+  let firstRan = false;
+  assert.throws(
+    () =>
+      migrate(database, "banking-test", [
+        {
+          version: 1,
+          name: "first",
+          up() {
+            firstRan = true;
+          },
+        },
+        { version: 2, name: "second", up() {} },
+      ]),
+    /history is not contiguous/,
+  );
+  assert.equal(firstRan, false);
+});
