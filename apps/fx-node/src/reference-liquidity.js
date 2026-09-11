@@ -186,6 +186,39 @@ export class ReferenceLiquidityBook {
     ) {
       throw new RangeError("expiresAt must be a future millisecond timestamp");
     }
+    if (
+      !normalized.metadata ||
+      typeof normalized.metadata !== "object" ||
+      Array.isArray(normalized.metadata)
+    ) {
+      throw new TypeError("metadata must be an object");
+    }
+
+    const existing = this.db
+      .prepare("SELECT * FROM reference_liquidity WHERE slice_id = ?")
+      .get(normalized.sliceId);
+    if (existing && BigInt(existing.reserved_output) > 0n) {
+      const economicsChanged =
+        existing.source_type !== normalized.sourceType ||
+        existing.source_id !== normalized.sourceId ||
+        existing.input_asset !== normalized.inputAsset ||
+        existing.output_asset !== normalized.outputAsset ||
+        existing.input_numerator !== normalized.inputNumerator ||
+        existing.input_denominator !== normalized.inputDenominator ||
+        existing.policy_authorization_id !== normalized.policyAuthorizationId ||
+        existing.policy_snapshot_hash !== normalized.policySnapshotHash ||
+        existing.account_ref !== normalized.accountRef;
+      if (economicsChanged) {
+        throw new Error(
+          "cannot change reference liquidity economics while capacity is reserved",
+        );
+      }
+      if (BigInt(normalized.maxOutput) < BigInt(existing.reserved_output)) {
+        throw new Error(
+          "maxOutput cannot fall below actively reserved reference liquidity",
+        );
+      }
+    }
 
     this.db
       .prepare(
@@ -276,9 +309,17 @@ export class ReferenceLiquidityBook {
 
     const slices = [];
     for (const row of rows) {
-      const available =
-        nonNegativeBigInt(row.max_output, "max_output") -
-        nonNegativeBigInt(row.reserved_output, "reserved_output");
+      const maxOutput = nonNegativeBigInt(row.max_output, "max_output");
+      const reservedOutput = nonNegativeBigInt(
+        row.reserved_output,
+        "reserved_output",
+      );
+      if (reservedOutput > maxOutput) {
+        throw new Error(
+          `reference liquidity accounting invariant violated for ${row.slice_id}`,
+        );
+      }
+      const available = maxOutput - reservedOutput;
       if (available <= 0n) continue;
       const verification = this.#verifyAuthorization(row, available);
       if (!verification || verification.valid !== true) continue;
@@ -338,7 +379,7 @@ export class ReferenceLiquidityBook {
 
       const maxOutput = BigInt(row.max_output);
       const reserved = BigInt(row.reserved_output);
-      if (maxOutput - reserved < output)
+      if (reserved > maxOutput || maxOutput - reserved < output)
         throw new Error("reference liquidity capacity changed");
 
       const input = ceilDiv(
@@ -466,6 +507,7 @@ export class ReferenceLiquidityBook {
       const source = this.db
         .prepare("SELECT * FROM reference_liquidity WHERE slice_id = ?")
         .get(row.slice_id);
+      if (!source) throw new Error("reference source missing during confirmation");
       const output = BigInt(row.output_amount);
       const reserved = BigInt(source.reserved_output);
       const capacity = BigInt(source.max_output);
@@ -511,6 +553,7 @@ export class ReferenceLiquidityBook {
       const source = this.db
         .prepare("SELECT * FROM reference_liquidity WHERE slice_id = ?")
         .get(row.slice_id);
+      if (!source) throw new Error("reference source missing during release");
       const output = BigInt(row.output_amount);
       const reserved = BigInt(source.reserved_output);
       if (reserved < output)
