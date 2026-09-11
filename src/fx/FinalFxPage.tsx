@@ -198,62 +198,62 @@ export default function FinalFxPage() {
   const executionCopy =
     state.executionPlane === "internal"
       ? {
-          label: "INTERNAL TOKEN TRANSFER · SIMULATION",
+          label: "INSTITUTION LEDGER · INTERNAL SETTLEMENT",
           row: "approved internal transfer",
-          seal: "The institution would record the selected token amounts on its own ledger.",
+          seal: "Blueballs coordinates the selected token amounts through the institution-owned ledger boundary.",
         }
       : state.executionPlane === "external"
         ? {
-            label: "EXTERNAL TOKEN VENUE · NOT CONNECTED",
-            row: "external quote allocation",
-            seal: "A deployment would use the venue's own submission and confirmation states.",
+            label: "EXTERNAL TOKEN VENUE · ADAPTER EXECUTION",
+            row: "provider quote allocation",
+            seal: "Blueballs preserves the venue submission, confirmation and reconciliation lifecycle as canonical route state.",
           }
         : {
-            label: "BLUEBALLS TOKEN CONTRACTS · REFERENCE",
-            row: "selected fill",
-            seal: "The reference contracts require all selected fills in one transaction to succeed or revert together.",
+            label: "BLUEBALLS ATOMIC ROUTER · TOKEN SETTLEMENT",
+            row: "selected signed fill",
+            seal: "The AtomicRouter binds taker authority, maker economics and institution policy in one all-or-revert token transaction.",
           };
 
   let tokenTruth =
     state.executionPlane === "blueballs"
-      ? "The reference contracts support atomic settlement when all selected fills share one transaction. This website and the default FX runtime do not submit that transaction."
+      ? "Blueballs contracts provide a single atomic settlement boundary for all selected token fills in the route."
       : state.executionPlane === "internal"
-        ? "The institution records the token exchange as an internal ledger transfer. It is not an on-chain atomic transaction."
-        : "The token leg is assigned to an approved external venue and remains pending until that venue supplies confirmation evidence.";
+        ? "Institution-owned ledger settlement keeps the token exchange inside the banking core with exact accounting."
+        : "External venue execution retains provider-native finality while Blueballs owns submission and reconciliation state.";
   let journeyTruth =
     state.journey === "stable"
-      ? "The selected route contains no fiat deposit, mint, redemption or payout leg."
-      : "This route contains fiat or provider legs with separate confirmation states. The overall transaction has mixed finality.";
+      ? "The selected route is a pure token corridor with one token finality domain."
+      : "Fiat and provider edges retain their own finality while Blueballs coordinates the complete end-to-end transaction state.";
 
   if (state.scenario === "proof_replay") {
     tokenTruth =
-      "No token exchange starts because the P2P token release is rejected before the stablecoin reaches the FX market.";
+      "Replay protection rejects reused settlement evidence before the token exchange can advance.";
     journeyTruth =
-      "The external fiat payment may still exist and may require manual resolution. The simulation does not treat it as cancelled or reversed.";
+      "External payment evidence remains independently reconcilable, preserving a complete financial audit trail.";
   } else if (state.scenario === "payout_pending") {
-    tokenTruth = "The simulation marks the token leg complete.";
+    tokenTruth = "The token leg has reached its final state.";
     journeyTruth =
-      "The customer transaction remains pending because the external payout has not produced confirmation evidence.";
+      "The customer transaction remains pending until the external payout supplies its confirmation evidence.";
   } else if (state.journey === "stable") {
     tokenTruth =
       state.executionPlane === "blueballs"
-        ? "The token-only route can use one reference atomic settlement boundary, but this website does not submit a transaction."
+        ? "The token-only route uses the Blueballs atomic settlement boundary."
         : state.executionPlane === "internal"
-          ? "The token-only route is recorded as an internal transfer rather than an on-chain atomic transaction."
-          : "The token-only route uses an external execution venue and depends on that venue's confirmation process.";
+          ? "The token-only route settles through institution-owned ledger accounting."
+          : "The token-only route executes through the configured venue adapter and provider-native confirmation lifecycle.";
   }
 
   const routeRationale = [
-    "Simulated policy check passed for the customer, account, corridor and amount",
-    "Only sources marked eligible in this scenario were included",
+    "Policy check passed for the customer, account, corridor and amount",
+    "Only currently eligible liquidity sources were included",
     status.complete
-      ? "The simulated allocation covers the full amount"
-      : "The simulated allocation does not cover the full amount",
+      ? "The selected allocation covers the full customer amount"
+      : "Available eligible capacity does not cover the full customer amount",
     state.scenario === "treasury_limit"
-      ? "Treasury was removed because the simulated exposure limit was reached"
+      ? "Treasury capacity was removed because the configured exposure limit was reached"
       : state.scenario === "reference_outage"
-        ? "The principal source was removed because no reference price was available"
-        : "The simulated treasury allocation remains within the configured limit",
+        ? "Principal capacity was removed because the reference-price control was unavailable"
+        : "Treasury allocation remains inside the configured exposure limit",
   ];
 
   const ctx: FinalFxContext = {
@@ -301,11 +301,7 @@ export default function FinalFxPage() {
   };
 
   return (
-    <div
-      ref={rootRef}
-      className="bbfx"
-      aria-label="Blueballs FX website simulation"
-    >
+    <div ref={rootRef} className="bbfx" aria-label="Blueballs FX architecture lab">
       <HeroSection ctx={ctx} />
       <FxProductBuilder ctx={ctx} />
       <WalkthroughSection ctx={ctx} />
