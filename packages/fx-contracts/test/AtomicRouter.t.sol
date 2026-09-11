@@ -63,7 +63,7 @@ contract AtomicRouterTest {
 
     function testMultiMakerRouteSettlesWithinSignedBounds() public {
         FxTypes.MakerFill[] memory fills = _twoFills();
-        FxTypes.TakerIntent memory intent = _intent(200 ether, 100 ether, 1, bytes32("policy"));
+        FxTypes.TakerIntent memory intent = _authorizedIntent(200 ether, 100 ether, 1);
         bytes memory takerSignature = _signTaker(intent, TAKER_PK);
 
         (uint256 totalInput, uint256 totalOutput) = router.execute(intent, takerSignature, fills);
@@ -79,7 +79,7 @@ contract AtomicRouterTest {
 
     function testReplayIsRejected() public {
         FxTypes.MakerFill[] memory fills = _twoFills();
-        FxTypes.TakerIntent memory intent = _intent(200 ether, 100 ether, 2, bytes32("policy"));
+        FxTypes.TakerIntent memory intent = _authorizedIntent(200 ether, 100 ether, 2);
         bytes memory takerSignature = _signTaker(intent, TAKER_PK);
 
         router.execute(intent, takerSignature, fills);
@@ -95,7 +95,7 @@ contract AtomicRouterTest {
 
     function testMaxInputFailureRollsBackEveryMakerFillAndNonce() public {
         FxTypes.MakerFill[] memory fills = _twoFills();
-        FxTypes.TakerIntent memory intent = _intent(193 ether, 100 ether, 3, bytes32("policy"));
+        FxTypes.TakerIntent memory intent = _authorizedIntent(193 ether, 100 ether, 3);
         bytes memory takerSignature = _signTaker(intent, TAKER_PK);
         bytes32 firstOrderHash = settlement.hashMakerOrder(fills[0].order);
 
@@ -118,7 +118,7 @@ contract AtomicRouterTest {
         fills[0] = _makerFill(
             makerOne, MAKER_ONE_PK, 40 ether, 80 ether, 40 ether, bytes32("maker-one-min")
         );
-        FxTypes.TakerIntent memory intent = _intent(100 ether, 50 ether, 4, bytes32("policy"));
+        FxTypes.TakerIntent memory intent = _authorizedIntent(100 ether, 50 ether, 4);
         bytes memory takerSignature = _signTaker(intent, TAKER_PK);
         bytes32 orderHash = settlement.hashMakerOrder(fills[0].order);
 
@@ -143,7 +143,7 @@ contract AtomicRouterTest {
         vm.prank(makerTwo);
         cancellation.cancelOrder(secondHash);
 
-        FxTypes.TakerIntent memory intent = _intent(200 ether, 100 ether, 5, bytes32("policy"));
+        FxTypes.TakerIntent memory intent = _authorizedIntent(200 ether, 100 ether, 5);
         bytes memory takerSignature = _signTaker(intent, TAKER_PK);
 
         bool reverted;
@@ -162,7 +162,7 @@ contract AtomicRouterTest {
 
     function testWrongTakerSignatureIsRejected() public {
         FxTypes.MakerFill[] memory fills = _twoFills();
-        FxTypes.TakerIntent memory intent = _intent(200 ether, 100 ether, 6, bytes32("policy"));
+        FxTypes.TakerIntent memory intent = _authorizedIntent(200 ether, 100 ether, 6);
         bytes memory wrongSignature = _signTaker(intent, OTHER_PK);
 
         bool reverted;
@@ -177,8 +177,7 @@ contract AtomicRouterTest {
 
     function testIntentSignatureBindsPolicyAuthorizationHash() public {
         FxTypes.MakerFill[] memory fills = _twoFills();
-        FxTypes.TakerIntent memory signedIntent =
-            _intent(200 ether, 100 ether, 7, keccak256("approved-policy"));
+        FxTypes.TakerIntent memory signedIntent = _authorizedIntent(200 ether, 100 ether, 7);
         bytes memory signature = _signTaker(signedIntent, TAKER_PK);
 
         FxTypes.TakerIntent memory tamperedIntent = signedIntent;
@@ -193,12 +192,48 @@ contract AtomicRouterTest {
         require(reverted, "policy hash was not signature-bound");
     }
 
+    function testPolicyAuthorizationCannotBeCopiedToAnotherTaker() public {
+        FxTypes.MakerFill[] memory fills = _twoFills();
+        FxTypes.TakerIntent memory approved = _authorizedIntent(200 ether, 100 ether, 72);
+
+        address otherTaker = vm.addr(OTHER_PK);
+        FxTypes.TakerIntent memory stolen = approved;
+        stolen.taker = otherTaker;
+        bytes memory otherSignature = _signTaker(stolen, OTHER_PK);
+
+        bool reverted;
+        try router.execute(stolen, otherSignature, fills) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "bearer policy authorization was reusable by another taker");
+        require(!router.usedNonce(otherTaker, 72), "attacker nonce consumed");
+    }
+
+    function testPolicyAuthorizationCannotBeReusedWithDifferentEconomics() public {
+        FxTypes.MakerFill[] memory fills = _twoFills();
+        FxTypes.TakerIntent memory approved = _authorizedIntent(200 ether, 100 ether, 73);
+
+        FxTypes.TakerIntent memory expanded = approved;
+        expanded.maxInput = 300 ether;
+        bytes memory signature = _signTaker(expanded, TAKER_PK);
+
+        bool reverted;
+        try router.execute(expanded, signature, fills) {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "policy authorization survived changed economics");
+        require(!router.usedNonce(taker, 73), "nonce consumed for mismatched authorization");
+    }
+
     function testRevokedPolicyAuthorizationBlocksStillValidSignatures() public {
         FxTypes.MakerFill[] memory fills = _twoFills();
-        bytes32 policyHash = keccak256("revocable-policy");
-        FxTypes.TakerIntent memory intent = _intent(200 ether, 100 ether, 70, policyHash);
+        FxTypes.TakerIntent memory intent = _authorizedIntent(200 ether, 100 ether, 70);
         bytes memory signature = _signTaker(intent, TAKER_PK);
-        policyRegistry.revoke(policyHash);
+        policyRegistry.revoke(intent.policyAuthorizationHash);
 
         bool reverted;
         try router.execute(intent, signature, fills) {
@@ -212,8 +247,7 @@ contract AtomicRouterTest {
 
     function testPolicyEpochInvalidationBlocksOldAuthorizedIntent() public {
         FxTypes.MakerFill[] memory fills = _twoFills();
-        bytes32 policyHash = keccak256("old-policy-epoch");
-        FxTypes.TakerIntent memory intent = _intent(200 ether, 100 ether, 71, policyHash);
+        FxTypes.TakerIntent memory intent = _authorizedIntent(200 ether, 100 ether, 71);
         bytes memory signature = _signTaker(intent, TAKER_PK);
         policyRegistry.invalidateBefore(2);
 
@@ -247,7 +281,7 @@ contract AtomicRouterTest {
             makerSellAmount: 10 ether
         });
 
-        FxTypes.TakerIntent memory intent = _intent(20 ether, 10 ether, 8, bytes32("policy"));
+        FxTypes.TakerIntent memory intent = _authorizedIntent(20 ether, 10 ether, 8);
         bytes memory signature = _signTaker(intent, TAKER_PK);
 
         bool reverted;
@@ -261,7 +295,6 @@ contract AtomicRouterTest {
 
     function testExpiredTakerIntentIsRejected() public {
         vm.warp(100);
-        FxTypes.MakerFill[] memory fills = _twoFills();
         FxTypes.TakerIntent memory intent = FxTypes.TakerIntent({
             taker: taker,
             inputToken: address(inputToken),
@@ -271,9 +304,12 @@ contract AtomicRouterTest {
             recipient: recipient,
             deadline: 99,
             nonce: 9,
-            policyAuthorizationHash: bytes32("policy")
+            policyAuthorizationHash: bytes32(0)
         });
+        intent.policyAuthorizationHash = router.hashPolicyIntent(intent);
+        policyRegistry.authorize(intent.policyAuthorizationHash, 200, 1);
         bytes memory signature = _signTaker(intent, TAKER_PK);
+        FxTypes.MakerFill[] memory fills = _twoFills();
 
         bool reverted;
         try router.execute(intent, signature, fills) {
@@ -319,12 +355,11 @@ contract AtomicRouterTest {
         });
     }
 
-    function _intent(uint256 maxInput, uint256 minOutput, uint256 nonce, bytes32 policyHash)
+    function _authorizedIntent(uint256 maxInput, uint256 minOutput, uint256 nonce)
         internal
-        returns (FxTypes.TakerIntent memory)
+        returns (FxTypes.TakerIntent memory intent)
     {
-        policyRegistry.authorize(policyHash, type(uint64).max, 1);
-        return FxTypes.TakerIntent({
+        intent = FxTypes.TakerIntent({
             taker: taker,
             inputToken: address(inputToken),
             outputToken: address(outputToken),
@@ -333,8 +368,10 @@ contract AtomicRouterTest {
             recipient: recipient,
             deadline: type(uint64).max,
             nonce: nonce,
-            policyAuthorizationHash: policyHash
+            policyAuthorizationHash: bytes32(0)
         });
+        intent.policyAuthorizationHash = router.hashPolicyIntent(intent);
+        policyRegistry.authorize(intent.policyAuthorizationHash, type(uint64).max, 1);
     }
 
     function _deposit(address actor, MockERC20 token, uint256 amount) internal {
