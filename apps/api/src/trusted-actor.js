@@ -2,11 +2,11 @@
  *
  * Blueballs does not embed passwords or become an identity provider. A deployment
  * may authenticate humans with OIDC/SAML/passkeys and attach this short-lived
- * HMAC assertion to an already-authenticated API request. The machine credential
- * remains the API credential; the assertion supplies the named human actor for
- * audit/dual-control decisions.
+ * HMAC assertion to an already-authenticated API request. The assertion is bound
+ * to the authenticated machine credential AND exact request intent so it cannot
+ * be replayed onto a different body/query during its clock-skew window.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { ApiError } from "./lib.js";
 import { bankingEnv } from "./runtime-env.js";
 
@@ -52,18 +52,68 @@ function equalHex(actual, expected) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-export function trustedActorMessage({ timestamp, credentialId, method, path, actorId, assurance }) {
-  return ["v1", timestamp, credentialId, method, path, actorId, assurance].join("\n");
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, canonical(value[key])]),
+    );
+  }
+  return value;
+}
+
+export function trustedActorRequestHash({ body = {}, url }) {
+  const query = url
+    ? [...url.searchParams.entries()].sort(([ak, av], [bk, bv]) =>
+        ak === bk ? av.localeCompare(bv) : ak.localeCompare(bk),
+      )
+    : [];
+  return createHash("sha256")
+    .update(JSON.stringify(canonical({ body, query })))
+    .digest("hex");
+}
+
+export function trustedActorMessage({
+  timestamp,
+  credentialId,
+  method,
+  path,
+  actorId,
+  assurance,
+  requestHash,
+}) {
+  return [
+    "v1",
+    timestamp,
+    credentialId,
+    method,
+    path,
+    actorId,
+    assurance,
+    requestHash,
+  ].join("\n");
 }
 
 /** Return null when no human assertion is present. Partial/invalid assertions
  * fail closed rather than silently attributing the command to the machine key. */
-export function trustedActorFromRequest({ req, key, method, path, nowMs = Date.now() }) {
+export function trustedActorFromRequest({
+  req,
+  key,
+  method,
+  path,
+  body = {},
+  url,
+  nowMs = Date.now(),
+}) {
   const actorId = header(req, "x-blueballs-actor-id");
   const timestamp = header(req, "x-blueballs-actor-timestamp");
   const assurance = header(req, "x-blueballs-actor-assurance");
   const signature = header(req, "x-blueballs-actor-signature");
-  const present = [actorId, timestamp, assurance, signature].some((value) => value !== null);
+  const present = [actorId, timestamp, assurance, signature].some(
+    (value) => value !== null,
+  );
   if (!present) return null;
   if (!actorId || !timestamp || !assurance || !signature) {
     throw new ApiError(
@@ -107,6 +157,7 @@ export function trustedActorFromRequest({ req, key, method, path, nowMs = Date.n
   if (!match) {
     throw new ApiError("authentication-error", 401, "Trusted actor signature is invalid");
   }
+  const requestHash = trustedActorRequestHash({ body, url });
   const expected = createHmac("sha256", configuredSecret())
     .update(
       trustedActorMessage({
@@ -116,6 +167,7 @@ export function trustedActorFromRequest({ req, key, method, path, nowMs = Date.n
         path,
         actorId,
         assurance,
+        requestHash,
       }),
     )
     .digest("hex");
@@ -125,6 +177,7 @@ export function trustedActorFromRequest({ req, key, method, path, nowMs = Date.n
   return Object.freeze({
     subject: actorId,
     assurance,
+    request_hash: requestHash,
     asserted_at: new Date(seconds * 1000).toISOString(),
   });
 }
