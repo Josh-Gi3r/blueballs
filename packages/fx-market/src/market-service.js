@@ -47,6 +47,27 @@ export class FxMarketService {
     return this.db.transactionSync(fn);
   }
 
+  #assertChainEventIdentity(eventId, routeId, kind) {
+    if (!eventId) return null;
+    const existing = this.db
+      .prepare(
+        "SELECT route_id, kind FROM chain_events WHERE event_id = ?",
+      )
+      .get(eventId);
+    if (!existing) return null;
+    if (existing.route_id !== routeId || existing.kind !== kind) {
+      const error = new Error(
+        `chain event ${eventId} is already bound to ${existing.route_id}/${existing.kind}`,
+      );
+      error.code = "CHAIN_EVENT_COLLISION";
+      error.eventId = eventId;
+      error.existingRouteId = existing.route_id;
+      error.existingKind = existing.kind;
+      throw error;
+    }
+    return existing;
+  }
+
   #verifyAuthorization(order) {
     if (!this.authorizationVerifier) return { valid: true };
     const result = this.authorizationVerifier(order.policy_authorization_id, {
@@ -260,6 +281,11 @@ export class FxMarketService {
     if (route.state !== "SUBMITTED")
       throw new Error("route must be SUBMITTED before confirmation");
 
+    this.#assertChainEventIdentity(
+      eventId,
+      routeId,
+      "SETTLEMENT_CONFIRMED",
+    );
     const result = this.market.confirmRoute({ routeId, eventId, fills });
     this.db
       .prepare(
@@ -278,10 +304,24 @@ export class FxMarketService {
   }) {
     const route = this.getRoute(routeId);
     if (!route) throw new Error("route not found");
-    if (route.state === "FAILED") return { duplicate: true, released: 0 };
+    if (route.state === "FAILED") {
+      if (eventId) {
+        const existing = this.#assertChainEventIdentity(
+          eventId,
+          routeId,
+          "SETTLEMENT_FAILED",
+        );
+        if (!existing)
+          throw new Error("route already failed by another reconciliation event");
+      }
+      return { duplicate: true, released: 0 };
+    }
     if (route.state !== "SUBMITTED")
       throw new Error("only a submitted route can fail settlement");
 
+    if (eventId) {
+      this.#assertChainEventIdentity(eventId, routeId, "SETTLEMENT_FAILED");
+    }
     const result = this.market.failRoute({ routeId, eventId, reason });
     this.db
       .prepare(
