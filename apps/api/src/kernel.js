@@ -232,8 +232,9 @@ function assertRouteAuthority(method, pattern, ctx) {
   }
 }
 
-/** Register one route. The wrapped handler is the single transport/security
- * boundary for every catalogue operation. */
+/** Register one route. Security/contract/lifecycle preflight is exposed on the
+ * route record so the HTTP layer can run it before idempotency lookup. Cached
+ * mutation responses therefore never bypass the controls that apply today. */
 export const route = (method, pattern, handler, opts = {}) => {
   const key = `${method} ${pattern}`;
   if (routes.some((candidate) => `${candidate.method} ${candidate.pattern}` === key)) {
@@ -247,7 +248,7 @@ export const route = (method, pattern, handler, opts = {}) => {
   }
   const successStatus = opts.created ? 201 : 200;
 
-  const publicHandler = async (ctx) => {
+  const preflight = (ctx) => {
     const path = ctx.url?.pathname ?? pattern;
     const actor =
       ctx.key && access !== "PUBLIC"
@@ -270,8 +271,6 @@ export const route = (method, pattern, handler, opts = {}) => {
         access,
         tenant_id: ctx.key?.tenant_id ?? null,
         actor_id: actor?.subject ?? ctx.key?.id ?? null,
-        // Preserve the machine credential identity in the audit scope when a
-        // deployment IAM gateway asserts a named human actor.
         actor_scope: actor
           ? `human:${actor.assurance};credential:${ctx.key.id}`
           : (ctx.key?.scope ?? (access === "PUBLIC" ? "public" : null)),
@@ -291,11 +290,17 @@ export const route = (method, pattern, handler, opts = {}) => {
     validateRequestBody(method, pattern, ctx.body ?? {});
     if (ctx.key) assertResourceLifecycle({ method, pattern, ctx, db });
 
-    const requestedChildPermissions =
-      method === "POST" && pattern === "/v2/keys" && ctx.key
-        ? childPermissions(ctx.key, ctx.body?.permissions)
-        : null;
+    return {
+      requestedChildPermissions:
+        method === "POST" && pattern === "/v2/keys" && ctx.key
+          ? childPermissions(ctx.key, ctx.body?.permissions)
+          : null,
+    };
+  };
 
+  const publicHandler = async (ctx, preflightState = null) => {
+    const state = preflightState ?? preflight(ctx);
+    const requestedChildPermissions = state.requestedChildPermissions;
     let result = await handler(ctx);
 
     result = prepareProductionProviderIntent({
@@ -372,6 +377,7 @@ export const route = (method, pattern, handler, opts = {}) => {
     method,
     pattern,
     parts: pattern.split("/").filter(Boolean),
+    preflight,
     handler: publicHandler,
     access,
     successStatus,
