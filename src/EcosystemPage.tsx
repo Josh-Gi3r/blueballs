@@ -3,13 +3,16 @@ import { CATEGORIES, CATEGORY_MAP, PROVIDERS } from "./ecosystem/data";
 import CategoryMap, { type FilterId } from "./ecosystem/CategoryMap";
 import ProviderCard from "./ecosystem/ProviderCard";
 import "./EcosystemPage.css";
+
 const MONO = "'IBM Plex Mono', monospace";
 type EcosystemPageProps = { onNavigate: (path: string) => void };
+
 const FILLER_COPY = [
-  ["DIRECTORY", "Provider candidates."],
-  ["OPEN SOURCE", "Free to fork and self-host."],
-  ["SOURCES", "Links to official websites."],
+  ["CAPABILITY MAP", "Official-source provider intelligence."],
+  ["PROVIDER NEUTRAL", "Keep the financial core institution-owned."],
+  ["COMPOSABLE", "Change external rails without rewriting products."],
 ] as const;
+
 function EcosystemFillers({
   count,
   columns,
@@ -37,9 +40,16 @@ function EcosystemFillers({
     </>
   );
 }
+
+const latestEvidenceDate = PROVIDERS.map((provider) => provider.asOf)
+  .filter(Boolean)
+  .sort()
+  .at(-1);
+
 export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
   const [active, setActive] = useState<FilterId>("all");
   const [query, setQuery] = useState("");
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return PROVIDERS.filter((provider) => {
@@ -62,20 +72,23 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
         .includes(q);
     });
   }, [active, query]);
+
   const selectedCategory = active === "all" ? null : CATEGORY_MAP[active];
+
   return (
     <div className="eco-page">
       <section className="eco-hero">
         <div className="eco-hero-copy">
-          <div className="eco-eyebrow">PROVIDER DIRECTORY</div>
+          <div className="eco-eyebrow">PROVIDER CAPABILITY MAP</div>
           <h1>
-            <span>Find the services</span>
-            <span>your product needs.</span>
+            <span>Compose the infrastructure</span>
+            <span>behind your product.</span>
           </h1>
           <p>
-            Compare companies that provide banking, identity, payments, cards,
-            custody, liquidity and other financial infrastructure. Blueballs is
-            the software layer; you choose the providers behind your product.
+            Blueballs keeps product and ledger semantics stable while provider
+            adapters connect the sponsor banks, identity vendors, payment rails,
+            card infrastructure, custodians and liquidity venues your deployment
+            selects.
           </p>
           <div className="eco-hero-actions">
             <button
@@ -86,46 +99,45 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
                   ?.scrollIntoView({ behavior: "smooth" })
               }
             >
-              Browse the directory
+              Browse provider capabilities
             </button>
             <button
               type="button"
               className="secondary"
               onClick={() => onNavigate("/developers")}
             >
-              See Blueballs APIs
+              Inspect provider contracts
             </button>
           </div>
           <div className="eco-hero-guide">
             <div>
-              <span>BLUEBALLS</span>
-              <strong>Run and change the open-source software yourself.</strong>
+              <span>FINANCIAL CORE</span>
+              <strong>Exact money, ledger, policy, events and audit stay inside Blueballs.</strong>
             </div>
             <div>
-              <span>BUILD</span>
-              <strong>Use the sandbox while you develop your product.</strong>
+              <span>CAPABILITY CONTRACTS</span>
+              <strong>Provider-specific behavior is translated at explicit adapter boundaries.</strong>
             </div>
             <div>
-              <span>PROVIDERS</span>
-              <strong>
-                Connect the banking and financial services you need.
-              </strong>
+              <span>DEPLOYMENT CONTROL</span>
+              <strong>Institutions choose the commercial and regulated relationships for their markets.</strong>
             </div>
           </div>
         </div>
         <CategoryMap active={active} setActive={setActive} />
       </section>
+
       <section id="eco-directory" className="eco-directory">
         <div className="eco-directory-head">
           <div>
-            <span>PROVIDER DIRECTORY</span>
+            <span>OFFICIAL-SOURCE CAPABILITIES</span>
             <h2>
-              {selectedCategory ? selectedCategory.label : "Browse by service."}
+              {selectedCategory ? selectedCategory.label : "Browse by infrastructure layer."}
             </h2>
             <p>
               {selectedCategory
                 ? selectedCategory.description
-                : "Filter by service or region, then go directly to the provider to see whether it fits your product."}
+                : "Filter by capability or region, then open the provider's own technical material to evaluate fit for your deployment."}
             </p>
           </div>
           <label className="eco-search">
@@ -139,6 +151,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             />
           </label>
         </div>
+
         <div className="eco-filter-row">
           <button
             type="button"
@@ -166,6 +179,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             </button>
           ))}
         </div>
+
         {selectedCategory && (
           <div className="eco-category-brief">
             <div>
@@ -173,7 +187,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
               <strong>{selectedCategory.description}</strong>
             </div>
             <div>
-              <span>RELATED BLUEBALLS MODULES</span>
+              <span>BLUEBALLS INTEGRATION SURFACES</span>
               <div>
                 {selectedCategory.blueballs.map((module) => (
                   <b key={module}>{module}</b>
@@ -182,14 +196,16 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             </div>
           </div>
         )}
+
         <div className="eco-results-line">
           <span>
-            {filtered.length} {filtered.length === 1 ? "listing" : "listings"}
+            {filtered.length} {filtered.length === 1 ? "provider" : "providers"}
           </span>
           <span>
-            Reviewed against official provider information · 12 Aug 2026
+            Official provider material · latest evidence {latestEvidenceDate ?? "tracked per listing"}
           </span>
         </div>
+
         <div className="eco-provider-grid">
           {filtered.map((provider) => (
             <ProviderCard provider={provider} key={provider.id} />
@@ -197,43 +213,47 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
           <EcosystemFillers count={filtered.length} columns={3} />
           <EcosystemFillers count={filtered.length} columns={2} />
         </div>
+
         {filtered.length === 0 && (
           <div className="eco-empty">
-            No providers match “{query}” in this category.
+            No provider matches “{query}” in this infrastructure layer.
           </div>
         )}
       </section>
+
       <section className="eco-bottom">
         <div>
-          <span>CONNECT A PROVIDER</span>
-          <h2>
-            Keep your product API stable while the provider changes underneath.
-          </h2>
+          <span>PROVIDER ORCHESTRATION</span>
+          <h2>Change external rails without changing your financial core.</h2>
           <p>
-            Blueballs adapters map external providers to the interfaces used by
-            your product. Build or change an adapter, test it in the sandbox,
-            then add credentials from the provider you choose.
+            Blueballs maps provider execution into durable intents, encrypted
+            payloads, stable external idempotency keys, leases, retries and
+            reconciliation. Product code continues to speak the canonical
+            Blueballs contract while the deployment controls the provider stack.
           </p>
         </div>
         <div className="eco-bottom-actions">
           <button type="button" onClick={() => onNavigate("/developers")}>
-            View API reference
+            View API contracts
           </button>
           <button
             type="button"
             className="secondary"
-            onClick={() => onNavigate("/fx")}
+            onClick={() => onNavigate("/sandbox")}
           >
-            See Stablecoin FX
+            Launch sandbox
           </button>
         </div>
       </section>
+
       <div className="eco-disclaimer">
-        <span style={{ fontFamily: MONO }}>ABOUT THIS DIRECTORY</span>
+        <span style={{ fontFamily: MONO }}>EVIDENCE MODEL</span>
         <p>
-          Access and sandbox details were checked against official provider
-          information on 12 Aug 2026. Products and availability change, so check
-          the provider's current documentation before building.
+          Provider capabilities are compiled from official provider materials and
+          carry an evidence date per listing. Availability changes by product,
+          entity and jurisdiction; each deployment establishes its own commercial,
+          regulatory and operational relationships while Blueballs keeps the core
+          provider-neutral.
         </p>
       </div>
     </div>
