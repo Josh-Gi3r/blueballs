@@ -1,9 +1,10 @@
 /** Dedicated authentication for provider-originated settlement facts.
  *
- * Provider inbound events can create customer money. They therefore do not use
- * the generic operator API key. A deployment configures a separate HMAC secret
- * and the provider gateway signs a canonical JSON representation with a bounded
- * timestamp. Durable event_id replay protection is enforced by provider-inbound.js.
+ * Provider inbound events can create customer money. They therefore require a
+ * dedicated HMAC secret in addition to the private operator-authenticated route.
+ * The signed message is `${timestamp}.${canonical-json-payload}` where payload
+ * excludes the `authentication` object itself. Durable event_id replay protection
+ * remains enforced by provider-inbound.js.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { ApiError } from "./lib.js";
@@ -22,9 +23,14 @@ function stable(value) {
 
 export function canonicalProviderInboundBody(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    throw new ApiError("validation-error", 400, "Provider event body must be a JSON object");
+    throw new ApiError(
+      "validation-error",
+      400,
+      "Provider event body must be a JSON object",
+    );
   }
-  return stable(body);
+  const { authentication: _authentication, ...payload } = body;
+  return stable(payload);
 }
 
 function configuredSecret() {
@@ -49,13 +55,11 @@ function maxSkewSeconds() {
   return raw;
 }
 
-function header(req, name) {
-  const value = req?.headers?.[name];
-  return Array.isArray(value) ? null : value ? String(value) : null;
-}
-
 function equalHex(actual, expected) {
-  if (!/^[0-9a-f]{64}$/i.test(actual ?? "") || !/^[0-9a-f]{64}$/i.test(expected ?? "")) {
+  if (
+    !/^[0-9a-f]{64}$/i.test(actual ?? "") ||
+    !/^[0-9a-f]{64}$/i.test(expected ?? "")
+  ) {
     return false;
   }
   const left = Buffer.from(actual, "hex");
@@ -63,60 +67,75 @@ function equalHex(actual, expected) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-/** Authenticate one provider-originated event. Signature format:
- *   x-blueballs-provider-timestamp: <unix seconds>
- *   x-blueballs-provider-signature: v1=<hex hmac sha256>
- * where the signed message is `${timestamp}.${canonical-json-body}`.
- */
-export function providerInboundAuth(req, body, nowMs = Date.now()) {
-  const timestampRaw = header(req, "x-blueballs-provider-timestamp");
-  const signatureRaw = header(req, "x-blueballs-provider-signature");
+export function verifyProviderInboundBody(body, nowMs = Date.now()) {
+  const auth = body?.authentication;
+  const timestampRaw = auth?.timestamp == null ? null : String(auth.timestamp);
+  const signatureRaw = auth?.signature == null ? null : String(auth.signature);
   if (!timestampRaw || !signatureRaw) {
     throw new ApiError(
       "authentication-error",
       401,
-      "Provider events require timestamp and signature headers",
+      "Provider events require a signed authentication envelope",
     );
   }
   if (!/^\d{10}$/.test(timestampRaw)) {
-    throw new ApiError("authentication-error", 401, "Provider event timestamp is invalid");
+    throw new ApiError(
+      "authentication-error",
+      401,
+      "Provider event timestamp is invalid",
+    );
   }
   const timestamp = Number(timestampRaw);
-  if (!Number.isSafeInteger(timestamp)) {
-    throw new ApiError("authentication-error", 401, "Provider event timestamp is invalid");
-  }
   const skew = Math.abs(Math.floor(nowMs / 1000) - timestamp);
-  if (skew > maxSkewSeconds()) {
-    throw new ApiError("authentication-error", 401, "Provider event timestamp is outside the allowed clock skew");
+  if (!Number.isSafeInteger(timestamp) || skew > maxSkewSeconds()) {
+    throw new ApiError(
+      "authentication-error",
+      401,
+      "Provider event timestamp is outside the allowed clock skew",
+    );
   }
   const match = /^v1=([0-9a-f]{64})$/i.exec(signatureRaw.trim());
   if (!match) {
-    throw new ApiError("authentication-error", 401, "Provider event signature is invalid");
+    throw new ApiError(
+      "authentication-error",
+      401,
+      "Provider event signature is invalid",
+    );
   }
   const expected = createHmac("sha256", configuredSecret())
     .update(`${timestampRaw}.${canonicalProviderInboundBody(body)}`)
     .digest("hex");
   if (!equalHex(match[1], expected)) {
-    throw new ApiError("authentication-error", 401, "Provider event signature is invalid");
+    throw new ApiError(
+      "authentication-error",
+      401,
+      "Provider event signature is invalid",
+    );
   }
-  return {
-    id: "provider-gateway",
-    tenant_id: null,
-    scope: "provider",
-  };
+  return true;
 }
 
-/** Helper used by deterministic adapters/tests. */
-export function signProviderInboundBody(body, { secret, timestamp = Math.floor(Date.now() / 1000) }) {
+/** Deterministic gateway/test helper. */
+export function signProviderInboundBody(
+  body,
+  { secret, timestamp = Math.floor(Date.now() / 1000) },
+) {
   if (typeof secret !== "string" || secret.length < 32) {
-    throw new TypeError("provider inbound signing secret must contain at least 32 characters");
+    throw new TypeError(
+      "provider inbound signing secret must contain at least 32 characters",
+    );
   }
+  const payload = { ...body };
+  delete payload.authentication;
   const stamp = String(timestamp);
   const signature = createHmac("sha256", secret)
-    .update(`${stamp}.${canonicalProviderInboundBody(body)}`)
+    .update(`${stamp}.${canonicalProviderInboundBody(payload)}`)
     .digest("hex");
   return {
-    "x-blueballs-provider-timestamp": stamp,
-    "x-blueballs-provider-signature": `v1=${signature}`,
+    ...payload,
+    authentication: {
+      timestamp: stamp,
+      signature: `v1=${signature}`,
+    },
   };
 }
