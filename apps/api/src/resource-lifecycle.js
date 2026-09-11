@@ -40,14 +40,75 @@ function openAccount(db, id, key) {
   return account;
 }
 
+function customerDependencies(db, customerId) {
+  const linked = [];
+  if ([...db.accounts.values()].some((row) => row.customer === customerId)) {
+    linked.push("account records");
+  }
+  if (db.wallets && [...db.wallets.values()].some((row) => row.customer === customerId)) {
+    linked.push("wallets");
+  }
+  if (db.cards && [...db.cards.values()].some((row) => row.customer === customerId)) {
+    linked.push("cards");
+  }
+  if (
+    db.applications &&
+    [...db.applications.values()].some(
+      (row) => row.customer === customerId && row.status !== "completed",
+    )
+  ) {
+    linked.push("incomplete onboarding applications");
+  }
+  if (
+    db.mandates &&
+    [...db.mandates.values()].some(
+      (row) => row.customer === customerId && row.status === "active",
+    )
+  ) {
+    linked.push("active mandates");
+  }
+  if (
+    db.subscriptions &&
+    [...db.subscriptions.values()].some(
+      (row) => row.customer === customerId && row.status === "active",
+    )
+  ) {
+    linked.push("active subscriptions");
+  }
+  return linked;
+}
+
 /** Run after authentication, route permission and request-contract validation.
  * Foreign resources stay 404 to preserve tenant-isolation semantics. */
 export function assertResourceLifecycle({ method, pattern, ctx, db }) {
   const body = ctx.body ?? {};
   const key = ctx.key;
 
+  if (method === "PATCH" && pattern === "/v2/customers/:id") {
+    activeCustomer(db, ctx.params.id, key);
+    return;
+  }
+
+  if (method === "DELETE" && pattern === "/v2/customers/:id") {
+    const customer = activeCustomer(db, ctx.params.id, key);
+    const dependencies = customerDependencies(db, customer.id);
+    if (dependencies.length) {
+      throw new ApiError(
+        "conflict",
+        409,
+        `Customer ${customer.id} cannot be deleted while linked ${dependencies.join(", ")} remain`,
+      );
+    }
+    return;
+  }
+
   if (method === "POST" && pattern === "/v2/accounts") {
     activeCustomer(db, body.customer, key);
+    return;
+  }
+
+  if (method === "PATCH" && pattern === "/v2/accounts/:id") {
+    openAccount(db, ctx.params.id, key);
     return;
   }
 
