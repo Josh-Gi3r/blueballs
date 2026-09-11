@@ -74,6 +74,9 @@ test("same submission reference completes source hooks left partial by a crash",
           policyVersion: 1,
         };
       },
+      verifyAuthorization() {
+        return { valid: true, authorizationId: "customer-auth" };
+      },
     },
     privateAdapter,
     referenceBook: { listSlices: () => [] },
