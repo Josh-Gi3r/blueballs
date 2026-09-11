@@ -48,6 +48,20 @@ const RFQ_FIRMNESS_BPS = 2;
 const pseudonym = (customerId) =>
   "ctp_" + Buffer.from(customerId).toString("base64url").slice(-10);
 
+function ceilDiv(numerator, denominator) {
+  return (numerator + denominator - 1n) / denominator;
+}
+
+/** A maker's min_receive describes the economics of its whole signed intent.
+ * Every partial fill must therefore pay at least the same pro-rata minimum,
+ * rounded up so splitting a fill can never make the maker receive less. */
+function makerMinimumForFill(maker, makerSellMinor) {
+  return ceilDiv(
+    makerSellMinor * toMinor(maker.min_receive),
+    toMinor(maker.amount),
+  );
+}
+
 function restingDepth() {
   const out = {};
   for (const intent of intents.values()) {
@@ -311,6 +325,11 @@ function matchIntent(intent) {
     const grossOut = convertAtMid(take, intent.from, intent.to);
     const out = convertWithSpread(take, intent.from, intent.to, bps);
     if (balanceOf(maker.account, intent.to) < grossOut) continue;
+
+    // Never cross a resting maker below its own signed minimum economics. The
+    // maker sells `grossOut` of intent.to and receives `take` of intent.from.
+    // Compare against a rounded-up pro-rata portion of its whole-intent floor.
+    if (take < makerMinimumForFill(maker, grossOut)) continue;
 
     plan.push({
       source: "p2p",
