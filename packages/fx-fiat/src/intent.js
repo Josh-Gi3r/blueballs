@@ -75,7 +75,7 @@ export function normalizeFiatIntent(intent) {
     ),
     createdAt: intent.createdAt,
     expiresAt: intent.expiresAt,
-    nonce: requiredString(String(intent.nonce), "nonce"),
+    nonce: requiredString(intent.nonce, "nonce"),
   };
 }
 
