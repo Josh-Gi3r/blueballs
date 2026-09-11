@@ -47,6 +47,37 @@ test("migrations apply once, in order, and are durably recorded", (t) => {
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM migration_probe").get().count, 1);
 });
 
+test("released kebab-case migration names remain valid and immutable", (t) => {
+  const database = withDatabase(t);
+  const migrations = [
+    {
+      version: 1,
+      name: "initial-banking-schema",
+      up(db) {
+        db.exec("CREATE TABLE released_schema_probe (id TEXT PRIMARY KEY)");
+      },
+    },
+    {
+      version: 2,
+      name: "durable-provider-operations",
+      up() {},
+    },
+  ];
+  const applied = migrate(database, "banking", migrations);
+  assert.deepEqual(
+    applied.map((row) => row.name),
+    ["initial-banking-schema", "durable-provider-operations"],
+  );
+  assert.throws(
+    () =>
+      migrate(database, "banking", [
+        { ...migrations[0], name: "initial_banking_schema" },
+        migrations[1],
+      ]),
+    /applied migrations are immutable/,
+  );
+});
+
 test("a failed migration rolls back its schema/data change and version marker", (t) => {
   const database = withDatabase(t);
   assert.throws(
