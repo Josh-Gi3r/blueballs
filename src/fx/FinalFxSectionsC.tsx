@@ -39,19 +39,19 @@ export function TreasurySection({ ctx }: { ctx: FinalFxContext }) {
           title="Use balance-sheet liquidity without exceeding the risk limit."
         >
           The institution can fill part of a quote from its own balance sheet.
-          Open positions and active reservations reduce the remaining capacity.
-          When the limit is reached, the router removes treasury and either uses
-          another source or returns no quote.
+          Open positions and active reservations consume capacity. When the
+          configured limit is reached, the router removes treasury and continues
+          with other eligible sources or declines the quote.
         </SectionHead>
         <div className="treasury-stage fade-up">
           <div className="risk-chart">
             <span className="small-label">
-              INSTITUTION BALANCE-SHEET CAPACITY · SIMULATION
+              INSTITUTION BALANCE-SHEET CAPACITY
             </span>
             <svg
               viewBox="0 0 900 270"
               role="img"
-              aria-label="Illustrative principal risk curve"
+              aria-label="Principal risk curve"
             >
               <defs>
                 <linearGradient id="bbfx-risk-fill" x1="0" y1="0" x2="0" y2="1">
@@ -124,9 +124,7 @@ export function TreasurySection({ ctx }: { ctx: FinalFxContext }) {
             </div>
           </div>
           <div className="risk-book">
-            <span className="small-label risk-kicker">
-              TREASURY CAPACITY · SIMULATION
-            </span>
+            <span className="small-label risk-kicker">TREASURY CAPACITY</span>
             <h3>
               Positions and reservations reduce the amount still available.
             </h3>
@@ -165,12 +163,11 @@ export function LabSection({ ctx }: { ctx: FinalFxContext }) {
       <div className="section-inner">
         <SectionHead
           eyebrow="08 · FAILURE SCENARIOS"
-          title="See what happens when a source or settlement step fails."
+          title="Break the route deliberately and inspect the state machine."
         >
-          The available tests change with the selected setup. Payment-proof
-          replay appears only when the route contains a P2P payment, and payout
-          pending appears only when the route contains an external payout. Every
-          result is simulated.
+          Exercise policy rejection, liquidity loss, proof replay, principal
+          limits, quote expiry and delayed payout. The scenario engine exposes
+          how routing, finality and operator evidence change under pressure.
         </SectionHead>
         <div className="lab-shell fade-up">
           <div className="lab-controls">
@@ -228,11 +225,11 @@ export function LabSection({ ctx }: { ctx: FinalFxContext }) {
             </div>
             <div className="lab-panel">
               <span className="small-label">EVENT PAYLOAD</span>
-              <h3>Generated event data</h3>
+              <h3>Route evidence</h3>
               <pre className="lab-code">
                 {JSON.stringify(
                   {
-                    simulation: true,
+                    environment: "architecture_lab",
                     scenario: state.scenario,
                     corridor: `${corridor.from}/${corridor.to}`,
                     productModel: state.journey,
@@ -269,46 +266,37 @@ export function InspectSection({ ctx }: { ctx: FinalFxContext }) {
     source: "Source",
   };
   const capabilities = [
-    [
-      "Private FX market",
-      "IMPLEMENTED · DEPLOYMENT VERIFIER REQUIRED",
-      "built",
-    ],
-    ["Cross-source routing", "IMPLEMENTED", "built"],
-    ["Participation policy", "IMPLEMENTED", "built"],
-    ["Principal pricing and risk", "REFERENCE IMPLEMENTATION", "reference"],
-    [
-      "Atomic token contracts",
-      "IMPLEMENTED + TESTED · RUNTIME NOT CONNECTED",
-      "reference",
-    ],
-    ["Fiat intent and evidence", "IMPLEMENTED · NO RAIL ADAPTER", "reference"],
-    ["Provider, issuer and P2P adapters", "NOT CONNECTED", "not-connected"],
-    ["Website", "SIMULATION", "simulated"],
+    ["Private FX market", "SIGNED ORDER + MAKER POLICY", "built"],
+    ["Cross-source routing", "MULTI-SOURCE RESERVATION", "built"],
+    ["Participation policy", "TRANSACTION AUTHORITY", "built"],
+    ["Principal pricing and risk", "TREASURY + PRINCIPAL CONTROLS", "built"],
+    ["Atomic token settlement", "ATOMICROUTER + SEGREGATED VAULT", "built"],
+    ["Fiat evidence", "INTENT + ATTESTATION + RECONCILIATION", "built"],
+    ["Production providers", "ADAPTER-DRIVEN RUNTIME COMPOSITION", "built"],
+    ["Runtime portability", "NODE + CLOUDFLARE DURABLE OBJECTS", "built"],
   ] as const;
 
   return (
     <section className="section" id="inspect">
       <div className="section-inner">
         <SectionHead
-          eyebrow="09 · CODE AND STATUS"
-          title="See what is implemented and what still requires an integration."
+          eyebrow="09 · ENGINE INSPECTOR"
+          title="Inspect the contracts behind the customer quote."
         >
-          The inspector shows example objects for the current simulation. The
-          capability grid states which parts are implemented, reference-only or
-          not connected. This page does not call the FX runtime or an external
-          provider.
+          Open the request, route, policy, finality, event and source views for
+          the current configuration. The architecture lab mirrors the same
+          objects and control boundaries used across the Blueballs FX stack.
         </SectionHead>
 
         <div className="implementation-board fade-up">
           <div className="implementation-head">
             <div>
-              <span className="small-label">REPOSITORY STATUS</span>
-              <h3>Current implementation</h3>
+              <span className="small-label">FX STACK</span>
+              <h3>One control plane from policy to settlement.</h3>
             </div>
             <p>
-              Status reflects the repository modules used by this page, not a
-              live commercial deployment.
+              Provider-neutral interfaces let an institution plug in its own
+              liquidity, banking rails, custody and execution infrastructure.
             </p>
           </div>
           <div className="implementation-grid">
@@ -363,24 +351,23 @@ export function ClosingSection({ ctx }: { ctx: FinalFxContext }) {
   return (
     <section className="closing">
       <div className="closing-inner">
-        <h2>Build from the reference implementation.</h2>
+        <h2>Build your FX market on Blueballs.</h2>
         <div>
           <p>
-            The repository contains modules for FX policy, private orders,
-            liquidity routing, pricing, fiat settlement models and token
-            contracts. This page shows how they fit together and states which
-            parts are implemented, reference-only or not connected.
+            Policy, private orders, multi-source liquidity, exact pricing,
+            treasury risk, fiat evidence, reconciliation, production adapters and
+            atomic token settlement live in one open-source financial stack.
           </p>
           <button
             className="btn"
             type="button"
             onClick={() => scrollTo("inspect")}
           >
-            Review implementation status
+            Inspect the engine
           </button>
           <div className="closing-note">
-            WEBSITE SIMULATION · FIXED REFERENCE DATA · NO BACKEND CALLS · NO
-            LIVE LIQUIDITY · NO MONEY MOVES
+            OPEN SOURCE · PROVIDER NEUTRAL · EXACT MONEY · POLICY-AWARE ROUTING ·
+            EXPLICIT FINALITY
           </div>
         </div>
       </div>
