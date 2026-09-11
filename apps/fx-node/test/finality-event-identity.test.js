@@ -61,6 +61,9 @@ function buildCoordinator({ failConfirmOnce = false } = {}) {
           policyVersion: 1,
         };
       },
+      verifyAuthorization() {
+        return { valid: true, authorizationId: "customer-auth" };
+      },
     },
     privateAdapter,
     referenceBook: { listSlices: () => [] },
