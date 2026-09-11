@@ -36,9 +36,10 @@ export function RouteSection({ ctx }: { ctx: FinalFxContext }) {
           eyebrow="03 · ONE QUOTE"
           title="Combine several liquidity sources into one customer quote."
         >
-          This simulation shows the routing model. Each source has its own rate,
-          capacity, expiry and reservation rules. Only eligible sources are
-          included, and no quote is shown unless the full amount can be covered.
+          Every source carries its own price, capacity, expiry and reservation
+          rules. Blueballs admits policy-approved capacity, ranks executable
+          liquidity and returns a firm quote only when the full customer amount
+          can be reserved.
         </SectionHead>
         <div
           className="route-stage fade-up"
@@ -112,10 +113,10 @@ export function ComposeSection({ ctx }: { ctx: FinalFxContext }) {
           eyebrow="04 · HOW THE EXCHANGE WORKS"
           title="Choose how the exchange is funded, priced and settled."
         >
-          These are separate choices. A provider can handle deposits and payouts
-          while customer orders or market makers supply the FX rate. A P2P
-          on-ramp can release stablecoin that is then exchanged using issuer,
-          maker, treasury or external-venue liquidity.
+          Funding, price formation and settlement are separate control planes.
+          Blueballs can combine provider deposits and payouts with customer
+          orders, issuer inventory, professional makers, treasury, principal or
+          external venues without changing the customer quote contract.
         </SectionHead>
         <div className="three-planes fade-up">
           <article className="plane">
@@ -168,9 +169,9 @@ export function ComposeSection({ ctx }: { ctx: FinalFxContext }) {
             <span>TOKEN SETTLEMENT</span>
             <h3>Where the selected token exchange is executed.</h3>
             <p>
-              Choose the Blueballs reference contracts, an internal token
-              transfer or an approved external venue. This page only simulates
-              the result.
+              Use the Blueballs AtomicRouter, institution-owned ledger
+              settlement or an approved external execution venue. The same route
+              lifecycle preserves submission, confirmation and reconciliation.
             </p>
             <select
               value={state.executionPlane}
@@ -260,7 +261,7 @@ export function PrivacySection({ ctx }: { ctx: FinalFxContext }) {
             <div className="chain-seal">
               {sources.length
                 ? executionCopy.seal
-                : "No token execution is created for this simulated state."}
+                : "No token execution is created for this route state."}
             </div>
             <div className="chain-note">
               NO CUSTOMER NAMES · NO COMPLETE ORDER BOOK · NO PUBLIC INDIVIDUAL
@@ -306,9 +307,9 @@ export function SettlementSection({ ctx }: { ctx: FinalFxContext }) {
           eyebrow="06 · SETTLEMENT STATUS"
           title="See exactly which part of the customer transaction is final."
         >
-          A customer sees one exchange, but its legs do not all settle the same
-          way. The token exchange can use one atomic boundary while deposits,
-          minting, redemption and payouts keep their own confirmation states.
+          A customer sees one exchange, while each settlement edge preserves its
+          real finality. Token settlement can use one atomic boundary and fiat,
+          mint, redemption and payout edges keep their own confirmation state.
         </SectionHead>
 
         <div className="settlement-board fade-up">
@@ -362,8 +363,8 @@ export function SettlementSection({ ctx }: { ctx: FinalFxContext }) {
                 <b>{leg.class}</b>
                 <p>
                   {leg.atomic
-                    ? "This boundary succeeds or reverts as one token transaction in the reference contract model."
-                    : "This leg keeps its own confirmation evidence and can remain pending independently of the token exchange."}
+                    ? "This boundary succeeds or reverts as one Blueballs token transaction."
+                    : "This leg retains independent confirmation evidence and can remain pending while other edges advance."}
                 </p>
               </article>
             ))}
