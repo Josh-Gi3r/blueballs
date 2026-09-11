@@ -38,6 +38,73 @@ test("SDK sends authenticated firm quote request with exact string amount", asyn
   });
 });
 
+test("public reference inspection and preview work without an API key", async () => {
+  const seen = [];
+  const client = new BlueballsFxClient({
+    baseUrl: "https://fx.example.test",
+    fetchImpl: async (url, options) => {
+      seen.push({ url, options });
+      return jsonResponse({ status: "ok" });
+    },
+  });
+  await client.health();
+  await client.referenceStatus();
+  await client.previewReferenceTrade({ inputAmount: "50000.00" });
+  assert.equal(seen.every(({ options }) => !("authorization" in options.headers)), true);
+  await assert.rejects(
+    () => client.reserveReferenceTrade({ inputAmount: "50000.00" }),
+    (error) =>
+      error instanceof BlueballsFxError && error.code === "AUTH_REQUIRED" && error.status === 0,
+  );
+});
+
+test("atomic amount inputs reject unsafe JavaScript numbers", async () => {
+  const client = new BlueballsFxClient({
+    baseUrl: "http://localhost:8788",
+    apiKey: "secret-key",
+    fetchImpl: async () => jsonResponse({}),
+  });
+  await assert.rejects(
+    () =>
+      client.quote({
+        inputAsset: "USDC",
+        outputAsset: "EURC",
+        exactOutput: Number.MAX_SAFE_INTEGER + 1,
+      }),
+    /positive safe integer/,
+  );
+  await assert.rejects(
+    () =>
+      client.referenceLiquidity({
+        inputAsset: "USDC",
+        outputAsset: "EURC",
+        exactOutput: "1.25",
+      }),
+    /positive integer/,
+  );
+});
+
+test("SDK validates its transport base before sending secrets", () => {
+  assert.throws(
+    () =>
+      new BlueballsFxClient({
+        baseUrl: "https://user:pass@example.test/path",
+        apiKey: "secret-key",
+        fetchImpl: async () => jsonResponse({}),
+      }),
+    /must not contain credentials/,
+  );
+  assert.throws(
+    () =>
+      new BlueballsFxClient({
+        baseUrl: "file:///tmp/fx.sock",
+        apiKey: "secret-key",
+        fetchImpl: async () => jsonResponse({}),
+      }),
+    /HTTP or HTTPS/,
+  );
+});
+
 test("health request is intentionally unauthenticated", async () => {
   let headers;
   const client = new BlueballsFxClient({
@@ -78,6 +145,36 @@ test("SDK preserves machine-readable node errors", async () => {
       assert.deepEqual(error.details, { scope: "fx" });
       return true;
     },
+  );
+});
+
+test("SDK normalizes network and protocol failures into structured errors", async () => {
+  const network = new BlueballsFxClient({
+    baseUrl: "http://localhost:8788",
+    apiKey: "secret-key",
+    fetchImpl: async () => {
+      throw new Error("socket closed");
+    },
+  });
+  await assert.rejects(
+    () => network.getQuote("q1"),
+    (error) =>
+      error instanceof BlueballsFxError &&
+      error.code === "NETWORK_ERROR" &&
+      error.status === 0,
+  );
+
+  const protocol = new BlueballsFxClient({
+    baseUrl: "http://localhost:8788",
+    apiKey: "secret-key",
+    fetchImpl: async () => new Response("gateway html", { status: 502 }),
+  });
+  await assert.rejects(
+    () => protocol.getQuote("q1"),
+    (error) =>
+      error instanceof BlueballsFxError &&
+      error.code === "PROTOCOL_ERROR" &&
+      error.status === 502,
   );
 });
 
