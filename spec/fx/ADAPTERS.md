@@ -9,7 +9,8 @@ The canonical FX node can boot directly in production mode:
 ```bash
 FX_NODE_MODE=production \
 FX_NODE_PRODUCTION_ADAPTER=@institution/blueballs-fx-runtime \
-FX_NODE_API_KEY='32-or-more-characters' \
+FX_NODE_API_KEY='32-or-more-character-client-key' \
+FX_NODE_OPERATOR_API_KEY='different-32-or-more-character-operator-key' \
 node apps/fx-node/src/cli.js
 ```
 
@@ -29,6 +30,14 @@ export async function createBlueballsFxProductionRuntime({ env }) {
 ```
 
 The runtime validates the complete adapter contract before opening the API listener. Production composition therefore remains deployment-specific while the Blueballs API, policy model, quote lifecycle and reconciliation semantics stay canonical.
+
+Production deployments also separate authority at the HTTP boundary:
+
+- `FX_NODE_API_KEY` authorizes client/integration market activity and execution submission;
+- `FX_NODE_OPERATOR_API_KEY` authorizes authoritative quote reconciliation, fiat attestations and final fiat settlement;
+- the two production secrets must be distinct and at least 32 characters each.
+
+A compromised client credential can therefore submit activity but cannot manufacture finality.
 
 ## Adapter classes
 
@@ -125,7 +134,7 @@ fail({ routeId, leg, reservationHandle, eventId, reason })
 
 `markSubmitted()` creates the non-releasable boundary. From this point a timeout or network failure becomes an ambiguous result requiring reconciliation.
 
-`confirm()` and `fail()` are idempotent on the canonical event identifier.
+`confirm()` and `fail()` are idempotent on a canonical event identity that is bound to the route and final outcome. Reusing one provider/chain event for a different route or opposite outcome must fail closed.
 
 Reference implementations live in:
 
@@ -202,7 +211,7 @@ InternalLedgerVerifier
 AttestedPaymentVerifier
 ```
 
-Production adapters authenticate provider callbacks, prevent payment-ID replay, retain evidence and surface manual review when facts conflict.
+Production adapters authenticate provider callbacks, prevent provider/payment replay, reject future-dated evidence, retain evidence and surface manual review when facts conflict. Authoritative attestation and final settlement enter the HTTP API only through the operator credential.
 
 See `packages/fx-fiat/src/adapters.js` and `packages/fx-fiat/src/settlement-store.js`.
 
@@ -219,7 +228,7 @@ A production onboarding pipeline supplies:
 - allowed assets and corridors;
 - ticket limits.
 
-`FxPolicyEngine` issues short-lived transaction authority bound to those facts. Changing participant facts or policy version invalidates stale authority.
+`FxPolicyEngine` issues short-lived transaction authority bound to those facts and the exact policy decision snapshot. Changing participant facts or effective policy content invalidates stale authority.
 
 Commercial provider authentication never bypasses institution policy.
 
@@ -234,7 +243,8 @@ Every adapter should prove:
 - expiry and policy revocation;
 - cancellation;
 - submission ambiguity;
-- confirmation and failure replay;
+- route-and-outcome-bound confirmation/failure replay;
+- client/operator credential separation;
 - no secret data in public responses;
 - no floating-point authoritative money calculations.
 
@@ -242,6 +252,7 @@ The production runtime loader itself is contract-tested in `apps/fx-node/test/pr
 
 ```text
 apps/fx-node/test/node.test.js
+apps/fx-node/test/operator-auth.test.js
 apps/fx-node/test/reference-runtime.test.js
 apps/fx-node/test/public-reference-runtime.test.js
 ```
