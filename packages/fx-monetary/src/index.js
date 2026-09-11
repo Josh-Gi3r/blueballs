@@ -271,7 +271,11 @@ export class MonetaryEngine {
           "RESERVE_UNIT_IN_USE",
           `${reserveCurrency} atomic precision cannot change while reserve state exists`,
           409,
-          { reserveCurrency, currentDecimals: Number(existing.decimals), requestedDecimals: decimals },
+          {
+            reserveCurrency,
+            currentDecimals: Number(existing.decimals),
+            requestedDecimals: decimals,
+          },
         );
       }
     }
@@ -416,38 +420,60 @@ export class MonetaryEngine {
     ).toUpperCase();
     const amountValue = atomic(amount);
     providerRef = requiredString(providerRef, "providerRef");
-    const depositId = `reserve_${randomUUID()}`;
-    const createdAt = this.now();
-    try {
-      this.#transaction(() => {
-        this.db
-          .prepare(
-            `
+
+    return this.#transaction(() => {
+      const existing = this.db
+        .prepare(
+          "SELECT * FROM monetary_reserve_deposits WHERE provider_ref = ?",
+        )
+        .get(providerRef);
+      if (existing) {
+        if (
+          existing.reserve_currency === reserveCurrency &&
+          BigInt(existing.amount) === amountValue
+        ) {
+          return rowToReserve(existing);
+        }
+        fail(
+          "RESERVE_REPLAY",
+          "providerRef was already used with different reserve evidence",
+          409,
+          {
+            providerRef,
+            existingDepositId: existing.deposit_id,
+            existingReserveCurrency: existing.reserve_currency,
+            existingAmount: existing.amount,
+            requestedReserveCurrency: reserveCurrency,
+            requestedAmount: amountValue.toString(),
+          },
+        );
+      }
+
+      const depositId = `reserve_${randomUUID()}`;
+      const createdAt = this.now();
+      this.db
+        .prepare(
+          `
           INSERT INTO monetary_reserve_deposits(
             deposit_id, reserve_currency, amount, state, provider_ref, created_at
           ) VALUES (?, ?, ?, 'PENDING', ?, ?)
         `,
-          )
-          .run(
-            depositId,
-            reserveCurrency,
-            amountValue.toString(),
-            providerRef,
-            createdAt,
-          );
-        this.#event("RESERVE_DEPOSIT_CREATED", {
-          reserveCurrency,
-          amount: amountValue.toString(),
+        )
+        .run(
           depositId,
+          reserveCurrency,
+          amountValue.toString(),
           providerRef,
-        });
+          createdAt,
+        );
+      this.#event("RESERVE_DEPOSIT_CREATED", {
+        reserveCurrency,
+        amount: amountValue.toString(),
+        depositId,
+        providerRef,
       });
-    } catch (error) {
-      if (/unique/i.test(error.message))
-        fail("RESERVE_REPLAY", "providerRef already used", 409);
-      throw error;
-    }
-    return this.getReserveDeposit(depositId);
+      return this.getReserveDeposit(depositId);
+    });
   }
 
   settleReserveDeposit(depositId) {
@@ -456,6 +482,7 @@ export class MonetaryEngine {
         .prepare("SELECT * FROM monetary_reserve_deposits WHERE deposit_id = ?")
         .get(depositId);
       if (!row) fail("NOT_FOUND", "reserve deposit not found", 404);
+      if (row.state === "SETTLED") return rowToReserve(row);
       if (row.state !== "PENDING")
         fail(
           "INVALID_STATE",
