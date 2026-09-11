@@ -11,6 +11,7 @@
  */
 import { createHmac, randomBytes } from "node:crypto";
 import {
+  ApiError,
   collection,
   ksuid,
   now,
@@ -66,15 +67,31 @@ function jsonClone(value) {
 
 function sealSecret(secret) {
   if (typeof secret !== "string" || !secret) {
-    throw new Error("Webhook signing secret is missing");
+    throw new ApiError(
+      "service-unavailable",
+      503,
+      "Webhook signing secret is unavailable",
+    );
   }
-  return sealProviderPayload({ secret });
+  try {
+    return sealProviderPayload({ secret });
+  } catch (error) {
+    throw new ApiError(
+      "service-unavailable",
+      503,
+      error?.code === "PROVIDER_PAYLOAD_TOO_LARGE"
+        ? "Webhook signing secret exceeds the secure envelope limit"
+        : "Webhook secret encryption is not configured correctly",
+    );
+  }
 }
 
 function openSecret(envelope) {
   const value = openProviderPayload(envelope);
   if (typeof value?.secret !== "string" || !value.secret) {
-    throw new Error("Webhook signing-secret envelope is malformed");
+    const error = new Error("Webhook signing-secret envelope is malformed");
+    error.code = "WEBHOOK_SECRET_ENVELOPE_INVALID";
+    throw error;
   }
   return value.secret;
 }
@@ -238,6 +255,35 @@ async function claim(jobId) {
       record.attempted_at = claimedAt;
       record.updated_at = claimedAt;
     }
+
+    let secret;
+    try {
+      secret = job.secret_envelope
+        ? openSecret(jsonClone(job.secret_envelope))
+        : job.secret;
+      if (!secret) throw new Error("Webhook signing secret is missing");
+    } catch (error) {
+      const delay =
+        RETRY_DELAYS_MS[
+          Math.min(job.attempt_count, RETRY_DELAYS_MS.length - 1)
+        ];
+      job.status = "retrying";
+      job.next_attempt_at = new Date(Date.now() + delay).toISOString();
+      job.lease_token = null;
+      job.lease_expires_at = null;
+      job.updated_at = now();
+      if (record) {
+        record.status = "retrying";
+        record.error =
+          error?.code === "PROVIDER_PAYLOAD_KEY_UNAVAILABLE"
+            ? "webhook signing key is unavailable"
+            : "webhook signing secret could not be decrypted";
+        record.next_attempt_at = job.next_attempt_at;
+        record.updated_at = job.updated_at;
+      }
+      return null;
+    }
+
     return {
       job_id: job.id,
       delivery_id: job.delivery_id,
@@ -248,9 +294,7 @@ async function claim(jobId) {
       event_created_at: job.event_created_at,
       data: jsonClone(job.data),
       url: job.url,
-      secret: job.secret_envelope
-        ? openSecret(jsonClone(job.secret_envelope))
-        : job.secret,
+      secret,
       replay: job.replay,
       attempt_count: job.attempt_count,
     };
@@ -384,8 +428,18 @@ export function drainWebhookOutbox({ limit = 25 } = {}) {
       .slice(0, limit)
       .map((job) => job.id);
     const results = [];
-    for (const id of ids) results.push(await attempt(id));
-    return results.filter(Boolean);
+    for (const id of ids) {
+      try {
+        const result = await attempt(id);
+        if (result) results.push(result);
+      } catch (error) {
+        console.error(
+          "webhook outbox attempt did not finalize; durable job remains retryable",
+          error?.code ?? error?.name ?? "webhook_attempt_error",
+        );
+      }
+    }
+    return results;
   })().finally(() => {
     draining = null;
   });
