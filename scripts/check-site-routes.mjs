@@ -16,6 +16,13 @@ const preview = readFileSync(
   new URL("./dev-cloudflare.mjs", import.meta.url),
   "utf8",
 );
+const router = readFileSync(new URL("../src/router.ts", import.meta.url), "utf8");
+const brand = readFileSync(new URL("../src/Brand.tsx", import.meta.url), "utf8");
+const siteRoot = readFileSync(
+  new URL("../src/SiteRoot.tsx", import.meta.url),
+  "utf8",
+);
+
 assert.match(
   worker,
   /KNOWN_PAGES[\s\S]*"\/cards"/,
@@ -44,6 +51,32 @@ assert.match(
   /permissions-policy/,
   "the site must set a permissions policy",
 );
+
+// Client-side route changes must reach SiteRoot as well as the page-level router.
+// Without this broadcast, clicking Cards from /home only changes the URL while
+// SiteRoot keeps rendering App, which makes /cards appear to work only after a
+// reload or after visiting a shell that dispatches popstate itself.
+assert.match(
+  router,
+  /history\.pushState\([\s\S]*dispatchEvent\(new PopStateEvent\("popstate"\)\)/,
+  "client navigation must broadcast popstate after pushState",
+);
+assert.match(
+  siteRoot,
+  /if \(path === "\/cards"\) return <DirectoryShell page="cards" \/>/,
+  "SiteRoot must own the canonical /cards page",
+);
+assert.match(
+  siteRoot,
+  /if \(path === "\/ecosystem"\) return <DirectoryShell page="ecosystem" \/>/,
+  "SiteRoot must own the canonical /ecosystem page",
+);
+assert.match(
+  brand,
+  /href="\/home"/,
+  "interior brand links must return to the canonical site home, not the cover",
+);
+
 assert.equal(
   pageMetadata("/cards").title,
   "Card programme research — Blueballs",
@@ -82,5 +115,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: /cards and /sandbox are allowlisted, crawlable and present in the sitemap",
+  "site route contract: cross-shell navigation is synchronized and /cards + /sandbox remain canonical, crawlable routes",
 );
