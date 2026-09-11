@@ -1,57 +1,56 @@
 # Vision
 
-Blueballs is open-source software for teams building a neobank, embedded-finance
-product or stablecoin-enabled financial product. It should let a capable team
-understand the system, run a complete reference stack, inspect every contract,
-replace the reference adapters and build on a dependable foundation.
+Blueballs is the open-source operating system for teams building modern financial institutions: neobanks, embedded-finance products, stablecoin rails and institution-owned FX.
+
+The goal is simple: one codebase should give a capable team the financial core, product surfaces, provider boundaries and release tooling needed to move from idea to a serious institution-grade stack without inheriting a black-box platform.
 
 ## The product
 
 Blueballs has three connected surfaces:
 
-1. **Banking foundation.** A tenant-isolated API for onboarding, accounts,
-   double-entry ledgering, cards, transfers, savings, credit, business banking,
-   webhooks and related product primitives.
-2. **Canonical FX foundation.** A provider-neutral runtime for policy, exact
-   pricing, liquidity selection, reservation, settlement state and optional
-   on-chain enforcement.
-3. **Product demonstrator.** A visual website that explains and demonstrates
-   the software, built from the same contracts as the stack it describes. A
-   provider named on it is a source-cited descriptor, never an implied
-   integration.
+1. **Banking core.** A tenant-isolated API for onboarding, accounts, exact double-entry ledgering, cards, transfers, custody, business banking, approvals, webhooks and provider orchestration.
+2. **Canonical FX core.** A provider-neutral runtime for policy, exact pricing, private and institutional liquidity, route construction, reservation, treasury/principal risk, fiat evidence, execution and reconciliation.
+3. **Product operating layer.** Interactive product interfaces and a Sandbox Builder that make the financial architecture understandable and configurable from the same repository.
 
-The API and FX contracts are the product boundary. The website and README make
-that product legible to founders, engineers, operators and reviewers.
+The API, state machines and machine-readable contracts are the system boundary. The website and documentation make that system legible to founders, engineers, operators, institutions and reviewers.
 
 ## Design principles
 
-- **Forkable before fashionable.** A new team must be able to clone, run, test
-  and extend the repository without private infrastructure.
-- **Exact money and atomic books.** Money crosses boundaries as decimal strings
-  or integer atomic units. Every ledger movement balances or rolls back.
-- **Tenant isolation by construction.** A stable tenant principal owns keys,
-  resources, events and idempotency state.
-- **Policy before price.** FX liquidity is eligible only after institution
-  authority, credentials, corridor rules and limits pass.
-- **Reserve before firm.** A firm quote exists only after all selected capacity
-  is reserved. Preview and execution are separate states.
-- **Provider-neutral core.** Institutions choose their banks, identity vendors,
-  rails, issuers, liquidity providers and custody stack through explicit
-  adapters. A provider listing or descriptor is not a partnership.
-- **Accurate public claims.** Documentation distinguishes implemented behavior,
-  simulations, reference adapters and deployment responsibilities.
+- **Financial correctness first.** Exact money, balanced books and atomic local commands are core architecture, not application conventions.
+- **Provider-neutral by design.** Banks, identity vendors, payment rails, issuers, liquidity venues and custodians connect through explicit versioned adapters.
+- **Policy before price.** FX capacity competes only after participant, credential, corridor and exposure policy pass.
+- **Reserve before firm.** A firm quote exists only after selected liquidity is reserved.
+- **Finality is explicit.** Token, bank, provider and custody edges retain their real settlement state and converge through reconciliation.
+- **Tenant isolation by construction.** Stable tenant principals own credentials, resources, events, provider work and idempotency state.
+- **Portable infrastructure.** The same core runs locally on Node/SQLite and at the edge on Cloudflare Durable Objects, with clear scale-out contracts.
+- **Open contracts, replaceable infrastructure.** Institutions can inspect every state machine and swap deployment adapters without forking the core product semantics.
+- **Executable assurance.** API contracts, migrations, restart/eviction, recovery, load, security and smart-contract invariants are part of the repository release gate.
+- **Public product quality.** Source, documentation, examples, comments and commit history should communicate the strength of the system as clearly as the code itself.
 
-## Scope
+## What Blueballs should feel like
 
-Blueballs is MIT-licensed software, not a licensed bank, sponsor-bank
-relationship, insured account, custody service or compliance programme. A
-deployment brings its own jurisdiction, licensing, vendors, security operations
-and customer protection. Saying so plainly is what lets everything else in this
-document be taken at face value.
+A team cloning Blueballs should discover a coherent financial system rather than a collection of disconnected examples:
 
-## Direction of travel
+```text
+product experience
+      ↓
+banking + FX contracts
+      ↓
+ledger / policy / routing / settlement
+      ↓
+durable provider adapters
+      ↓
+institution-owned infrastructure
+```
 
-The reference stack should grow through coherent product workflows and stable
-extension contracts—not by accumulating disconnected routes. New features
-belong in the canonical banking or FX architecture, with a working example,
-public contract and failure-mode tests.
+Every new capability should extend that system coherently, with a public contract, deterministic verification and clear ownership.
+
+## Institution-owned deployment
+
+Blueballs supplies the financial software core and provider contracts. Institutions bring the licensed relationships, infrastructure credentials and jurisdiction-specific operating policy appropriate to the products they launch.
+
+That separation is a feature: the open-source core remains reusable while the institution keeps control of its banking relationships, providers, data and deployment.
+
+## Direction
+
+Blueballs should keep expanding toward a complete, composable financial institution platform: stronger product building, richer provider adapters, multi-shard operation, deeper programmable treasury and increasingly unified banking + FX workflows, while preserving the exact-money, isolation and finality invariants that make the core trustworthy.
