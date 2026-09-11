@@ -55,6 +55,12 @@ function safeInteger(
   return value;
 }
 
+function coverageRequired(amount, bps) {
+  const value = BigInt(amount);
+  const basisPoints = BigInt(bps);
+  return (value * basisPoints + 9_999n) / 10_000n;
+}
+
 function rowToInstrument(row) {
   if (!row) return null;
   return {
@@ -207,6 +213,70 @@ export class MonetaryEngine {
     return { eventId, createdAt };
   }
 
+  #assertReserveUnit(code, reserveCurrency, decimals) {
+    const peer = this.db
+      .prepare(
+        `
+        SELECT code, decimals
+        FROM monetary_instruments
+        WHERE reserve_currency = ? AND code <> ?
+        ORDER BY code
+        LIMIT 1
+      `,
+      )
+      .get(reserveCurrency, code);
+    if (peer && Number(peer.decimals) !== decimals) {
+      fail(
+        "RESERVE_UNIT_MISMATCH",
+        `${reserveCurrency} instruments must use one shared atomic precision`,
+        409,
+        {
+          reserveCurrency,
+          requestedDecimals: decimals,
+          existingInstrument: peer.code,
+          existingDecimals: Number(peer.decimals),
+        },
+      );
+    }
+
+    const existing = this.db
+      .prepare("SELECT * FROM monetary_instruments WHERE code = ?")
+      .get(code);
+    if (
+      existing &&
+      existing.reserve_currency === reserveCurrency &&
+      Number(existing.decimals) !== decimals
+    ) {
+      const reserveRows = this.db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM monetary_reserve_deposits WHERE reserve_currency = ?",
+        )
+        .get(reserveCurrency);
+      const receiptRows = this.db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM monetary_receipts WHERE reserve_currency = ?",
+        )
+        .get(reserveCurrency);
+      const risk = this.db
+        .prepare(
+          "SELECT amount FROM monetary_risk_capital WHERE reserve_currency = ?",
+        )
+        .get(reserveCurrency);
+      if (
+        Number(reserveRows?.count ?? 0) > 0 ||
+        Number(receiptRows?.count ?? 0) > 0 ||
+        BigInt(risk?.amount ?? "0") > 0n
+      ) {
+        fail(
+          "RESERVE_UNIT_IN_USE",
+          `${reserveCurrency} atomic precision cannot change while reserve state exists`,
+          409,
+          { reserveCurrency, currentDecimals: Number(existing.decimals), requestedDecimals: decimals },
+        );
+      }
+    }
+  }
+
   configureInstrument({
     code,
     name,
@@ -238,6 +308,7 @@ export class MonetaryEngine {
     }
     const createdAt = this.now();
     this.#transaction(() => {
+      this.#assertReserveUnit(code, reserveCurrency, decimals);
       const existing = this.db
         .prepare("SELECT * FROM monetary_instruments WHERE code = ?")
         .get(code);
@@ -485,16 +556,25 @@ export class MonetaryEngine {
       )
       .all(reserveCurrency)
       .reduce((sum, row) => sum + BigInt(row.amount), 0n);
-    const supply = this.db
+    const liabilities = this.db
       .prepare(
         `
-      SELECT s.amount FROM monetary_supply s
+      SELECT i.code, i.min_coverage_bps, s.amount
+      FROM monetary_supply s
       JOIN monetary_instruments i ON i.code = s.instrument_code
       WHERE i.reserve_currency = ?
     `,
       )
-      .all(reserveCurrency)
-      .reduce((sum, row) => sum + BigInt(row.amount), 0n);
+      .all(reserveCurrency);
+    const supply = liabilities.reduce(
+      (sum, row) => sum + BigInt(row.amount),
+      0n,
+    );
+    const requiredCoverage = liabilities.reduce(
+      (sum, row) =>
+        sum + coverageRequired(row.amount, row.min_coverage_bps),
+      0n,
+    );
     const lockedReceipts = this.db
       .prepare(
         `
@@ -512,9 +592,10 @@ export class MonetaryEngine {
     return {
       settled,
       supply,
+      requiredCoverage,
       lockedReceipts,
       riskCapital: BigInt(risk?.amount ?? "0"),
-      unallocated: settled - supply - lockedReceipts,
+      unallocated: settled - requiredCoverage - lockedReceipts,
     };
   }
 
@@ -531,7 +612,7 @@ export class MonetaryEngine {
       if (totals.unallocated < amountValue) {
         fail(
           "INSUFFICIENT_SETTLED_RESERVE",
-          "only settled, unallocated reserve can support minting",
+          "only settled reserve above minimum coverage and active receipt locks can support minting",
           409,
           {
             requested: amountValue.toString(),
@@ -559,11 +640,9 @@ export class MonetaryEngine {
       const requiredReserve = liabilities.reduce((sum, liability) => {
         const supply =
           liability.code === code ? nextSupply : BigInt(liability.amount);
-        return (
-          sum + (supply * BigInt(liability.min_coverage_bps) + 9_999n) / 10_000n
-        );
+        return sum + coverageRequired(supply, liability.min_coverage_bps);
       }, 0n);
-      if (totals.settled < requiredReserve)
+      if (totals.settled - totals.lockedReceipts < requiredReserve)
         fail(
           "COVERAGE_LIMIT",
           "mint would violate minimum reserve coverage",
@@ -607,6 +686,34 @@ export class MonetaryEngine {
           "redemption exceeds outstanding supply",
           409,
         );
+      const totals = this.#currencyTotals(instrument.reserveCurrency);
+      const nextSupply = supply - amountValue;
+      const liabilities = this.db
+        .prepare(
+          `
+        SELECT i.code, i.min_coverage_bps, s.amount
+        FROM monetary_instruments i
+        JOIN monetary_supply s ON s.instrument_code = i.code
+        WHERE i.reserve_currency = ?
+      `,
+        )
+        .all(instrument.reserveCurrency);
+      const postRedemptionCoverage = liabilities.reduce((sum, liability) => {
+        const remainingSupply =
+          liability.code === code ? nextSupply : BigInt(liability.amount);
+        return sum + coverageRequired(remainingSupply, liability.min_coverage_bps);
+      }, 0n);
+      if (
+        totals.settled - amountValue - totals.lockedReceipts <
+        postRedemptionCoverage
+      ) {
+        fail(
+          "COVERAGE_LIMIT",
+          "redemption would consume reserve required by other outstanding liabilities or receipts",
+          409,
+        );
+      }
+
       const deposits = this.db
         .prepare(
           `
@@ -642,7 +749,6 @@ export class MonetaryEngine {
           "settled reserve unavailable for redemption",
           409,
         );
-      const nextSupply = supply - amountValue;
       this.db
         .prepare(
           "UPDATE monetary_supply SET amount = ? WHERE instrument_code = ?",
@@ -684,8 +790,15 @@ export class MonetaryEngine {
       if (totals.unallocated < amountValue) {
         fail(
           "INSUFFICIENT_SETTLED_RESERVE",
-          "receipt requires settled, unallocated reserve",
+          "receipt requires settled reserve above minimum instrument coverage",
           409,
+          {
+            requested: amountValue.toString(),
+            available: (totals.unallocated > 0n
+              ? totals.unallocated
+              : 0n
+            ).toString(),
+          },
         );
       }
       const receiptId = `receipt_${randomUUID()}`;
@@ -745,6 +858,34 @@ export class MonetaryEngine {
           `cannot consume receipt from ${receipt.state}`,
           409,
         );
+      const instrumentLiabilities = this.db
+        .prepare(
+          `
+        SELECT i.min_coverage_bps, s.amount
+        FROM monetary_instruments i
+        JOIN monetary_supply s ON s.instrument_code = i.code
+        WHERE i.reserve_currency = ?
+      `,
+        )
+        .all(receipt.reserveCurrency);
+      const requiredCoverage = instrumentLiabilities.reduce(
+        (sum, liability) =>
+          sum + coverageRequired(liability.amount, liability.min_coverage_bps),
+        0n,
+      );
+      const totals = this.#currencyTotals(receipt.reserveCurrency);
+      const otherLocked = totals.lockedReceipts - BigInt(receipt.amount);
+      if (
+        totals.settled - BigInt(receipt.amount) - otherLocked <
+        requiredCoverage
+      ) {
+        fail(
+          "COVERAGE_LIMIT",
+          "receipt consumption would invade reserve required by outstanding instruments",
+          409,
+        );
+      }
+
       const deposits = this.db
         .prepare(
           `
@@ -812,6 +953,7 @@ export class MonetaryEngine {
         reserveCurrency,
         settledReserve: totals.settled.toString(),
         redeemableSupply: totals.supply.toString(),
+        requiredCoverageReserve: totals.requiredCoverage.toString(),
         lockedReceipts: totals.lockedReceipts.toString(),
         unallocatedReserve: (totals.unallocated > 0n
           ? totals.unallocated
