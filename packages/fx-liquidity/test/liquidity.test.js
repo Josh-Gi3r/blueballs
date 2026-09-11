@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { planExactOutput, reservePlan } from "../src/index.js";
+import {
+  planExactOutput,
+  releaseReservedRoute,
+  reservePlan,
+} from "../src/index.js";
 
 const NOW = 1_000_000;
 
@@ -214,4 +218,55 @@ test("successful reservation returns source-specific handles for reconciliation"
     route.legs.map((x) => x.reservationHandle),
     ["market-0", "bank-1"],
   );
+});
+
+test("explicit route release attempts every leg even when one adapter fails", async () => {
+  const events = [];
+  const route = {
+    routeId: "r1",
+    legs: [
+      {
+        sourceType: "PRIVATE_MARKET",
+        sourceId: "market",
+        reservationHandle: "market-0",
+      },
+      {
+        sourceType: "ISSUER",
+        sourceId: "issuer",
+        reservationHandle: "issuer-1",
+      },
+      {
+        sourceType: "BANK_PRINCIPAL",
+        sourceId: "bank",
+        reservationHandle: "bank-2",
+      },
+    ],
+  };
+  const adapter = (name, shouldFail = false) => ({
+    reserve: async () => ({ reservationHandle: `${name}-unused` }),
+    release: async () => {
+      events.push(name);
+      if (shouldFail) throw new Error(`${name} unavailable`);
+      return `${name}-released`;
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      releaseReservedRoute({
+        route,
+        adapters: {
+          PRIVATE_MARKET: adapter("market"),
+          ISSUER: adapter("issuer", true),
+          BANK_PRINCIPAL: adapter("bank"),
+        },
+      }),
+    (error) => {
+      assert.equal(error instanceof AggregateError, true);
+      assert.equal(error.releaseErrors.length, 1);
+      assert.equal(error.releaseResults.length, 2);
+      return true;
+    },
+  );
+  assert.deepEqual(events, ["bank", "issuer", "market"]);
 });
