@@ -80,19 +80,38 @@ export async function releaseReservedRoute({
   if (!route || !Array.isArray(route.legs))
     throw new TypeError("route required");
   const results = [];
+  const failures = [];
   for (let i = route.legs.length - 1; i >= 0; i -= 1) {
     const leg = route.legs[i];
-    const result = await adapterFor(adapters, leg).release({
-      routeId: route.routeId,
-      leg,
-      reservationHandle: leg.reservationHandle,
-      reason,
-    });
-    results.push({
-      sourceType: leg.sourceType,
-      sourceId: leg.sourceId,
-      result,
-    });
+    try {
+      const result = await adapterFor(adapters, leg).release({
+        routeId: route.routeId,
+        leg,
+        reservationHandle: leg.reservationHandle,
+        reason,
+      });
+      results.push({
+        sourceType: leg.sourceType,
+        sourceId: leg.sourceId,
+        result,
+      });
+    } catch (error) {
+      failures.push({
+        sourceType: leg.sourceType,
+        sourceId: leg.sourceId,
+        reservationHandle: leg.reservationHandle,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  if (failures.length) {
+    const error = new AggregateError(
+      failures.map((failure) => new Error(failure.error)),
+      "one or more liquidity reservations could not be released",
+    );
+    error.releaseErrors = failures;
+    error.releaseResults = results;
+    throw error;
   }
   return results;
 }
