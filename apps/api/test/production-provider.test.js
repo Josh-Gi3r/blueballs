@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import test from "node:test";
+import { signProviderInboundBody } from "../../../spec/provider-inbound-signing.mjs";
 import { createApiFixture } from "./helpers/api-process.js";
 
 const BOOTSTRAP_KEY = "bb_production_bootstrap_test_key_1234567890";
+const OPERATOR_KEY = "bb_production_operator_test_key_1234567890";
 const GATEWAY_TOKEN = "provider-gateway-test-token-123456";
+const INBOUND_SECRET =
+  "production-provider-inbound-test-secret-0123456789abcdef0123456789abcdef";
 const PAYLOAD_KEY = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
 async function listenGateway(handler) {
   const server = createServer(handler);
@@ -100,6 +106,8 @@ async function productionApi(t, gateway) {
       BANK_API_MODE: "production",
       BANK_BOOTSTRAP_API_KEY: BOOTSTRAP_KEY,
       BANK_BOOTSTRAP_EMAIL: "ops@example.test",
+      OPERATOR_API_KEY_HASH: sha256(OPERATOR_KEY),
+      BANK_PROVIDER_INBOUND_SECRET: INBOUND_SECRET,
       BANK_PROVIDER_GATEWAY_URL: gateway.url,
       BANK_PROVIDER_GATEWAY_TOKEN: GATEWAY_TOKEN,
       BANK_PROVIDER_PAYLOAD_KEY: PAYLOAD_KEY,
@@ -111,6 +119,56 @@ async function productionApi(t, gateway) {
   });
   t.after(() => api.close());
   return api;
+}
+
+async function tenantId(api) {
+  const keys = await api.request("GET", "/v2/keys", { key: BOOTSTRAP_KEY });
+  assert.equal(keys.status, 200);
+  return keys.body.current.tenant_id;
+}
+
+async function fundAccount(api, { tenant, account, amount, eventId }) {
+  const body = signProviderInboundBody(
+    {
+      event_id: eventId,
+      tenant_id: tenant,
+      type: "payments.account_credit_settled",
+      resource_id: account,
+      amount: { amount, currency: "SGD" },
+      rail: "paynow",
+      provider_reference: `inbound-${eventId}`,
+      provider_state: "settled",
+    },
+    { secret: INBOUND_SECRET },
+  );
+  const result = await api.request("POST", "/internal/provider/events", {
+    key: OPERATOR_KEY,
+    body,
+  });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+}
+
+async function createPayNowDestination(api, name) {
+  const recipient = await api.request("POST", "/v2/recipients", {
+    key: BOOTSTRAP_KEY,
+    body: { name },
+  });
+  assert.equal(recipient.status, 201);
+  const destination = await api.request(
+    "POST",
+    `/v2/recipients/${recipient.body.id}/destinations`,
+    {
+      key: BOOTSTRAP_KEY,
+      body: {
+        rail: "paynow",
+        name,
+        currency: "SGD",
+        proxy: "+6593334444",
+      },
+    },
+  );
+  assert.equal(destination.status, 201);
+  return { recipient: recipient.body, destination: destination.body };
 }
 
 test("production cards, receiving details, onboarding and transfers execute through the provider protocol", async (t) => {
@@ -132,6 +190,7 @@ test("production cards, receiving details, onboarding and transfers execute thro
   });
   t.after(() => gateway.close());
   const api = await productionApi(t, gateway);
+  const tenant = await tenantId(api);
 
   // Production mode has no self-serve sandbox signup.
   const signup = await api.request("POST", "/v2/auth/signup", {
@@ -235,42 +294,25 @@ test("production cards, receiving details, onboarding and transfers execute thro
   }, "provider-backed onboarding decision");
   assert.equal(completed.decision, "approved");
 
-  // A credit-line draw is a real balanced product flow and gives this account a
-  // balance without using the sandbox-only direct funding endpoint.
-  const credit = await api.request("POST", "/v2/credit", {
-    key: BOOTSTRAP_KEY,
-    body: { account: account.body.id, limit: "1000.00" },
+  // Customer money in production enters only from signed provider settlement
+  // evidence, never through sandbox funding or reference credit products.
+  await fundAccount(api, {
+    tenant,
+    account: account.body.id,
+    amount: "500.00",
+    eventId: "provider-test-funding-000001",
   });
-  assert.equal(credit.status, 201);
-  const draw = await api.request("POST", `/v2/credit/${credit.body.id}/draw`, {
-    key: BOOTSTRAP_KEY,
-    body: { amount: "500.00" },
-  });
-  assert.equal(draw.status, 200);
 
-  const recipient = await api.request("POST", "/v2/recipients", {
-    key: BOOTSTRAP_KEY,
-    body: { name: "Production Supplier" },
-  });
-  const destination = await api.request(
-    "POST",
-    `/v2/recipients/${recipient.body.id}/destinations`,
-    {
-      key: BOOTSTRAP_KEY,
-      body: {
-        rail: "paynow",
-        name: "Production Supplier",
-        currency: "SGD",
-        proxy: "+6593334444",
-      },
-    },
+  const { recipient, destination } = await createPayNowDestination(
+    api,
+    "Production Supplier",
   );
   const transfer = await api.request("POST", "/v2/transfers", {
     key: BOOTSTRAP_KEY,
     body: {
       from: account.body.id,
-      recipient: recipient.body.id,
-      destination: destination.body.id,
+      recipient: recipient.id,
+      destination: destination.id,
       rail: "paynow",
       amount: "125.00",
     },
@@ -332,6 +374,7 @@ test("ambiguous transfer submission reconciles with the same provider idempotenc
   });
   t.after(() => gateway.close());
   const api = await productionApi(t, gateway);
+  const tenant = await tenantId(api);
 
   const customer = await api.request("POST", "/v2/customers", {
     key: BOOTSTRAP_KEY,
@@ -341,18 +384,26 @@ test("ambiguous transfer submission reconciles with the same provider idempotenc
     key: BOOTSTRAP_KEY,
     body: { customer: customer.body.id, currency: "SGD" },
   });
-  const credit = await api.request("POST", "/v2/credit", {
-    key: BOOTSTRAP_KEY,
-    body: { account: account.body.id, limit: "500.00" },
+  await fundAccount(api, {
+    tenant,
+    account: account.body.id,
+    amount: "250.00",
+    eventId: "provider-test-funding-000002",
   });
-  await api.request("POST", `/v2/credit/${credit.body.id}/draw`, {
-    key: BOOTSTRAP_KEY,
-    body: { amount: "250.00" },
-  });
+  const { recipient, destination } = await createPayNowDestination(
+    api,
+    "Reconciliation Supplier",
+  );
 
   const transfer = await api.request("POST", "/v2/transfers", {
     key: BOOTSTRAP_KEY,
-    body: { from: account.body.id, rail: "paynow", amount: "50.00" },
+    body: {
+      from: account.body.id,
+      recipient: recipient.id,
+      destination: destination.id,
+      rail: "paynow",
+      amount: "50.00",
+    },
   });
   assert.equal(transfer.status, 201);
 
