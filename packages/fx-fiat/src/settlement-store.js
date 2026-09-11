@@ -24,6 +24,17 @@ function parseJson(value) {
   return JSON.parse(value);
 }
 
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function rowToIntent(row) {
   if (!row) return null;
   return {
@@ -246,8 +257,14 @@ export class FiatSettlementStore {
   }
 
   observePayment(intentId, observedAt = this.now()) {
-    if (!Number.isSafeInteger(observedAt) || observedAt < 0)
+    const now = this.now();
+    if (
+      !Number.isSafeInteger(observedAt) ||
+      observedAt < 0 ||
+      observedAt > now
+    ) {
       throw new RangeError("observedAt invalid");
+    }
     return this.#transition(intentId, ["SUBMITTED"], "PAYMENT_OBSERVED", {
       paymentObservedAt: observedAt,
     });
@@ -306,13 +323,16 @@ export class FiatSettlementStore {
         .prepare("SELECT * FROM fiat_attestations WHERE attestation_id = ?")
         .get(suppliedId);
       if (prior) {
-        if (
-          prior.intent_id === attestation.intentId &&
-          prior.payment_id === attestation.paymentId
-        ) {
+        let sameEvidence = false;
+        try {
+          sameEvidence = canonical(parseJson(prior.payload_json)) === canonical(attestation);
+        } catch {
+          sameEvidence = false;
+        }
+        if (sameEvidence) {
           return { duplicate: true, attestationId: suppliedId };
         }
-        throw new Error("attestationId collision");
+        throw new Error("attestationId already exists with different evidence");
       }
     }
 
@@ -344,12 +364,14 @@ export class FiatSettlementStore {
         throw new TypeError("paymentId required");
       if (
         !Number.isSafeInteger(attestation.settledAt) ||
-        attestation.settledAt < 0
+        attestation.settledAt < 0 ||
+        attestation.settledAt > now
       )
         throw new RangeError("settledAt invalid");
       if (
         !Number.isSafeInteger(attestation.issuedAt) ||
-        attestation.issuedAt < attestation.settledAt
+        attestation.issuedAt < attestation.settledAt ||
+        attestation.issuedAt > now
       )
         throw new RangeError("issuedAt invalid");
       if (
@@ -360,13 +382,22 @@ export class FiatSettlementStore {
       if (attestation.status !== "VERIFIED")
         throw new Error("attestation is not verified");
 
+      // A provider-native payment is a single external fact even if more than
+      // one verifier can attest it. Do not let verifier fan-out turn one settled
+      // payment into multiple Blueballs intents.
       const paymentReplay = this.db
         .prepare(
-          "SELECT intent_id FROM fiat_attestations WHERE verifier_id = ? AND payment_id = ?",
+          `
+          SELECT a.intent_id
+          FROM fiat_attestations a
+          JOIN fiat_intents i ON i.intent_id = a.intent_id
+          WHERE i.provider_id = ? AND a.payment_id = ?
+          LIMIT 1
+        `,
         )
-        .get(attestation.verifierId, attestation.paymentId);
+        .get(intent.provider_id, attestation.paymentId);
       if (paymentReplay) {
-        const error = new Error("paymentId already used");
+        const error = new Error("paymentId already used for this provider");
         error.code = "PAYMENT_REPLAY";
         throw error;
       }
@@ -410,25 +441,31 @@ export class FiatSettlementStore {
   settleVerifiedIntent(intentId, eventId = randomUUID()) {
     return this.#transaction(() => {
       const prior = this.db
-        .prepare("SELECT event_id FROM fiat_events WHERE event_id = ?")
+        .prepare("SELECT intent_id FROM fiat_events WHERE event_id = ?")
         .get(eventId);
-      if (prior) return { duplicate: true };
+      if (prior) {
+        if (prior.intent_id === intentId) return { duplicate: true };
+        const error = new Error("settlement event id already belongs to another intent");
+        error.code = "PAYMENT_REPLAY";
+        throw error;
+      }
       const intent = this.db
         .prepare("SELECT * FROM fiat_intents WHERE intent_id = ?")
         .get(intentId);
       if (!intent) throw new Error("intent not found");
       if (intent.state !== "VERIFIED")
         throw new Error("intent must be VERIFIED before settlement");
+      const settledAt = this.now();
       this.db
         .prepare(
           "UPDATE fiat_intents SET state = 'SETTLED', settled_at = ? WHERE intent_id = ?",
         )
-        .run(this.now(), intentId);
+        .run(settledAt, intentId);
       this.db
         .prepare(
           "INSERT INTO fiat_events(event_id, intent_id, kind, created_at, payload_json) VALUES (?, ?, ?, ?, ?)",
         )
-        .run(eventId, intentId, "SETTLED", this.now(), "{}");
+        .run(eventId, intentId, "SETTLED", settledAt, "{}");
       return { duplicate: false };
     });
   }
