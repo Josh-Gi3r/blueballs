@@ -9,7 +9,12 @@ export type FxSourceType =
   | "BANK_PRINCIPAL";
 
 export type FxQuoteState =
-  "RESERVED" | "SUBMITTED" | "CONFIRMED" | "RELEASED" | "FAILED" | "EXPIRED";
+  | "RESERVED"
+  | "SUBMITTED"
+  | "CONFIRMED"
+  | "RELEASED"
+  | "FAILED"
+  | "EXPIRED";
 
 export interface SourceAllocation {
   type: FxSourceType;
@@ -80,6 +85,16 @@ export interface QuoteRequest {
   expiresInMs?: number;
   participantId?: string;
   accountRef?: string;
+}
+
+export interface QuoteConfirmation {
+  eventId: string;
+  fills?: Array<Record<string, unknown>>;
+}
+
+export interface QuoteFailure {
+  eventId?: string;
+  reason: string;
 }
 
 export interface PublicTradeRequest {
@@ -226,8 +241,10 @@ export interface FiatIntent {
 
 export interface BlueballsFxClientOptions {
   baseUrl: string;
-  /** Optional for public reference/health calls; required by authenticated methods. */
+  /** Client/integration credential for order, quote, reservation and execution calls. */
   apiKey?: string;
+  /** Separate operator/finality credential for reconciliation and fiat evidence calls. */
+  operatorApiKey?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -249,7 +266,12 @@ export class BlueballsFxError extends Error {
 export class BlueballsFxClient {
   constructor(options: BlueballsFxClientOptions);
 
-  health(): Promise<{ status: string; service: string; runtime?: string; source_commit?: string }>;
+  health(): Promise<{
+    status: string;
+    service: string;
+    runtime?: string;
+    source_commit?: string;
+  }>;
   referenceStatus(): Promise<ReferenceStatus>;
   referencePolicy(): Promise<Record<string, unknown>>;
   referenceMarket(): Promise<ReferenceMarket>;
@@ -296,6 +318,14 @@ export class BlueballsFxClient {
     quoteId: string,
   ): Promise<FxQuote & { execution: Record<string, unknown> }>;
   getRoute(routeId: string): Promise<FxRoute>;
+  confirmQuote(
+    quoteId: string,
+    confirmation: QuoteConfirmation,
+  ): Promise<Record<string, unknown>>;
+  failQuote(
+    quoteId: string,
+    failure: QuoteFailure,
+  ): Promise<Record<string, unknown>>;
 
   createFiatIntent(intent: FiatIntent): Promise<FiatIntent>;
   getFiatIntent(intentId: string): Promise<FiatIntent>;
