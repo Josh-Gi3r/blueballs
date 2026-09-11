@@ -3,6 +3,7 @@ pragma solidity ^0.8.36;
 
 import { FxVault } from "../src/FxVault.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
+import { ReentrantERC20 } from "./mocks/ReentrantERC20.sol";
 
 contract SettlementHarness {
     FxVault public vault;
@@ -21,6 +22,10 @@ contract SettlementHarness {
 
 contract VaultActor {
     function approve(MockERC20 token, address spender, uint256 amount) external {
+        token.approve(spender, amount);
+    }
+
+    function approveReentrant(ReentrantERC20 token, address spender, uint256 amount) external {
         token.approve(spender, amount);
     }
 
@@ -74,6 +79,28 @@ contract FxVaultTest {
         require(vault.totalLiabilities(address(token)) == 100 ether, "liabilities");
         require(vault.physicalBalance(address(token)) == 100 ether, "physical");
         require(vault.surplus(address(token)) == 0, "surplus");
+    }
+
+    function testTokenCallbackCannotReenterDepositAccounting() public {
+        ReentrantERC20 reentrant = new ReentrantERC20();
+        address[] memory supported = new address[](1);
+        supported[0] = address(reentrant);
+        FxVault guarded = new FxVault(address(this), supported);
+
+        VaultActor actor = new VaultActor();
+        reentrant.mint(address(actor), 100 ether);
+        actor.approveReentrant(reentrant, address(guarded), 100 ether);
+        reentrant.configureAttack(guarded, true);
+
+        actor.deposit(guarded, address(reentrant), 100 ether);
+
+        require(reentrant.reentryBlocked(), "token callback reentered vault");
+        require(
+            guarded.balanceOf(address(reentrant), address(actor)) == 100 ether,
+            "actor received duplicate credit"
+        );
+        require(guarded.totalLiabilities(address(reentrant)) == 100 ether, "liability drift");
+        require(guarded.physicalBalance(address(reentrant)) == 100 ether, "physical drift");
     }
 
     function testSettlementMoveCannotCreateOrDestroyLiability() public {
