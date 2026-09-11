@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { signProviderInboundBody } from "../src/provider-inbound-auth.js";
+import { signProviderInboundBody } from "../../../spec/provider-inbound-signing.mjs";
 import { createApiFixture } from "./helpers/api-process.js";
 
 const BOOTSTRAP_KEY = "bb_inbound_bootstrap_1234567890abcdef123456";
