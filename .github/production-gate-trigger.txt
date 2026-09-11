@@ -1,0 +1,2 @@
+Production gate trigger for the 2026-09-11 production-hardening proof branch.
+This file has no runtime effect and may be deleted after CI behavior is verified.
