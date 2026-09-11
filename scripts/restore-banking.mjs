@@ -6,13 +6,14 @@ function args(argv) {
   for (let i = 0; i < argv.length; i++) {
     const value = argv[i];
     if (value === "--backup") out.backup = argv[++i];
-    else if (value === "--db") out.destination = argv[++i];
+    else if (value === "--db" || value === "--destination")
+      out.destination = argv[++i];
     else if (value === "--force") out.force = true;
     else throw new Error(`Unknown argument ${value}`);
   }
   if (!out.backup || !out.destination) {
     throw new Error(
-      "Usage: node scripts/restore-banking.mjs --backup <backup.sqlite> --db <blueballs.sqlite> [--force]",
+      "Usage: node scripts/restore-banking.mjs --backup <backup.sqlite> (--db|--destination) <blueballs.sqlite> [--force]",
     );
   }
   return out;
