@@ -4,6 +4,10 @@
  * across retries so receivers can deduplicate. A process can die after an HTTP
  * request reached the receiver but before Blueballs recorded the response; that
  * ambiguity is never represented as exactly-once delivery.
+ *
+ * Production webhook signing secrets are sealed before both the webhook target
+ * row and durable outbox job are persisted. Plaintext exists only in memory at
+ * target creation/delivery time.
  */
 import { createHmac, randomBytes } from "node:crypto";
 import {
@@ -15,6 +19,10 @@ import {
   subscribeToEventsBeforeCommit,
 } from "./kernel.js";
 import { WEBHOOK_DELIVERY_MODE, fetchWebhook } from "./webhook-egress.js";
+import {
+  openProviderPayload,
+  sealProviderPayload,
+} from "./provider-payload-crypto.js";
 
 const API_VERSION = "2026-08-06";
 const DEFAULT_RETRY_DELAYS_MS = [0, 1_000, 10_000, 60_000, 300_000, 1_800_000];
@@ -44,12 +52,79 @@ if (!Number.isSafeInteger(PUMP_MS) || PUMP_MS < 10) {
   throw new Error("WEBHOOK_PUMP_MS must be an integer of at least 10ms");
 }
 
-export const webhooks = collection("webhooks");
+const webhookStore = collection("webhooks");
 export const deliveries = collection("deliveries");
 const outbox = collection("webhookOutbox");
 
+function sealSecret(secret) {
+  if (typeof secret !== "string" || !secret) {
+    throw new Error("Webhook signing secret is missing");
+  }
+  return sealProviderPayload({ secret });
+}
+
+function openSecret(envelope) {
+  const value = openProviderPayload(envelope);
+  if (typeof value?.secret !== "string" || !value.secret) {
+    throw new Error("Webhook signing-secret envelope is malformed");
+  }
+  return value.secret;
+}
+
+function storedWebhook(value) {
+  const row = structuredClone(value);
+  if (row.secret) {
+    row.secret_envelope = sealSecret(row.secret);
+    delete row.secret;
+  }
+  return row;
+}
+
+function runtimeWebhook(value) {
+  if (!value) return value;
+  const row = structuredClone(value);
+  if (row.secret_envelope) row.secret = openSecret(row.secret_envelope);
+  return row;
+}
+
+/** Storage facade: target secrets are sealed before persistence while route/outbox
+ * code receives a transient plaintext value only when it actually needs to sign. */
+export const webhooks = {
+  get(id) {
+    return runtimeWebhook(webhookStore.get(id));
+  },
+  has(id) {
+    return webhookStore.has(id);
+  },
+  set(id, value) {
+    webhookStore.set(id, storedWebhook(value));
+    return this;
+  },
+  delete(id) {
+    return webhookStore.delete(id);
+  },
+  *values() {
+    for (const value of webhookStore.values()) yield runtimeWebhook(value);
+  },
+  *entries() {
+    for (const [id, value] of webhookStore.entries()) {
+      yield [id, runtimeWebhook(value)];
+    }
+  },
+  get size() {
+    return webhookStore.size;
+  },
+  [Symbol.iterator]() {
+    return this.entries();
+  },
+};
+
 export function withoutSecret(wh) {
-  const { secret: _secret, ...publicTarget } = wh;
+  const {
+    secret: _secret,
+    secret_envelope: _secretEnvelope,
+    ...publicTarget
+  } = wh;
   return publicTarget;
 }
 
@@ -87,7 +162,7 @@ function newDelivery(wh, evt, opts = {}) {
     event_created_at: eventCreatedAt,
     data: evt.data,
     url: wh.url,
-    secret: wh.secret,
+    secret_envelope: wh.secret_envelope ?? sealSecret(wh.secret),
     owner: wh.owner,
     replay: !!opts.replay,
     replayed_from: opts.replayedFrom ?? null,
@@ -165,7 +240,9 @@ async function claim(jobId) {
       event_created_at: job.event_created_at,
       data: structuredClone(job.data),
       url: job.url,
-      secret: job.secret,
+      secret: job.secret_envelope
+        ? openSecret(job.secret_envelope)
+        : job.secret,
       replay: job.replay,
       attempt_count: job.attempt_count,
     };
@@ -325,7 +402,8 @@ export function nextWebhookOutboxAt() {
 export function webhookOutboxStatus() {
   const jobs = [...outbox.values()];
   return {
-    pending: jobs.filter((job) => ["pending", "retrying"].includes(job.status)).length,
+    pending: jobs.filter((job) => ["pending", "retrying"].includes(job.status))
+      .length,
     in_flight: jobs.filter((job) => job.status === "in_flight").length,
     failed: jobs.filter((job) => job.status === "failed").length,
     succeeded: jobs.filter((job) => job.status === "succeeded").length,
