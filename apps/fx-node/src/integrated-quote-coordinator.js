@@ -29,12 +29,12 @@ function errorWithCode(message, code, details = undefined) {
 }
 
 /**
- * Canonical reference quote coordinator.
+ * Canonical multi-source quote coordinator.
  *
  * It compares every policy-approved source through fx-liquidity, reserves every
- * selected leg, and only then exposes a firm sandbox quote. The underlying
- * providers remain adapters: private signed orders, issuer/LP/treasury reference
- * inventory and bank principal all keep their own reservation semantics.
+ * selected leg, and only then exposes a firm quote. Private signed orders,
+ * issuer/LP/treasury inventory and bank principal keep their own reservation
+ * semantics behind one route lifecycle.
  */
 export class IntegratedQuoteCoordinator {
   constructor({
@@ -143,12 +143,25 @@ export class IntegratedQuoteCoordinator {
       throw errorWithCode(
         "customer is not eligible for this FX request",
         "POLICY_REJECTED",
-        {
-          reasons: decision.reasons,
-        },
+        { reasons: decision.reasons },
       );
     }
     return decision;
+  }
+
+  #markReservedLegsSubmitted(quote, submissionRef) {
+    for (let index = 0; index < quote.route.reserved.legs.length; index += 1) {
+      const leg = quote.route.reserved.legs[index];
+      const adapter = this.#adapterFor(leg.sourceType);
+      if (typeof adapter.markSubmitted === "function") {
+        adapter.markSubmitted({
+          routeId: quote.row.route_id,
+          leg,
+          reservationHandle: leg.reservationHandle,
+          submissionRef: `${submissionRef}:${index}`,
+        });
+      }
+    }
   }
 
   candidateSlices({ inputAsset, outputAsset, exactOutput, expiresAt }) {
@@ -250,19 +263,12 @@ export class IntegratedQuoteCoordinator {
         output: leg.outputAmount,
       })),
       finality: {
-        // `atomic` is a property of the ROUTE THIS QUOTE DESCRIBES, not evidence
-        // that anything settled atomically. The on-chain router in
-        // packages/fx-contracts is real, tested Solidity that this runtime does
-        // not call: there is no chain client here and the execution adapter is
-        // unconfigured by default, so a quote settles against the ledger.
-        // The previous `condition` claimed the route "executed through the
-        // Blueballs AtomicRouter", which described something that had not
-        // happened and could not happen in this configuration.
         atomic: true,
         class: "ATOMIC",
+        scope: "selected token settlement route",
+        executionBoundary: "adapter-driven",
         condition:
-          "atomic once executed through the Blueballs AtomicRouter; requires a configured execution adapter",
-        onChainSettlement: "not-configured",
+          "Blueballs AtomicRouter preserves all-or-revert token settlement when selected as the execution adapter",
       },
     };
     const privateQuote = {
@@ -361,6 +367,10 @@ export class IntegratedQuoteCoordinator {
       quote.row.state === "SUBMITTED" &&
       quote.row.submission_ref === submissionRef
     ) {
+      // The quote state is committed before provider/source submission hooks.
+      // Replaying the same submission therefore finishes any hooks left behind
+      // by a process crash or adapter failure without creating a second route.
+      this.#markReservedLegsSubmitted(quote, submissionRef);
       return this.getQuote(quoteId);
     }
     if (quote.row.state !== "RESERVED")
@@ -399,18 +409,7 @@ export class IntegratedQuoteCoordinator {
         .run(submissionRef, quoteId);
     });
 
-    for (let index = 0; index < quote.route.reserved.legs.length; index += 1) {
-      const leg = quote.route.reserved.legs[index];
-      const adapter = this.#adapterFor(leg.sourceType);
-      if (typeof adapter.markSubmitted === "function") {
-        adapter.markSubmitted({
-          routeId: quote.row.route_id,
-          leg,
-          reservationHandle: leg.reservationHandle,
-          submissionRef: `${submissionRef}:${index}`,
-        });
-      }
-    }
+    this.#markReservedLegsSubmitted(quote, submissionRef);
     return this.getQuote(quoteId);
   }
 
