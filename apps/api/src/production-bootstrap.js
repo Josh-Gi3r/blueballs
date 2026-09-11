@@ -13,6 +13,21 @@ export function ensureProductionBootstrap({
 }) {
   if (mode !== "production") return null;
 
+  // Production must never silently adopt a database that was created by the
+  // public/local sandbox. The sandbox and production modes share schema, but
+  // their credentials and tenant authority are intentionally not interchangeable.
+  const incompatibleTenant = [...db.tenants.values()].find(
+    (tenant) => tenant.mode !== "production",
+  );
+  const incompatibleKey = [...db.keys.values()].find(
+    (key) => key.scope === "sandbox",
+  );
+  if (incompatibleTenant || incompatibleKey) {
+    throw new Error(
+      "Production banking runtime refuses sandbox tenant/key state. Migrate data into an explicitly provisioned production tenant instead of changing BANK_API_MODE on a sandbox database.",
+    );
+  }
+
   const requestedTenantId = env.BANK_BOOTSTRAP_TENANT_ID || null;
   const requestedExistingTenant = requestedTenantId
     ? db.tenants.get(requestedTenantId)
