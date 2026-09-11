@@ -56,6 +56,14 @@ const webhookStore = collection("webhooks");
 export const deliveries = collection("deliveries");
 const outbox = collection("webhookOutbox");
 
+/** PersistentMap returns mutation-tracking Proxy objects inside a request scope.
+ * structuredClone() rejects Proxy values. Webhook rows are JSON-only, so a JSON
+ * round trip gives us an untracked copy without leaking the storage proxy into
+ * crypto/network code. */
+function jsonClone(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
 function sealSecret(secret) {
   if (typeof secret !== "string" || !secret) {
     throw new Error("Webhook signing secret is missing");
@@ -72,7 +80,7 @@ function openSecret(envelope) {
 }
 
 function storedWebhook(value) {
-  const row = structuredClone(value);
+  const row = jsonClone(value);
   if (row.secret) {
     row.secret_envelope = sealSecret(row.secret);
     delete row.secret;
@@ -82,7 +90,7 @@ function storedWebhook(value) {
 
 function runtimeWebhook(value) {
   if (!value) return value;
-  const row = structuredClone(value);
+  const row = jsonClone(value);
   if (row.secret_envelope) row.secret = openSecret(row.secret_envelope);
   return row;
 }
@@ -238,10 +246,10 @@ async function claim(jobId) {
       event_id: job.event_id,
       event_type: job.event_type,
       event_created_at: job.event_created_at,
-      data: structuredClone(job.data),
+      data: jsonClone(job.data),
       url: job.url,
       secret: job.secret_envelope
-        ? openSecret(job.secret_envelope)
+        ? openSecret(jsonClone(job.secret_envelope))
         : job.secret,
       replay: job.replay,
       attempt_count: job.attempt_count,
