@@ -274,7 +274,7 @@ export default function FxProductBuilder({ ctx }: { ctx: FinalFxContext }) {
               </div>
 
               <div className="fx-device-holder">
-                <DeviceShell badge="SIMULATION">
+                <DeviceShell badge="FX LAB">
                   <div className="fx-device-exchange">
                     <div className="fx-device-title">Exchange</div>
                     <div className="fx-device-field">
@@ -322,7 +322,8 @@ export default function FxProductBuilder({ ctx }: { ctx: FinalFxContext }) {
                       Review quote
                     </button>
                     <div className="fx-device-foot">
-                      Illustrative website simulation · no money moves
+                      Interactive architecture lab · one configuration across the
+                      stack
                     </div>
                   </div>
                 </DeviceShell>

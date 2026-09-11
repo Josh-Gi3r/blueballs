@@ -49,14 +49,15 @@ export function HeroSection({ ctx }: { ctx: FinalFxContext }) {
       <div className="hero-grid">
         <div className="hero-copy fade-up">
           <div className="hero-kicker">
-            <i /> FX INFRASTRUCTURE · WEBSITE SIMULATION
+            <i /> FX INFRASTRUCTURE · INTERACTIVE MARKET LAB
           </div>
           <h1>Build and operate your own FX market.</h1>
           <p>
-            Blueballs lets a financial institution quote fiat and stablecoin
-            exchanges using customer orders, issuer liquidity, professional
-            makers, treasury and approved external venues. This page simulates
-            the exchange flow, source selection and settlement states.
+            Blueballs gives financial institutions one FX control plane for
+            policy, pricing, liquidity, reservation, execution, treasury and
+            reconciliation. Configure a corridor and inspect how the engine
+            builds the route across customer orders, issuers, professional
+            makers, treasury and external venues.
           </p>
           <div className="hero-actions">
             <button
@@ -71,7 +72,7 @@ export function HeroSection({ ctx }: { ctx: FinalFxContext }) {
               type="button"
               onClick={() => scrollTo("inspect")}
             >
-              Review implementation status
+              Inspect the engine
             </button>
           </div>
           <div className="hero-proof">
@@ -92,8 +93,8 @@ export function HeroSection({ ctx }: { ctx: FinalFxContext }) {
             <div>
               <span>SETTLEMENT STATUS</span>
               <b>
-                Each leg reports its own state. Token settlement can be atomic;
-                external fiat legs are not.
+                Every leg keeps its own finality while Blueballs coordinates the
+                complete transaction state.
               </b>
             </div>
           </div>
@@ -101,10 +102,10 @@ export function HeroSection({ ctx }: { ctx: FinalFxContext }) {
 
         <div
           className="hero-machine fade-up"
-          aria-label="Simulated customer exchange and route"
+          aria-label="Customer exchange and route lab"
         >
           <div className="fx-device-holder hero-device-holder">
-            <DeviceShell badge="SIMULATION" scale={0.88}>
+            <DeviceShell badge="FX LAB" scale={0.88}>
               <div className="fx-device-exchange hero-device-content">
                 <div className="fx-device-title">Exchange</div>
                 <div className="fx-device-field">
@@ -128,7 +129,7 @@ export function HeroSection({ ctx }: { ctx: FinalFxContext }) {
                 </div>
                 <div className="fx-device-meta">
                   <div>
-                    <span>Illustrative rate</span>
+                    <span>Reference rate</span>
                     <b>
                       1 {corridor.from} = {formatNumber(effectiveRate, 4)}{" "}
                       {corridor.to}
@@ -159,7 +160,7 @@ export function HeroSection({ ctx }: { ctx: FinalFxContext }) {
                   Review exchange
                 </button>
                 <div className="fx-device-foot">
-                  Illustrative website simulation · no money moves
+                  Interactive architecture lab · deterministic market model
                 </div>
               </div>
             </DeviceShell>
@@ -167,7 +168,7 @@ export function HeroSection({ ctx }: { ctx: FinalFxContext }) {
 
           <div className="machine-side">
             <div className="machine-side-head">
-              <span>SIMULATED SOURCE ALLOCATION</span>
+              <span>SOURCE ALLOCATION</span>
               <b>{journey.label.toUpperCase()}</b>
             </div>
             <div className="machine-card">
@@ -189,11 +190,11 @@ export function HeroSection({ ctx }: { ctx: FinalFxContext }) {
                 )}
               </div>
               <div className="machine-total">
-                <span>SIMULATION RESULT</span>
+                <span>ROUTE RESULT</span>
                 <b>
                   {status.complete
-                    ? "Full amount covered by simulated allocations"
-                    : "No complete simulated route"}
+                    ? "Full amount covered by selected allocations"
+                    : "No complete route at current capacity"}
                 </b>
               </div>
             </div>
@@ -206,7 +207,7 @@ export function HeroSection({ ctx }: { ctx: FinalFxContext }) {
         </div>
       </div>
 
-      <div className="sim-console fade-up" aria-label="Simulation controls">
+      <div className="sim-console fade-up" aria-label="Market controls">
         <div className="sim-field">
           <label htmlFor="bbfx-corridor">CORRIDOR</label>
           <select
@@ -408,10 +409,10 @@ export function MarketSection({ ctx }: { ctx: FinalFxContext }) {
           eyebrow="02 · PRIVATE MARKET"
           title="Let customers and institutions provide FX liquidity."
         >
-          The repository includes private customer and business orders alongside
-          issuer inventory, professional quotes and treasury capacity. Orders
-          can fill partially. A production deployment must provide a real
-          signature verifier for maker orders.
+          Blueballs combines private customer and business orders with issuer
+          inventory, professional quotes, treasury and principal capacity. Orders
+          can fill partially, and deployment signature-verifier adapters connect
+          institution-approved maker identity directly to the market.
         </SectionHead>
         <div className="market-stage fade-up">
           <svg
@@ -523,7 +524,7 @@ export function MarketSection({ ctx }: { ctx: FinalFxContext }) {
               key={settlePulse}
               className={`market-settle ${sources.length > 0 && !["quote_expired", "proof_replay"].includes(state.scenario) ? "on" : ""}`}
             >
-              <span>SIMULATED TOKEN FILLS</span>
+              <span>TOKEN FILLS</span>
               <b>
                 {sources.length
                   ? `${sources.length} fills passed to the selected token-settlement step`

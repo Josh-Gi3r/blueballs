@@ -1,7 +1,6 @@
 # Architecture
 
-Blueballs is a monorepo with a product demonstrator, a general banking API, a
-canonical FX runtime and replaceable integration boundaries.
+Blueballs is a monorepo for building and operating modern financial institutions. Product interfaces, banking, provider orchestration, FX, smart contracts and cloud runtimes share one set of machine-readable financial contracts.
 
 ![Blueballs system map](docs/assets/blueballs-system-map.svg)
 
@@ -9,127 +8,152 @@ canonical FX runtime and replaceable integration boundaries.
 
 | Layer | Source | Responsibility |
 | --- | --- | --- |
-| Product demonstrator | `src/`, `workers/site/` | Product narrative, Sandbox Builder, simulated journeys, API catalogue and provider research |
-| Banking API | `apps/api/`, `workers/api/` | Tenant product resources, builder projects, exact ledger, events, webhooks and 181-operation contract |
-| Canonical FX node | `apps/fx-node/`, `workers/fx/` | Policy-aware pricing, routing, reservation and settlement lifecycle |
-| FX domain packages | `packages/fx-*` | Policy, pricing, liquidity, market, fiat, SDK, simulator and contracts |
-| Public contracts | `spec/`, generated OpenAPI | Behaviour, invariants, threat boundaries and extension rules |
-| Provider boundary | `docs/partners/`, `src/ecosystem/` | Source-cited research and optional adapter descriptors; no implicit connection |
+| Product operating layer | `src/`, `workers/site/` | Product interfaces, Sandbox Builder, architecture labs, API catalogue and provider directory |
+| Banking core | `apps/api/`, `workers/api/` | Tenant resources, exact ledger, provider orchestration, events, webhooks, audit and 181-operation contract |
+| Canonical FX runtime | `apps/fx-node/`, `workers/fx/` | Policy, pricing, routing, reservation, execution and settlement lifecycle |
+| FX domain packages | `packages/fx-*` | Policy, pricing, liquidity, market, fiat, monetary, SDK, simulator and contracts |
+| Public contracts | `spec/`, generated OpenAPI | Behaviour, invariants, ownership and extension rules |
+| Provider boundaries | banking gateway + FX adapters | Institution-owned banks, rails, identity, custody, liquidity and execution providers |
 
-The historical FX routes under `apps/api/src/routes/` are compatibility
-demonstrations. New FX economics and integrations belong in `apps/fx-node` and
-`packages/fx-*`.
+Banking-compatible FX endpoints remain in the banking catalogue, while canonical FX economics and settlement ownership live in `apps/fx-node` and `packages/fx-*`.
 
 ## Runtime topologies
 
-### Local Node reference
+### Node
 
-`pnpm dev` starts the Vite site on port 5280, banking API on 5290 and canonical
-FX node on 8788. Banking and FX persistence use local SQLite files. This is the
-shortest path for contributors and forkers.
+`pnpm dev` starts the site on 5280, banking API on 5290 and FX node on 8788. Banking and FX use local SQLite stores for the self-hosted reference topology.
 
-### Cloudflare reference
+### Cloudflare
 
-The site Worker owns the public domain and calls the banking and FX Workers over
-same-account service bindings. Each API is backed by a SQLite Durable Object.
-Native `transactionSync(callback)` is the atomic boundary; transaction-control
-SQL is not emulated.
+The site Worker owns the public domain and routes Banking and FX over same-account service bindings. Authoritative financial state lives in SQLite Durable Objects and background provider/webhook work resumes through alarms.
 
 ```mermaid
 flowchart LR
-  Browser --> Site[Site Worker + static assets]
+  Browser --> Site[Site Worker + assets]
   Site -->|service binding| Bank[Banking Worker]
   Site -->|service binding| FX[FX Worker]
   Bank --> BDO[(Banking Durable Object SQLite)]
   FX --> FDO[(FX Durable Object SQLite)]
 ```
 
-Both topologies are single-node by design, which is what makes the stack
-runnable anywhere. Clustered and multi-region deployment is deployment work —
-see [`OPERATIONS.md`](OPERATIONS.md) and [`ROADMAP.md`](ROADMAP.md).
+### Production provider composition
+
+The banking core speaks one provider-neutral gateway contract for payments, receiving details, cards, identity and custody.
+
+The FX node supports deployment runtime composition:
+
+```bash
+FX_NODE_MODE=production \
+FX_NODE_PRODUCTION_ADAPTER=@institution/blueballs-fx-runtime \
+FX_NODE_API_KEY='32-or-more-characters' \
+node apps/fx-node/src/cli.js
+```
+
+The adapter supplies institution market/liquidity, quote persistence/lifecycle, fiat evidence and execution while Blueballs keeps the canonical API, policy and finality model.
 
 ## Banking ownership and money
 
-Signup creates an opaque `tenant_id`. Authenticated child keys inherit the same
-tenant; email remains contact metadata and is never identity proof. Tenant
-resources, events, webhook deliveries and idempotency records carry that stable
-owner. Cross-tenant reads and mutations resolve as not found or empty results.
+Signup/bootstrap creates an opaque `tenant_id`. Authenticated child credentials inherit the tenant; contact metadata is never identity authority.
 
-Banking amounts enter as base-10 strings, convert to exact minor units and post
-through a double-entry transaction. Multi-leg operations—such as credit draw or
-repayment—commit in one Node or Durable Object transaction and roll back as a
-unit.
+Tenant resources, events, provider work and idempotency records carry the stable principal. Cross-tenant reads and mutations resolve as not found or empty results.
 
-Balances are always derived by summing the ledger and are never stored on a row,
-so no code path can disagree with the ledger about what an account holds. The
-posting function enforces two invariants for every transaction: the legs sum to
-zero, and no customer account is left below zero. Customer accounts are bare
-type-prefixed identifiers (`acc_…`, `vlt_…`, `wal_…`, `crd_…`). The system side
-of a movement is namespaced with a colon—`clearing:paynow`, `external:funding`,
-`lp:USDC/EURC:USDC`, `principal:EURC`—and is expected to run negative, because a
-negative system balance is the money owed to customers. A route may still refuse
-a movement earlier and with a better message, but the floor does not depend on
-it remembering to.
+Amounts enter as base-10 strings, convert to exact minor units and post through the double-entry ledger. Multi-leg commands commit one Node or Durable Object transaction and roll back as a unit.
+
+Balances are derived by summing postings rather than stored separately. The posting boundary enforces two invariants:
+
+1. transaction legs sum to zero;
+2. customer accounts cannot finish below zero.
+
+System-side accounts use explicit namespaces such as `clearing:*`, `external:*`, `lp:*` and `principal:*`.
+
+## Banking command lifecycle
+
+```text
+request
+  → auth / authorization
+  → lifecycle preflight
+  → domain state transition
+  → ledger postings
+  → events + durable outboxes
+  → idempotency result
+  → audit correlation
+  → local commit
+```
+
+Authentication, authorization and route-specific authority checks occur before idempotent replay. External work begins only from durable state after the local command is committed.
 
 ## Sandbox Builder boundary
 
-`src/sandbox/` owns the five-stage Brief → Blueprint → Build → Test → Launch
-experience. Trusted routes in `apps/api/src/routes/builder.js` own persistent
-projects and journeys. Provisioning creates tenant-owned customers and accounts;
-opening balances and test payments always enter through the protected ledger.
+`src/sandbox/` owns the Brief → Blueprint → Build → Test → Launch product flow. Trusted API routes own persistent projects and tenant-isolated journeys.
 
-The builder emits configuration, not executable application code. It may shape
-presentation, journeys, brands, product rules and adapter choices, but it cannot
-write balances, ledger rows, idempotency records, transaction state or FX
-reservations. The current blueprint engine is deterministic. A self-hoster may
-add server-side model adapters while preserving that authority boundary. See
-[`SANDBOX.md`](SANDBOX.md).
+The builder can shape presentation, journeys, brands, product rules and adapter selections while financial authority remains in the ledger, provider and FX runtimes.
+
+## Provider lifecycle
+
+```mermaid
+sequenceDiagram
+  participant C as Banking command
+  participant O as Durable outbox
+  participant P as Provider gateway
+  participant R as Reconciliation
+  C->>O: Commit provider intent with financial state
+  O->>P: Submit with stable job idempotency
+  P-->>O: Success / pending / failed / ambiguous
+  O->>R: Preserve ambiguity and external evidence
+  R-->>C: Apply canonical final outcome once
+```
+
+Provider payloads and webhook signing material are sealed with AES-256-GCM before persistence. Signed inbound settlement uses an independent HMAC boundary and durable replay identities.
 
 ## FX lifecycle
 
 ```mermaid
 sequenceDiagram
   participant C as Client
-  participant N as Canonical FX node
+  participant N as FX node
   participant P as Policy + pricing
   participant L as Eligible liquidity
   participant E as Execution adapter
-  C->>N: Preview exact-output trade
-  N->>P: Authorise corridor and price
+  C->>N: Preview trade
+  N->>P: Authorize corridor and price
   P->>L: Read eligible capacity
-  N-->>C: Indicative, not reserved
-  C->>N: Operator-authenticated reservation
-  N->>L: Reserve every selected leg atomically
-  N-->>C: Firm sandbox trade
+  N-->>C: Indicative route
+  C->>N: Reserve firm quote
+  N->>L: Reserve every selected leg
+  N-->>C: Firm quote + route
   C->>N: Execute
-  N->>E: Revalidate and submit
-  E-->>N: Result or ambiguous submission
+  N->>E: Revalidate + submit
+  E-->>N: Provider/chain evidence
+  N-->>C: Confirmed or reconciliation state
 ```
 
-Identity, private orders, policy, pricing and route construction remain
-off-chain. Solidity contracts optionally constrain backing, authority,
-cancellation, replay and atomic token settlement. External fiat edges retain
-their real finality and are never described as atomic merely because a token leg
-is atomic.
+Identity, private orders, policy, pricing and route construction stay off-chain. The optional Solidity kernel constrains token backing/accounting, authority, cancellation, replay and atomic token settlement.
 
-The default runtime intentionally has no execution adapter and fails closed.
+Fiat/provider edges keep their own finality rather than being collapsed into the token transaction.
 
-## Extension points
+## Scale model
 
-- Banking providers implement deployment-owned identity, cards, accounts,
-  payments, custody and reporting adapters around the public API contract.
-- FX providers implement the interfaces in [`spec/fx/ADAPTERS.md`](spec/fx/ADAPTERS.md)
-  without adding vendor semantics to the FX kernel.
-- Public API changes update the endpoint catalogue, OpenAPI, executable examples
-  and verification gates in the same commit.
-- Provider names belong in the research directory and provider documents unless
-  a separately tested optional adapter exists.
+The current banking correctness model uses one authoritative serialized writer per SQLite-backed shard. Scale-out is by institution/tenant shard ownership, principal routing and explicit cross-shard settlement orchestration rather than unsynchronized writers over one mutable state view.
 
-## Security boundaries
+See [`docs/SCALING.md`](docs/SCALING.md).
 
-Public, tenant, operator and global-read access classes are declared for every
-banking operation and checked against the router. Shared-host webhook delivery
-is disabled. Self-hosted webhook egress is HTTPS-only, exact-host allowlisted,
-redirect-free and concurrency bounded. Read [`SECURITY.md`](SECURITY.md) and
-[`spec/fx/THREAT-MODEL.md`](spec/fx/THREAT-MODEL.md) before changing a trust
-boundary.
+## Extension rules
+
+- Banking providers implement the versioned gateway capability contract.
+- FX deployments implement [`spec/fx/ADAPTERS.md`](spec/fx/ADAPTERS.md).
+- Public API changes update contracts, OpenAPI, examples and verification together.
+- Provider-specific credentials/commercial assumptions stay outside canonical domain logic.
+- Financial changes add invariant and failure-path proof.
+
+## Release assurance
+
+The architecture is verified through the repository:
+
+```bash
+pnpm verify
+pnpm verify:release
+```
+
+The full release profile covers banking lifecycle success, tenant isolation, restart/eviction, migrations, provider finality/reconciliation, FX, Foundry fuzz/invariants, recovery, load/chaos, dependency inventory and container scanning.
+
+Read [`PRODUCTION-HARDENING.md`](PRODUCTION-HARDENING.md), [`SECURITY.md`](SECURITY.md) and [`OPERATIONS.md`](OPERATIONS.md) for the assurance and operating model.

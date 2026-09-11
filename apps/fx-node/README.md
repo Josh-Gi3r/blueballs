@@ -1,32 +1,25 @@
 # Blueballs FX Node
 
-`apps/fx-node` is the canonical self-hostable runtime for Blueballs FX.
+`apps/fx-node` is the canonical Blueballs FX runtime: a self-hostable control plane for policy-aware pricing, liquidity selection, reservation, execution and settlement orchestration.
 
-It composes institution policy, signed private liquidity, reference pricing, principal risk, multi-source route construction, source reservation, fiat settlement state and the public BRL to EUR reference trade.
+It composes institution policy, signed private liquidity, reference pricing, principal risk, multi-source route construction, fiat settlement state and optional atomic token execution behind one API surface.
 
-It also includes a reference Monetary Engine for reserve-backed sandbox instruments
-and purpose-bound settlement receipts. Its BRL to EUR preview delegates to the same
-pricing, liquidity and reservation pipeline as the canonical reference trade. The
-published three-source price is explicitly a valuation fixture, not an external
-oracle or executable quote. These are simulations, not production assets, deposits,
-price feeds or claims on Blueballs.
-
-## Start the reference runtime
+## Run it
 
 From the repository root:
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev:fx
 ```
 
-Or start the full product:
+The full stack starts with:
 
 ```bash
 pnpm dev
 ```
 
-Defaults:
+Default local configuration:
 
 ```text
 host             127.0.0.1
@@ -34,52 +27,70 @@ port             8788
 mode             reference-sandbox
 API key          bb_test_local_fx
 data directory   ./blueballs-fx-data
-execution        not configured
 ```
 
-Run directly:
-
-```bash
-cd apps/fx-node
-FX_NODE_API_KEY=bb_test_change_me npm start
-```
-
-The reference inventory is local and replaceable. Policy admission is not bypassed: participants, credentials, account attribution, corridor rules, limits and authorisations flow through `FxPolicyEngine`.
-
-A smaller historical private-order-only mode remains available for isolated market tests:
-
-```bash
-FX_NODE_MODE=private-sandbox npm start
-```
-
-No production mode silently falls back to either sandbox.
-
-## One customer trade, one runtime object
-
-The public reference trade is:
+Three runtime compositions are supported:
 
 ```text
-BRL through an attested PIX-style payment
-    → an internal BRL deposit claim (not a public token)
-    → policy-approved, multi-source BRL-claim/EURC FX
-    → EURC issuer redemption
-    → EUR
+reference-sandbox   complete deterministic multi-source market and monetary lab
+private-sandbox     compact private-order market for integration development
+production          institution-supplied adapters for live policy, liquidity, fiat and execution
 ```
 
-The same trade object contains:
+## Production composition
+
+Production mode loads one deployment adapter module and keeps the Blueballs API/state-machine contract unchanged.
+
+```bash
+FX_NODE_MODE=production \
+FX_NODE_PRODUCTION_ADAPTER=./deployment/fx-runtime.mjs \
+FX_NODE_API_KEY='replace-with-a-strong-production-key' \
+node apps/fx-node/src/cli.js
+```
+
+The adapter exports a factory:
+
+```js
+export async function createBlueballsFxProductionRuntime({ env }) {
+  return {
+    market,            // discovery, signed orders, route lookup
+    quotes,            // reserve, submit, confirm, fail
+    fiat,              // intent, evidence and settlement lifecycle
+    executionAdapter,  // provider / venue / AtomicRouter submission
+    publicDepth: false,
+    async close() {},
+  };
+}
+```
+
+Blueballs validates the adapter contract at startup. Production API keys require at least 32 characters, browser CORS defaults to closed, and execution is routed through the supplied adapter rather than changing the FX kernel.
+
+See [`spec/fx/ADAPTERS.md`](../../spec/fx/ADAPTERS.md) for the complete provider contract.
+
+## One trade object, end to end
+
+The reference runtime demonstrates a mixed-finality customer route:
+
+```text
+BRL payment evidence
+    → internal BRL deposit claim
+    → policy-approved multi-source FX into EURC
+    → issuer redemption
+    → EUR payout
+```
+
+The same trade object carries:
 
 - customer amount and rate;
 - quote and route identifiers;
-- eligible and excluded sources;
+- eligible and excluded liquidity sources;
 - selected source allocation;
-- token corridor amounts;
-- mixed-finality settlement edges;
-- policy-authorisation evidence;
-- quote expiry and lifecycle state.
+- policy authorization evidence;
+- quote expiry and reservation state;
+- token and fiat settlement edges;
+- execution and reconciliation state.
 
 ### Preview
-
-Preview uses live policy-approved capacity but does not reserve it:
 
 ```bash
 curl -X POST http://localhost:8788/v2/fx/reference/trades/preview \
@@ -88,7 +99,7 @@ curl -X POST http://localhost:8788/v2/fx/reference/trades/preview \
   -d '{"inputAmount":"50000.00"}'
 ```
 
-The response is labelled `LIVE FX NODE PREVIEW` and has `evidence.reserved: false`.
+Preview reads current eligible capacity without reserving it.
 
 ### Reserve
 
@@ -99,7 +110,7 @@ curl -X POST http://localhost:8788/v2/fx/reference/trades \
   -d '{"inputAmount":"50000.00","expiresInMs":60000}'
 ```
 
-A firm sandbox trade is returned only after all selected source capacity and principal risk have been reserved. The response includes `tradeId`, `quoteId` and `routeId`.
+A firm quote is returned only after every selected leg and principal-risk allocation is reserved. The response includes `tradeId`, `quoteId` and `routeId`.
 
 Retrieve or release it:
 
@@ -112,27 +123,11 @@ curl -X DELETE \
   http://localhost:8788/v2/fx/reference/trades/trade_...
 ```
 
-A submitted route cannot be released. It must be reconciled.
+Submitted routes enter reconciliation rather than being released back into liquidity.
 
-## Reference market scenarios
+## Market scenarios
 
-Inspect the current market:
-
-```bash
-curl -H 'Authorization: Bearer bb_test_local_fx' \
-  http://localhost:8788/v2/fx/reference/scenario
-```
-
-Apply one backend scenario:
-
-```bash
-curl -X POST http://localhost:8788/v2/fx/reference/scenario \
-  -H 'Authorization: Bearer bb_test_local_fx' \
-  -H 'content-type: application/json' \
-  -d '{"id":"issuer_policy_blocked"}'
-```
-
-Available scenarios:
+The reference market can exercise liquidity and policy conditions without changing application code:
 
 ```text
 balanced
@@ -143,7 +138,12 @@ principal_limit
 reference_outage
 ```
 
-These mutate the reference runtime. They are distinct from the deterministic economic simulator exposed on the website.
+Inspect or switch the scenario:
+
+```text
+GET  /v2/fx/reference/scenario
+POST /v2/fx/reference/scenario
+```
 
 ## Runtime inspection
 
@@ -155,46 +155,17 @@ GET  /v2/fx/reference/scenario
 POST /v2/fx/reference/scenario
 GET  /v2/fx/reference/liquidity
 GET  /v2/fx/reference/settlement-route
+GET  /openapi.yaml
 ```
 
-The machine-readable contract is served without authentication:
+## Monetary engine
 
-```text
-GET /openapi.yaml
-```
-
-## Monetary Engine reference
-
-The reference runtime configures two currency-labelled illustrative instruments:
-
-- `USD`, a reference USD-backed stablecoin model;
-- `EUR`, a reference EUR tokenized bank-deposit model.
-
-These are instrument identifiers inside the sandbox, not token tickers or claims that
-Blueballs issues dollars or euros.
-
-Reserve assets, outstanding supply, active settlement receipts and FX risk capital
-are separate accounting categories. Risk capital is visible in health output but
-is never counted as issuance reserve. Pending deposits cannot support minting.
-
-Public, non-mutating evidence:
+The reference composition includes reserve-backed instrument and purpose-bound settlement-receipt models. Reserve assets, outstanding supply, receipts and FX risk capital remain separate accounting categories.
 
 ```text
 GET  /v2/fx/reference/monetary/health
 GET  /v2/fx/reference/monetary/instruments
 POST /v2/fx/reference/monetary/remittance/preview
-```
-
-The compatibility preview accepts BRL atomic units and returns the canonical BRL to
-EUR trade preview. Its `pricing.reference` object identifies deterministic fixtures
-as `REFERENCE_FIXTURE`, `VALUATION_CONTROL_ONLY` and non-executable. Its client price
-is calculated from policy-approved liquidity; a firm price exists only after every
-selected source reserves capacity through the trade endpoint. One basis point is
-`0.01%`; source and aggregate spread comparisons use exact integer arithmetic.
-
-Operator-authenticated state transitions:
-
-```text
 POST /v2/fx/reference/monetary/reserves
 POST /v2/fx/reference/monetary/reserves/:depositId/settle
 POST /v2/fx/reference/monetary/instruments/:code/mint
@@ -205,13 +176,11 @@ POST /v2/fx/reference/monetary/risk-capital
 GET  /v2/fx/reference/monetary/events
 ```
 
-A settlement receipt is explicitly non-transferable, purpose-bound and expiring.
-It locks settled reserve until it is consumed once or expires; it is not presented
-as a stablecoin or general-purpose money.
+Pricing and coverage calculations use exact integer arithmetic.
 
 ## Token quote API
 
-The underlying exact-output token API remains available for builders who already know the token pair and desired output:
+Builders can use the exact-output token API directly:
 
 ```text
 POST /v2/fx/quotes
@@ -220,33 +189,17 @@ POST /v2/fx/quotes/:quoteId/execute
 GET  /v2/fx/routes/:routeId
 ```
 
-The reference runtime includes a proof-token USDC/EURC corridor and an internal
-BRL-deposit-claim/EURC corridor. The BRL claim is a sandbox ledger claim, not a
-publicly issued token or an assertion that a BRL stablecoin exists.
+A quote becomes firm after selected capacity is reserved. Immediately before execution Blueballs revalidates policy and reservations, marks the route submitted, and preserves ambiguous external outcomes for reconciliation.
 
-## Execution semantics
+## Atomic token settlement
 
-The default runtime does not configure an execution adapter.
+`packages/fx-contracts` provides the Blueballs `AtomicRouter`, maker settlement, vault, policy-authorization and cancellation contracts. The router binds taker authority, maker-signed economics and institution policy in one atomic token transaction.
 
-```text
-POST /v2/fx/reference/trades/:tradeId/execute
-POST /v2/fx/quotes/:quoteId/execute
-```
-
-Both fail closed with `EXECUTION_UNAVAILABLE` until an operator supplies an adapter. The node never invents a transaction hash or treats submission as settlement.
-
-Before an outbound attempt:
-
-1. live policy and reservations are revalidated;
-2. the route becomes `SUBMITTED`;
-3. it becomes non-releasable;
-4. an ambiguous external result remains submitted for reconciliation.
-
-The repository separately contains a controlled Anvil proof for the Solidity AtomicRouter. That proof demonstrates the contract kernel; it is not silently substituted for an operational execution adapter.
+The same FX lifecycle can also submit to institutional venues or internal settlement adapters. Provider-native confirmation remains part of the canonical route state.
 
 ## Fiat and finality
 
-The BRL to EUR route is `MIXED_FINALITY`:
+Blueballs models fiat as evidence-backed settlement edges rather than collapsing external payment finality into token finality. A route can combine:
 
 ```text
 VERIFIED_FIAT_PAYMENT   ATTESTED_EXTERNAL
@@ -254,11 +207,9 @@ TOKEN_SWAP              ATOMIC
 ISSUER_REDEEM           ASYNC_EXTERNAL
 ```
 
-Only token edges in the same AtomicRouter transaction boundary may be called atomic.
+Each edge keeps its own finality class while the trade remains one coordinated lifecycle.
 
 ## Docker
-
-From the repository root:
 
 ```bash
 docker build -f apps/fx-node/Dockerfile -t blueballs-fx .
@@ -269,7 +220,7 @@ docker run --rm \
   blueballs-fx
 ```
 
-Or run the full site, banking API and FX node:
+Or run the site, banking API and reference FX composition together:
 
 ```bash
 docker compose -f compose.reference.yml up --build
@@ -277,29 +228,6 @@ docker compose -f compose.reference.yml up --build
 
 ## Persistence
 
-The reference runtime persists separate SQLite stores for:
+The reference composition persists independent SQLite stores for policy, market state, liquidity, principal risk, quotes, trades, fiat settlement and monetary-engine evidence. Set `FX_NODE_DATA_DIR` to choose the directory.
 
-- policy;
-- private market;
-- reference liquidity;
-- principal risk;
-- integrated quotes;
-- customer-facing trades;
-- fiat settlement.
-- monetary instruments, reserves, supply, receipts, risk capital and event evidence.
-
-Set `FX_NODE_DATA_DIR` to choose the directory.
-
-## Replacing reference providers
-
-Read `spec/fx/ADAPTERS.md`. Production deployments must provide real:
-
-- maker signature verification and key custody;
-- identity and compliance facts;
-- issuer, LP, institution and treasury adapters;
-- bank-rail and payment-verification adapters;
-- execution and reconciliation integration;
-- production database and high-availability design;
-- monitoring, operational controls and independent security review.
-
-See `spec/fx/PUBLIC-REFERENCE.md` for the reference contract and `spec/fx/PRODUCTION-CHECKLIST.md` for what a production deployment connects.
+Production deployments can supply their own storage/provider implementations through the same adapter boundary without changing public quote semantics.

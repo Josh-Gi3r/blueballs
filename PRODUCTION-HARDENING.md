@@ -1,266 +1,215 @@
-# Production Hardening
+# Engineering Assurance
 
-Blueballs targets production-grade open-source financial infrastructure.
+Blueballs is engineered as production-grade open-source financial infrastructure. This document defines the invariants and executable assurance model behind that standard.
 
-A deployment still supplies its licences, regulated providers, credentials,
-jurisdiction-specific controls, human IAM and operating organisation, but the
-Blueballs core must not require a fork to repair basic correctness, accounting,
-tenancy, contracts, retry safety, reconciliation or observability.
+## Core financial invariant
 
-This document is the release gate for that standard. A checked engineering item
-means the capability/gate exists in the repository; it does **not** mean a release
-candidate has passed that gate. Release evidence is tracked separately below.
-
-## Production invariant
-
-For every financial command, the following state belongs to one logical unit of
-work:
+Every local financial command is one logical unit of work:
 
 ```text
 request
-  -> authenticated principal / authorization
-  -> domain state transition
-  -> ledger postings
-  -> durable event / webhook outbox
-  -> idempotency result
-  -> audit / correlation evidence
-  -> provider outbox evidence, when applicable
-  -> local commit
+  → authenticated principal / authorization
+  → domain state transition
+  → ledger postings
+  → durable events and outboxes
+  → idempotency result
+  → audit and correlation evidence
+  → provider intent, when applicable
+  → commit
 ```
 
-A local financial command commits the complete state transition or none of it.
-External side effects are never treated as rolled back merely because local state
-rolled back; ambiguous provider submission remains explicit reconciliation state.
+The command commits completely or rolls back completely. External side effects use durable job identity and explicit reconciliation rather than being treated as part of a local rollback.
 
-## P0 — release blockers
+## Financial correctness
 
-### Financial transaction atomicity and restart safety
+Blueballs implements and tests the following controls:
 
-- [x] Stage banking resource mutations, ledger rows, events/outboxes and
-  idempotency in one request unit of work.
-- [x] Commit staged database state inside one SQLite transaction.
-- [x] Trigger non-durable event subscribers only after commit.
-- [x] Add regression coverage for failure after money/event staging.
-- [x] Serialize request units while the shared mutable cache is the storage view,
-  preventing overlapping writes and dirty reads.
-- [x] Add concurrent double-spend and higher-contention exact-balance tests.
-- [x] Add Node restart probes across financial command boundaries plus durable
-  webhook/provider/recovery state.
-- [x] Add Durable Object eviction probes across representative account, vault,
-  transfer, card-authorisation and wallet financial families.
-- [ ] Retain a green execution report for the complete restart/eviction suite on
-  the release commit.
+- exact decimal/atomic money conversion without floating-point authoritative accounting;
+- balanced double-entry posting;
+- customer-account overdraft protection at the ledger boundary;
+- serialized command execution for the current SQLite-backed authoritative shard;
+- atomic persistence of domain state, ledger, events/outboxes, idempotency and audit evidence;
+- concurrent double-spend and higher-contention exact-balance tests;
+- restart tests across representative financial command boundaries;
+- Cloudflare Durable Object eviction tests across account, vault, transfer, card and wallet families;
+- append-only versioned application migrations with rollback/retry tests;
+- backup/restore proof that re-derives exact money from restored postings.
 
-### Release verification and CI
+## Banking contract assurance
 
-The repository-local `pnpm verify` command is the exact-checkout release proof.
-GitHub Actions is an independent hosted gate. A release requires both.
+The banking surface is generated and tested as one contract system:
 
-- [x] Keep the complete cross-surface gate in `pnpm verify`.
-- [x] Make targeted production deploy commands run release verification before
-  publishing.
-- [x] Gate persistence schema, API contracts, runtime ownership, provider
-  capabilities, key permissions and public examples against drift.
-- [x] Define `.github/workflows/production-gate.yml` for build/contracts, banking
-  API proof, Workers, FX/SDK, Foundry, container/Compose, Trivy, dependency/
-  secret checks and CodeQL.
-- [x] Make local builds fail if the hosted production workflow is removed or
-  materially weakened.
-- [ ] Require the `Production gate` status check on protected `main`.
-- [ ] Require CODEOWNERS/maintainer review for ledger, authentication, policy,
-  provider/FX execution, migrations and public-contract changes.
-- [ ] Produce a clean-checkout verification report for the final release commit.
+- 181 catalogued operations;
+- route/access ownership reconciliation;
+- request-body and query validation;
+- successful response validation against the same source contracts used for OpenAPI;
+- documented example validation;
+- lifecycle coverage through real HTTP calls;
+- explicit runtime-mode classification;
+- permission-domain classification and drift checks;
+- RFC 9457 error-contract coverage;
+- generated TypeScript/OpenAPI compatibility proof;
+- machine-readable operation coverage written to `artifacts/api-operation-coverage.json`.
 
-Branch protection/review enforcement are repository-admin settings and cannot be
-substituted with source files.
+The API suite fails when a success-capable operation does not produce a schema-valid successful lifecycle response.
 
-### Executable API contract
+## Identity and authorization
 
-- [x] Exercise all 181 catalogued banking operations for route/access/runtime
-  reachability.
-- [x] Validate request bodies and query parameters at the HTTP boundary against
-  the production contracts used to generate OpenAPI.
-- [x] Validate successful runtime responses against those production schemas.
-- [x] Validate documented success examples during builds.
-- [x] Generate `artifacts/api-operation-coverage.json` from real HTTP calls.
-- [x] Add explicit broad lifecycle suites for non-FX and FX catalogue families.
-- [x] Cover the synchronous RFC 9457 error classes currently emitted by the
-  banking request path: 400, 401, 403, 404, 409, 413, 422, 429 and 503.
-- [x] Keep provider transport/finality errors in the durable provider state
-  machine instead of fabricating request-time `502` behavior for asynchronous
-  provider work.
-- [ ] Retain a release artifact proving every success-capable operation returned
-  a schema-valid 2xx response and every adapter-required operation failed closed
-  by contract.
+- Tenant identity is a stable opaque principal rather than contact metadata.
+- Secondary API keys can be restricted by domain/read/write permission.
+- Restricted credentials cannot delegate authority they do not hold.
+- Operator state is isolated behind an independent operator credential.
+- Named-human assertions can be supplied by institution-owned IAM/BFF infrastructure.
+- Human assertions are HMAC-signed and bound to the machine credential, HTTP method, route, query and body.
+- Step-up and multi-approver workflows preserve distinct actor evidence.
+- Authentication, authorization and lifecycle preflight execute before idempotent replay is returned.
 
-### Clean-checkout release proof
+## Provider orchestration
 
-These remain evidence gates until executed on the exact candidate SHA:
+Blueballs ships a provider-neutral production protocol for payments, receiving details, card issuance, identity and custody.
 
-- [ ] `pnpm install --frozen-lockfile` succeeds on pinned Node 24.15.x.
-- [ ] `pnpm verify` succeeds from a clean checkout.
-- [ ] Reference container builds and its high/critical vulnerability scan passes.
-- [ ] Compose topology validates.
-- [ ] Foundry unit, fuzz and invariant suites pass.
-- [ ] Generated contracts/OpenAPI/SDK artifacts have no source drift.
-- [ ] Hosted `Production gate` is green for the same SHA.
+The provider layer includes:
 
-## P1 — production core hardening
+- durable operation outbox;
+- stable external idempotency IDs;
+- leases and retry schedules;
+- attempt history;
+- capability-specific result/finality validation;
+- explicit pending, ambiguous, failed and manual-review states;
+- reconciliation cases tied back to original commands/resources;
+- AES-256-GCM payload sealing with key IDs and key rotation support;
+- provider-result conformance fixtures and drift gates;
+- safe-refund rules based on explicit funds state;
+- production success handlers that update canonical state and ledger evidence atomically.
 
-### Concurrency, persistence and scale
+Provider transport evidence and business evidence must agree before a financial outcome becomes final.
 
-- [x] Define the current banking model explicitly: one serialized unit of work per
-  authoritative SQLite-backed shard while the mutable cache exists.
-- [x] Prevent concurrent requests from observing another command's staged cache
-  mutations.
-- [x] Introduce append-only versioned application-data migrations.
-- [x] Fail closed when an older binary encounters a newer schema.
-- [x] Gate durable collection names against the schema registry.
-- [x] Prove failed data-transforming migrations roll back and can restart/retry
-  without double-applying data.
-- [x] Define the scale-out path to institution/tenant sharding, principal routing,
-  inter-shard settlement orchestration and eventual MVCC/OCC prerequisites in
-  [`docs/SCALING.md`](docs/SCALING.md).
+## Provider-originated money
 
-### Authentication, human IAM and authorization
+Inbound account credits and custody deposits use a separate settlement-evidence boundary:
 
-- [x] Expose the authenticated key/tenant context to trusted internal consumers
-  without deriving tenancy from an arbitrary key-list row.
-- [x] Add domain-scoped read/write permissions for secondary API keys.
-- [x] Prevent restricted credentials from granting permissions they do not hold.
-- [x] Gate every TENANT/GLOBAL_READ catalogue route to one permission domain.
-- [x] Record tenant, actor, authorization scope and command correlation in
-  structured audit evidence.
-- [x] Keep human session authentication deployment-owned rather than embedding a
-  second password/MFA system in the banking core.
-- [x] Accept short-lived HMAC-signed named-human assertions from a trusted
-  deployment IAM/session gateway; forged/partial/stale assertions fail closed.
-- [x] Define human step-up and N-of-M/dual-control requirements in
-  [`docs/IAM.md`](docs/IAM.md). Existing approval chains enforce distinct machine
-  approver credentials; deployments centralizing users behind one gateway must
-  enforce distinct IdP subjects before issuing approval commands.
+- private operator route;
+- dedicated timestamped HMAC signature;
+- final provider state requirement;
+- tenant/resource ownership checks;
+- currency checks;
+- event-ID replay protection;
+- provider-reference settlement deduplication;
+- ledger posting, durable evidence and customer event committed in one command.
 
-### Provider and adapter standard
+## Webhook delivery
 
-- [x] Define a provider-neutral gateway envelope with stable job-level
-  idempotency, command correlation and bounded transport behavior.
-- [x] Persist provider work in a durable outbox before the local command commits.
-- [x] Treat timeout, lease expiry, redirects and contradictory transport evidence
-  as ambiguous/reconciliation state rather than blind resubmission.
-- [x] Apply capability-specific result/finality checks before provider outcomes
-  make identity, receiving details, cards, transfers or custody final.
-- [x] Encrypt provider outbox payloads with AES-256-GCM and key IDs before
-  persistence; production fails closed without encryption material.
-- [x] Require provider-originated settled account/custody events to pass both the
-  private operator boundary and a separate timestamped HMAC signature.
-- [x] Publish a versioned machine-readable capability contract and deterministic
-  conformance adapter/fixtures for every currently declared production
-  capability.
-- [x] Gate provider intent, outcome handlers, docs and conformance fixtures
-  against capability-contract drift.
+Webhook delivery is durable and at-least-once:
 
-### Webhook delivery
+- delivery intent is committed with the originating event;
+- stable delivery IDs support receiver deduplication;
+- leases and retries survive process restarts;
+- Cloudflare alarms resume work after Durable Object eviction;
+- signing secrets are encrypted before durable persistence;
+- egress is HTTPS-only, exact-host allowlisted, redirect-free and concurrency-bounded.
 
-- [x] Persist webhook delivery intent inside the financial/event command.
-- [x] Use stable logical delivery IDs, leases, at-least-once retries and
-  `Retry-After` handling.
-- [x] Resume durable webhook work after Node restart and Cloudflare alarms.
-- [x] Seal webhook signing secrets before persistence using the production
-  payload-encryption keyring; production fails closed without encryption.
-- [x] Keep outbound delivery HTTPS-only, exact-host allowlisted, redirect-free and
-  concurrency bounded.
+## FX assurance
 
-### Edge routing
+The canonical FX stack combines:
 
-- [x] Define Banking-vs-FX runtime ownership in machine-readable metadata.
-- [x] Make the Site Worker import the shared ownership function directly; there is
-  no second handwritten FX path list.
-- [x] Fail builds when ownership metadata and canonical FX routes drift.
-- [x] Enumerate all 181 public catalogue paths in an edge-ownership test and prove
-  every path resolves to Banking or FX plus credential forwarding has no hidden
-  operator-key injection.
-- [ ] Retain Cloudflare-runtime execution evidence for the complete public edge
-  routing suite on the release candidate.
+- participant/account attribution and transaction policy;
+- short-lived policy authorizations invalidated by participant or policy changes;
+- exact rational pricing and integer atomic-unit amounts;
+- private signed orders and multiple institutional source classes;
+- policy-first liquidity eligibility;
+- multi-source exact-output optimization;
+- idempotent reservation/release;
+- route state that becomes non-releasable at submission;
+- explicit confirmation/failure reconciliation;
+- fiat evidence and finality state separate from token execution;
+- adapter-driven production runtime composition;
+- optional `AtomicRouter` settlement for token legs.
 
-### Operational correctness
+The production FX node loads an institution-supplied runtime adapter and validates the complete market/quote/fiat/execution contract before serving traffic.
 
-- [x] Introduce stable command correlation across request, ledger and events.
-- [x] Add structured audit records separate from customer events.
-- [x] Strip persistence-only ownership metadata from public responses and stored
-  events/webhook payloads.
-- [x] Persist provider attempts/reconciliation cases with original command and
-  operation IDs.
-- [x] Add liveness (`/v2/_health`), dependency readiness (`/v2/_ready`) and
-  operator-authenticated operational metrics (`/v2/_ops/metrics`).
-- [x] Report aggregate balances, command/audit failures, idempotency replays,
-  provider latency/backlog, webhook backlog and reconciliation age/count without
-  exposing customer/provider payload data.
+## Solidity kernel
 
-## P2 — production operations
+The FX contracts cover:
 
-- [x] Define a non-Durable-Object active/passive single-writer HA reference and
-  failover/fencing requirements.
-- [x] Ship verified Node/SQLite snapshot and restore tooling plus automated
-  exact-money restore tests.
-- [x] Document continuous-PITR as deployment/storage-specific rather than
-  misrepresenting periodic snapshots as zero-data-loss PITR.
-- [x] Define DR exercises and explicit reference RPO/RTO objectives in
-  [`docs/PRODUCTION-OPERATIONS.md`](docs/PRODUCTION-OPERATIONS.md).
-- [x] Document provider payload, webhook, gateway, inbound-HMAC and API/operator
-  credential rotation procedures.
-- [x] Provide repeatable tracked-secret, production-dependency and container CVE
-  scanning commands; hosted CI also runs CodeQL.
-- [x] Provide load/soak and deterministic chaos/restart commands with financial
-  acceptance criteria in [`docs/LOAD-CHAOS.md`](docs/LOAD-CHAOS.md).
-- [ ] Execute and retain the release-candidate load/soak, recovery/DR and security
-  reports against the intended deployment topology.
-- [ ] Complete an independent external application and, where used, smart-contract
-  security review before a public 1.0 production-certification claim.
+- EIP-712 taker and maker authority;
+- ERC-1271 smart-wallet signatures through `SignatureChecker`;
+- nonce replay protection;
+- institution policy authorization and epoch invalidation;
+- maker cancellation and partial-fill accounting;
+- cumulative exact rounding across partial fills;
+- segregated vault liabilities;
+- solvency checks and surplus-only rescue;
+- bounded withdrawal-delay incident controls;
+- atomic route execution protected by reentrancy guards.
 
-## Definition of done for 1.0
+The Foundry gate includes formatting, build, unit tests, fuzzing and vault invariants.
 
-Blueballs 1.0 may be described as production-grade only when the release commit
-has retained machine-verifiable evidence for all of the following:
+## Runtime and operations
+
+Blueballs supports Node/SQLite and Cloudflare Worker/Durable Object compositions with shared banking semantics.
+
+Operational tooling includes:
+
+- liveness, readiness and operator metrics;
+- command/audit/provider/webhook backlog visibility;
+- versioned migrations;
+- verified SQLite backup and restore;
+- active/passive single-writer HA reference architecture;
+- RPO/RTO and DR runbooks;
+- provider/encryption/credential rotation procedures;
+- deterministic restart/chaos suite;
+- disposable banking + FX load proof;
+- tracked-secret and dependency scanning;
+- CycloneDX dependency inventory;
+- reference-container vulnerability scanning.
+
+## Release authority
+
+Verification is reproducible from the repository rather than dependent on a hosted CI vendor.
+
+Standard engineering gate:
+
+```bash
+pnpm verify
+```
+
+Full clean-checkout release gate:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm verify:release
+```
+
+The full profile executes the complete repository gate and additional security, dependency, restart/chaos, load and container checks. It writes evidence under `artifacts/`, including:
+
+- exact commit and Git tree;
+- pinned runtime/toolchain identity;
+- lockfile SHA-256;
+- API operation coverage;
+- load report;
+- CycloneDX dependency inventory and digest;
+- per-gate exit results;
+- clean-checkout state before and after verification.
+
+## 1.0 acceptance model
+
+The release profile is designed to prove the following invariants for the exact candidate checkout:
 
 ```text
-181 / 181 banking operations classified and contract-tested
-all success-capable operations exercised successfully
-all adapter-required operations proven fail-closed without an adapter
-0 cross-tenant data leaks in the isolation suite
-0 partial local commits across tested financial commands
-0 undocumented runtime routes
-0 documented-but-missing routes
-0 OpenAPI request/response drift
-0 generated SDK drift
-0 unreviewed high/critical security or invariant failures
-Production gate green and required on protected main
-pnpm verify green on the exact release checkout
-Docker / Trivy / Foundry / Compose proof retained
-load/soak and restore/DR evidence retained for the production topology
-external security review completed and release-blocking findings resolved
+181 banking operations classified and contract-tested
+success-capable operations exercised with schema-valid responses
+adapter-backed operations retain explicit provider/finality contracts
+zero observed cross-tenant data exposure in the isolation suite
+zero partial local commits across tested financial commands
+zero undocumented or unowned public routes
+zero OpenAPI request/response drift
+zero generated SDK drift
+exact-money restore proof passes
+restart and Durable Object eviction proof passes
+Foundry unit/fuzz/invariant gate passes
+load acceptance criteria pass
+secret/dependency/container security gates pass
+release checkout remains clean
 ```
 
-Adapter-required operations may fail closed by design when a regulated provider
-is not configured, but that behavior itself must be contract-tested and
-documented.
-
-## Release evidence
-
-Every production release should retain:
-
-- exact commit SHA and signed/tagged release identity as applicable;
-- GitHub `Production gate` result for that SHA;
-- clean-checkout `pnpm verify` report;
-- API operation coverage report;
-- generated OpenAPI and SDK package proof;
-- Foundry contract test summary;
-- container image digest and vulnerability scan;
-- dependency inventory/SBOM;
-- banking migration version;
-- load/soak configuration/results;
-- backup/restore or DR exercise result;
-- external review reference for a 1.0 production-certification claim;
-- known deployment limitations and required external adapters.
-
-A screenshot, successful frontend build, hosted status badge or static OpenAPI
-file is never evidence that a financial workflow works.
+This keeps the engineering claim tied to executable evidence, while institutions remain free to compose their own providers, infrastructure, IAM and jurisdiction-specific operating policy around the Blueballs core.

@@ -1,77 +1,92 @@
-# Security verification
+# Security Verification
 
-Security checks are release controls, not evidence that Blueballs or a deployment
-has completed an independent security audit.
+Blueballs security verification is executable from the repository and tied to the exact source checkout being evaluated.
 
-## Local / release-machine checks
-
-From a clean checkout with the pinned Node/pnpm versions:
+## Standard security gate
 
 ```bash
-pnpm install --frozen-lockfile
 pnpm security:release
-pnpm sbom
 ```
 
-`security:release` runs the tracked high-signal credential scan, rejects high or
-critical production dependency advisories and runs repository lint rules.
+This runs:
 
-On a release machine with Docker:
+- tracked high-signal credential scanning;
+- production dependency advisory checks at HIGH/CRITICAL severity;
+- repository lint rules.
+
+## Container gate
 
 ```bash
 pnpm security:container
 ```
 
-This builds `Dockerfile.reference` and scans the resulting image with a pinned
-Trivy image. High/critical findings with available fixes fail the gate. The
-scanner result must be retained with the release evidence rather than inferred
-from a prior build.
+The command builds `Dockerfile.reference` from the current checkout and scans the resulting image with the pinned Trivy container. HIGH/CRITICAL findings with available fixes fail the gate.
 
-## Hosted analysis
+## Dependency inventory
 
-`.github/workflows/production-gate.yml` repeats the secret/dependency checks,
-builds/scans the reference container and runs GitHub CodeQL over the JavaScript /
-TypeScript code. The final `Production gate` depends on the security job.
+```bash
+pnpm sbom
+```
 
-Hosted CodeQL is supplemental to the exact-checkout `pnpm verify` evidence; neither
-replaces the other.
+This writes a CycloneDX inventory for the pnpm workspace and pinned Foundry dependencies to:
 
-## Solidity
+```text
+artifacts/blueballs-sbom.cdx.json
+```
 
-The FX contracts use the Foundry `ci` target for formatting, build, unit tests,
-fuzzing and invariants. A production smart-contract deployment still requires an
-independent review appropriate to the deployed bytecode, signer/key policy and
-chain environment.
+The inventory embeds the current Git commit and can be archived with release evidence.
 
-## Secrets
+## Full release profile
 
-The local scanner intentionally targets high-signal credential formats and
-tracked non-template `.env` files. It is not a substitute for GitHub secret
-scanning, cloud secret-manager policy or organisation-wide leak detection.
-Production deployments should enable the hosting provider's repository and
-runtime secret scanning as well.
+```bash
+pnpm verify:release
+```
 
-## SBOM and dependency inventory
+The full profile combines security checks with the financial/runtime assurance surface:
 
-`pnpm sbom` produces the repository dependency inventory used in release
-evidence. Pin release tooling and archive the lockfile/SBOM with the commit.
-Dependency risk assessment must also consider provider SDKs/infrastructure that
-live outside this provider-neutral repository.
+- banking API lifecycle and tenant-isolation proof;
+- exact-money and transaction rollback invariants;
+- provider finality/reconciliation conformance;
+- signed inbound settlement replay protection;
+- webhook egress and secret-envelope behaviour;
+- trusted actor/request binding;
+- Cloudflare Durable Object runtime and eviction tests;
+- canonical FX node/package tests;
+- production FX adapter contract tests;
+- Foundry unit/fuzz/invariant tests;
+- backup/restore and migration recovery;
+- restart/chaos;
+- disposable banking + FX load proof;
+- reference-container security scan;
+- CycloneDX inventory.
 
-## Required external review before a 1.0 production certification claim
+The resulting `artifacts/verification-report.json` records the exact commit, Git tree, runtime versions, lockfile digest, API operation coverage, load evidence, SBOM digest and per-gate status.
 
-The repository may not self-certify an independent audit. Before a public 1.0
-production certification claim, retain external review evidence covering at
-least:
+## Secrets and key material
 
-- banking API authentication/authorization and tenant isolation;
-- financial transaction/ledger/idempotency invariants;
-- provider/webhook SSRF, signing, replay and ambiguity handling;
-- identity/customer-data exposure and encryption boundaries;
-- deployment configuration and secret management;
-- canonical FX policy/reservation/settlement design;
-- Solidity contracts and deployment roles where used;
-- penetration testing of the actual deployed institution surface.
+The tracked-file scanner is intentionally high-signal. Runtime credentials belong in deployment secret storage rather than the repository.
 
-Findings that can affect funds, tenant boundaries, authorization or finality are
-release blockers until fixed and regression-tested.
+Blueballs production cryptographic boundaries include independent material for:
+
+- tenant/operator machine credentials;
+- named-human actor assertions;
+- provider gateway authentication;
+- provider-originated settlement HMAC;
+- AES-256-GCM provider/webhook payload encryption;
+- external provider/venue signing keys where required by deployment adapters.
+
+Rotation procedures are documented in [`PRODUCTION-OPERATIONS.md`](PRODUCTION-OPERATIONS.md).
+
+## Solidity verification
+
+```bash
+make -C packages/fx-contracts ci
+```
+
+The Foundry target covers formatting, build, unit tests, fuzzing and invariants. The contract kernel is intentionally small and separates token backing/accounting, policy authorization, order cancellation, maker settlement and route execution.
+
+## External review interoperability
+
+The deterministic release artifacts, OpenAPI contracts, Solidity sources and threat-model documentation are designed to make third-party application, contract and penetration reviews reproducible. External reviewers can pin the same commit and run the same release profile before adding their own analysis.
+
+See [`../SECURITY.md`](../SECURITY.md), [`../PRODUCTION-HARDENING.md`](../PRODUCTION-HARDENING.md) and [`../RELEASE.md`](../RELEASE.md).
