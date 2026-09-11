@@ -1,5 +1,5 @@
-/** Pure API-key permission vocabulary shared by runtime, docs and CI.
- * This module must have no banking-runtime imports or persistence side effects. */
+/** Pure API-key permission vocabulary shared by runtime, docs and verification.
+ * This module has no banking-runtime imports or persistence side effects. */
 export const KEY_PERMISSION_DOMAINS = Object.freeze([
   "keys",
   "identity",
@@ -28,8 +28,14 @@ export const PERMISSION_ROUTE_RULES = Object.freeze([
   [/^\/v2\/(?:customers|applications)(?:\/|$)/, "identity"],
   [/^\/v2\/(?:accounts|details)(?:\/|$)/, "accounts"],
   [/^\/v2\/wallets(?:\/|$)/, "wallets"],
-  [/^\/v2\/(?:recipients|destinations|transfers|qr|links|mandates|subscriptions)(?:\/|$)/, "payments"],
-  [/^\/v2\/(?:fx|ramps)(?:\/|$)/, "fx"],
+  [
+    /^\/v2\/(?:recipients|destinations|transfers|qr|links|mandates|subscriptions)(?:\/|$)/,
+    "payments",
+  ],
+  // The historical /v2/quotes family remains tenant-authenticated in sandbox
+  // mode, while new production FX work uses the canonical FX node. Keep both
+  // route families under the same least-privilege FX permission domain.
+  [/^\/v2\/(?:quotes|fx|ramps)(?:\/|$)/, "fx"],
   [/^\/v2\/(?:cards|authorisations|disputes)(?:\/|$)/, "cards"],
   [/^\/v2\/(?:vaults|credit)(?:\/|$)/, "lending"],
   [/^\/v2\/(?:policies|approval-chains|approvals|orgs)(?:\/|$)/, "controls"],
