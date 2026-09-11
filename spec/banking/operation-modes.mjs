@@ -12,6 +12,13 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "POST /v2/transfers/:id/settle",
     "POST /v2/destinations/:id/verify",
 
+    // The reference application API stores uploaded base64 document contents
+    // inline. Production deployments must use encrypted/object-store/provider
+    // document handling rather than persist document binaries in these fixtures.
+    "POST /v2/applications/:id/documents",
+    "GET /v2/applications/:id/documents/:did",
+    "DELETE /v2/applications/:id/documents/:did",
+
     // Card issuance itself is provider-backed in production. Network
     // authorisation/transaction ingestion, controls and disputes are still
     // reference workflows and must not pretend a local state change reached a
@@ -45,6 +52,14 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "GET /v2/credit",
     "POST /v2/credit/:id/draw",
     "POST /v2/credit/:id/repay",
+
+    // Reference statements include a plaintext base64 stand-in for PDF exports,
+    // and fee schedules are teaching fixtures. Do not expose them as production
+    // document generation or commercial fee configuration.
+    "POST /v2/statements",
+    "GET /v2/statements/:id",
+    "GET /v2/fees/config",
+    "PUT /v2/fees/config",
 
     // Payment-link and recurring-payment fixtures do not execute through a
     // connected production collection/mandate provider yet.
