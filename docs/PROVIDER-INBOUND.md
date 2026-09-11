@@ -40,6 +40,7 @@ The body contains:
   "type": "payments.account_credit_settled",
   "resource_id": "acc_...",
   "amount": { "amount": "125.37", "currency": "EUR" },
+  "source": "sponsor-bank-a",
   "provider_reference": "bank-credit-123",
   "provider_state": "settled",
   "authentication": {
@@ -64,17 +65,33 @@ using that provider's own authentication first, normalize it into the Blueballs
 canonical event, then sign the canonical event with the dedicated Blueballs
 inbound secret.
 
-## Replay and idempotency
+## Replay and financial idempotency
 
-`event_id` is the durable financial idempotency identity.
+Blueballs uses **two independent durable identities** for inbound money:
+
+1. `event_id` identifies the canonical callback/event delivery; and
+2. `(source, type, provider_reference)` identifies the final external settlement
+   itself.
+
+Rules:
 
 - Same `event_id` + same canonical evidence: return the original record with
   `replayed: true`; no second ledger posting.
 - Same `event_id` + different canonical evidence: `409`; no ledger posting.
+- A different `event_id` that reuses an already-applied provider settlement
+  reference in the same source/type namespace: `409`; no second ledger posting.
 - A legitimate retry may carry a fresh timestamp/signature. Authentication
   metadata is deliberately excluded from the durable evidence fingerprint.
 
-Never use a timestamp or HTTP request ID as the financial idempotency identity.
+`source` is optional and defaults to the gateway's single provider namespace. A
+gateway serving several upstream banks/custodians should set a stable source ID,
+because many providers only guarantee reference uniqueness within their own
+namespace. The adapter must supply a provider reference that uniquely identifies
+one settled value movement; partial/leg settlements need distinct canonical
+references.
+
+Never use a timestamp, HTTP request ID or newly generated webhook delivery ID as
+the sole financial idempotency identity.
 
 ## Supported settled facts
 
@@ -87,8 +104,11 @@ Required controls:
 - account is not closed;
 - amount is a positive exact decimal money value;
 - currency exactly matches the account;
+- `provider_state` is final `settled`;
 - provider event signature is valid and fresh;
-- event ID has not been used for different evidence.
+- event ID has not been used for different evidence;
+- provider settlement reference has not already been applied under a different
+  event ID.
 
 The accepted event posts balanced ledger entries from the external inbound rail
 account to the customer account and emits `account.payment_received`.
@@ -101,8 +121,9 @@ Required controls:
 - wallet is owned by that tenant and active;
 - amount is positive exact money;
 - currency exactly matches the wallet;
+- `provider_state` is final `settled`;
 - provider event signature is valid and fresh;
-- event ID replay rules pass.
+- event ID and provider-settlement replay rules pass.
 
 The accepted event posts balanced ledger entries from the external custody
 network account to the canonical wallet and emits `wallet.deposit_settled`.
@@ -139,7 +160,7 @@ coordination rather than silently accepting unlimited historical secrets.
 ## Audit evidence
 
 Accepted/failed commands receive a Blueballs `command_id` and structured audit
-record. Retain the provider `event_id`, `provider_reference`, command ID and
-upstream provider audit/callback evidence together for incident/reconciliation
-work. Do not persist the HMAC secret or arbitrary upstream raw payloads in audit
-records.
+record. Retain the provider `event_id`, `source`, `provider_reference`, command ID
+and upstream provider audit/callback evidence together for
+incident/reconciliation work. Do not persist the HMAC secret or arbitrary
+upstream raw payloads in audit records.
