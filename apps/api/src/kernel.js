@@ -34,6 +34,7 @@ import { validateQueryParameters } from "./query-validation.js";
 import {
   assertKeyPermission,
   childPermissions,
+  hasPermission,
   publicKeyPermissions,
 } from "./key-permissions.js";
 import {
@@ -213,6 +214,23 @@ function assertRuntimeMode(method, pattern, body) {
   }
 }
 
+function assertRouteAuthority(method, pattern, ctx) {
+  if (method !== "POST" || pattern !== "/v2/cards/:id/unfreeze") return;
+  const card = db.cards?.get(ctx.params.id);
+  const initiatorKey = card?.freeze?.by_key;
+  if (
+    initiatorKey &&
+    initiatorKey !== ctx.key?.id &&
+    !hasPermission(ctx.key, "cards:*")
+  ) {
+    throw new ApiError(
+      "forbidden",
+      403,
+      "Only the credential that froze this card or an unrestricted card administrator may unfreeze it",
+    );
+  }
+}
+
 /** Register one route. The wrapped handler is the single transport/security
  * boundary for every catalogue operation. */
 export const route = (method, pattern, handler, opts = {}) => {
@@ -263,6 +281,7 @@ export const route = (method, pattern, handler, opts = {}) => {
 
     if (ctx.key && access !== "PUBLIC" && access !== "OPERATOR") {
       assertKeyPermission(ctx.key, method, pattern);
+      assertRouteAuthority(method, pattern, ctx);
     }
 
     validateQueryParameters(method, pattern, ctx.url);
