@@ -108,7 +108,7 @@ const json = (res, status, body, extra = {}) => {
     "x-blueballs-source-commit": SOURCE_COMMIT,
     "x-ratelimit-limit": String(RATE_LIMIT),
     "access-control-allow-headers":
-      "content-type,x-api-key,x-idempotency-key",
+      "content-type,x-api-key,x-idempotency-key,x-blueballs-actor-id,x-blueballs-actor-timestamp,x-blueballs-actor-assurance,x-blueballs-actor-signature",
     "access-control-allow-methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS",
     ...extra,
   });
@@ -1130,11 +1130,12 @@ const server = createServer(async (req, res) => {
         }
 
         const ctx = { params: hit.params, body, url, key, req };
+        const preflightState = hit.r.preflight ? hit.r.preflight(ctx) : null;
         return MUTATION_METHODS.has(req.method)
           ? idempotent({ req, body, url, route: hit.r, key }, () =>
-              hit.r.handler(ctx),
+              hit.r.handler(ctx, preflightState),
             )
-          : hit.r.handler(ctx);
+          : hit.r.handler(ctx, preflightState);
       },
       { command_id: commandId, request_id: requestId },
     );
