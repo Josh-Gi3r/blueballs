@@ -92,6 +92,7 @@ export class ReferencePriceEngine {
       const normalized = {
         sourceId,
         observedAt: observation.observedAt,
+        status: observation.status ?? "OK",
         mid: midpoint(bid, ask),
       };
       const existing = latestBySource.get(sourceId);
@@ -115,7 +116,9 @@ export class ReferencePriceEngine {
     }
     accepted = inliers;
 
-    let confidence = "NORMAL";
+    let confidence = accepted.some((item) => item.status === "DEGRADED")
+      ? "DEGRADED"
+      : "NORMAL";
     if (accepted.length < this.minSources) {
       if (!(this.allowDegradedSingleSource && accepted.length >= 1)) {
         return this.#unavailable(base, quote, rejected, "INSUFFICIENT_SOURCES");
