@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   crawlerDocument,
   pageMetadata,
@@ -20,6 +20,14 @@ const router = readFileSync(new URL("../src/router.ts", import.meta.url), "utf8"
 const brand = readFileSync(new URL("../src/Brand.tsx", import.meta.url), "utf8");
 const siteRoot = readFileSync(
   new URL("../src/SiteRoot.tsx", import.meta.url),
+  "utf8",
+);
+const cardsPage = readFileSync(
+  new URL("../src/CardsPage.tsx", import.meta.url),
+  "utf8",
+);
+const cardsVisualPage = readFileSync(
+  new URL("../src/cards/CardsVisualPage.tsx", import.meta.url),
   "utf8",
 );
 
@@ -52,10 +60,8 @@ assert.match(
   "the site must set a permissions policy",
 );
 
-// Client-side route changes must reach SiteRoot as well as the page-level router.
-// Without this broadcast, clicking Cards from /home only changes the URL while
-// SiteRoot keeps rendering App, which makes /cards appear to work only after a
-// reload or after visiting a shell that dispatches popstate itself.
+// Cross-shell navigation is one location contract: both SiteRoot and page-level
+// route consumers must observe the same History API transition.
 assert.match(
   router,
   /history\.pushState\([\s\S]*dispatchEvent\(new PopStateEvent\("popstate"\)\)/,
@@ -74,8 +80,31 @@ assert.match(
 assert.match(
   brand,
   /href="\/home"/,
-  "interior brand links must return to the canonical site home, not the cover",
+  "interior brand links must return to the canonical site home",
 );
+
+// Keep one public Cards implementation and one loaded Cards stylesheet.
+assert.match(
+  cardsPage,
+  /import CardsVisualPage from "\.\/cards\/CardsVisualPage"/,
+  "CardsPage must delegate to the canonical CardsVisualPage",
+);
+assert.match(
+  cardsVisualPage,
+  /import "\.\/cards-visual-page\.css"/,
+  "the canonical Cards page must load its canonical stylesheet",
+);
+for (const stalePath of [
+  "../src/CardsPage.css",
+  "../src/cards/hero-explorer.css",
+  "../src/cards/workbench.css",
+]) {
+  assert.equal(
+    existsSync(new URL(stalePath, import.meta.url)),
+    false,
+    `${stalePath} must stay retired`,
+  );
+}
 
 assert.equal(
   pageMetadata("/cards").title,
@@ -115,5 +144,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: cross-shell navigation is synchronized and /cards + /sandbox remain canonical, crawlable routes",
+  "site route contract: cross-shell navigation is synchronized and Cards has one canonical public implementation",
 );
