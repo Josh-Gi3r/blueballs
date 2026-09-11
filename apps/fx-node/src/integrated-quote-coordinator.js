@@ -21,10 +21,11 @@ function rowToQuote(row) {
   };
 }
 
-function errorWithCode(message, code, details = undefined) {
+function errorWithCode(message, code, details = undefined, status = undefined) {
   const error = new Error(message);
   error.code = code;
   if (details !== undefined) error.details = details;
+  if (status !== undefined) error.status = status;
   return error;
 }
 
@@ -110,6 +111,14 @@ export class IntegratedQuoteCoordinator {
       );
       CREATE INDEX IF NOT EXISTS idx_integrated_fx_quote_state
         ON integrated_fx_quotes(state, expires_at);
+      CREATE TABLE IF NOT EXISTS integrated_fx_events (
+        event_id TEXT PRIMARY KEY,
+        quote_id TEXT NOT NULL REFERENCES integrated_fx_quotes(quote_id),
+        kind TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_integrated_fx_events_quote
+        ON integrated_fx_events(quote_id, kind);
     `);
   }
 
@@ -162,6 +171,40 @@ export class IntegratedQuoteCoordinator {
         });
       }
     }
+  }
+
+  #bindFinalityEvent(quoteId, eventId, kind) {
+    const existing = this.db
+      .prepare(
+        "SELECT quote_id, kind FROM integrated_fx_events WHERE event_id = ?",
+      )
+      .get(eventId);
+    if (existing) {
+      if (existing.quote_id !== quoteId || existing.kind !== kind) {
+        throw errorWithCode(
+          `finality event ${eventId} is already bound to another quote or outcome`,
+          "FINALITY_EVENT_COLLISION",
+          {
+            eventId,
+            requestedQuoteId: quoteId,
+            requestedKind: kind,
+            existingQuoteId: existing.quote_id,
+            existingKind: existing.kind,
+          },
+          409,
+        );
+      }
+      return { duplicate: true };
+    }
+    this.db
+      .prepare(
+        `
+        INSERT INTO integrated_fx_events(event_id, quote_id, kind, created_at)
+        VALUES (?, ?, ?, ?)
+      `,
+      )
+      .run(eventId, quoteId, kind, this.now());
+    return { duplicate: false };
   }
 
   candidateSlices({ inputAsset, outputAsset, exactOutput, expiresAt }) {
@@ -367,9 +410,6 @@ export class IntegratedQuoteCoordinator {
       quote.row.state === "SUBMITTED" &&
       quote.row.submission_ref === submissionRef
     ) {
-      // The quote state is committed before provider/source submission hooks.
-      // Replaying the same submission therefore finishes any hooks left behind
-      // by a process crash or adapter failure without creating a second route.
       this.#markReservedLegsSubmitted(quote, submissionRef);
       return this.getQuote(quoteId);
     }
@@ -418,12 +458,20 @@ export class IntegratedQuoteCoordinator {
       throw new TypeError("eventId required");
     const quote = this.getPrivateQuote(quoteId);
     if (!quote) throw new Error("quote not found");
-    if (quote.row.state === "CONFIRMED" && quote.row.event_id === eventId) {
-      return { duplicate: true, quote: this.getQuote(quoteId) };
+    if (quote.row.state === "CONFIRMED") {
+      if (quote.row.event_id === eventId)
+        return { duplicate: true, quote: this.getQuote(quoteId) };
+      throw errorWithCode(
+        "quote is already confirmed by a different finality event",
+        "FINALITY_EVENT_COLLISION",
+        { quoteId, existingEventId: quote.row.event_id, requestedEventId: eventId },
+        409,
+      );
     }
     if (quote.row.state !== "SUBMITTED")
       throw new Error("quote must be SUBMITTED before confirmation");
 
+    this.#bindFinalityEvent(quoteId, eventId, "CONFIRMED");
     for (let index = 0; index < quote.route.reserved.legs.length; index += 1) {
       const leg = quote.route.reserved.legs[index];
       const adapter = this.#adapterFor(leg.sourceType);
@@ -451,11 +499,21 @@ export class IntegratedQuoteCoordinator {
   fail(quoteId, { eventId = null, reason = "SETTLEMENT_FAILED" }) {
     const quote = this.getPrivateQuote(quoteId);
     if (!quote) throw new Error("quote not found");
-    if (quote.row.state === "FAILED")
+    if (quote.row.state === "FAILED") {
+      if (eventId && quote.row.event_id && quote.row.event_id !== eventId) {
+        throw errorWithCode(
+          "quote is already failed by a different finality event",
+          "FINALITY_EVENT_COLLISION",
+          { quoteId, existingEventId: quote.row.event_id, requestedEventId: eventId },
+          409,
+        );
+      }
       return { duplicate: true, quote: this.getQuote(quoteId) };
+    }
     if (quote.row.state !== "SUBMITTED")
       throw new Error("only a submitted quote can fail settlement");
 
+    if (eventId) this.#bindFinalityEvent(quoteId, eventId, "FAILED");
     for (
       let index = quote.route.reserved.legs.length - 1;
       index >= 0;
