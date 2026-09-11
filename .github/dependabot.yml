@@ -20,3 +20,6 @@ updates:
       - dependency-name: "*"
         update-types:
           - version-update:semver-major
+      - dependency-name: "agents"
+        update-types:
+          - version-update:semver-minor
