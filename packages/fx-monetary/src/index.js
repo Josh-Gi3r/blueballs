@@ -233,11 +233,37 @@ export class MonetaryEngine {
     if (kind === INSTRUMENT_KINDS.TOKENIZED_DEPOSIT && transferable !== true) {
       fail(
         "VALIDATION_ERROR",
-        "tokenized deposit transferability must be explicit and enabled in this reference model",
+        "tokenized deposit transferability must be explicit and enabled in this model",
       );
     }
     const createdAt = this.now();
     this.#transaction(() => {
+      const existing = this.db
+        .prepare("SELECT * FROM monetary_instruments WHERE code = ?")
+        .get(code);
+      const supplyRow = this.db
+        .prepare("SELECT amount FROM monetary_supply WHERE instrument_code = ?")
+        .get(code);
+      const outstandingSupply = BigInt(supplyRow?.amount ?? "0");
+
+      if (existing && outstandingSupply > 0n) {
+        const liabilityTermsChanged =
+          existing.kind !== kind ||
+          existing.reserve_currency !== reserveCurrency ||
+          existing.decimals !== decimals ||
+          existing.min_coverage_bps !== minCoverageBps ||
+          (existing.transferable === 1) !== transferable ||
+          enabled !== true;
+        if (liabilityTermsChanged) {
+          fail(
+            "INSTRUMENT_HAS_SUPPLY",
+            "reserve currency, kind, decimals, coverage, transferability and enabled state are immutable while supply is outstanding",
+            409,
+            { code, outstandingSupply: outstandingSupply.toString() },
+          );
+        }
+      }
+
       this.db
         .prepare(
           `
@@ -856,14 +882,22 @@ export function previewRemittance({
   safeInteger(oracle.expiresAt, "oracle.expiresAt", {
     min: oracle.observedAt + 1,
   });
+  if (oracle.observedAt > now)
+    fail("ORACLE_FUTURE", "oracle observation is in the future", 409);
   if (oracle.expiresAt <= now)
     fail("ORACLE_STALE", "oracle reference is stale", 409);
-  if (
-    !Array.isArray(oracle.sourceIds) ||
-    oracle.sourceIds.length < 2 ||
-    oracle.sourceIds.some((id) => typeof id !== "string")
-  ) {
-    fail("VALIDATION_ERROR", "oracle requires at least two sourceIds");
+  if (!Array.isArray(oracle.sourceIds)) {
+    fail("VALIDATION_ERROR", "oracle sourceIds must be an array");
+  }
+  const sourceIds = [
+    ...new Set(
+      oracle.sourceIds.map((id) =>
+        typeof id === "string" ? id.trim() : "",
+      ),
+    ),
+  ].filter(Boolean);
+  if (sourceIds.length < 2) {
+    fail("VALIDATION_ERROR", "oracle requires at least two distinct sourceIds");
   }
   if (!bps || typeof bps !== "object") fail("VALIDATION_ERROR", "bps required");
   const components = {
@@ -911,7 +945,7 @@ export function previewRemittance({
       midDenominator: denominator.toString(),
       observedAt: oracle.observedAt,
       expiresAt: oracle.expiresAt,
-      sourceIds: [...oracle.sourceIds],
+      sourceIds,
       confidence: requiredString(oracle.confidence, "oracle.confidence"),
     },
   };
