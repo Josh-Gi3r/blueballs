@@ -48,14 +48,14 @@ test("settled provider account credits are exact, tenant-bound, signed and repla
     provider_reference: "bank-credit-000001",
     provider_state: "settled",
   };
-  const event = signed(evidence);
 
   const accepted = await api.request("POST", "/internal/provider/events", {
     key: OPERATOR_KEY,
-    body: event,
+    body: signed(evidence),
   });
   assert.equal(accepted.status, 200);
   assert.equal(accepted.body.type, evidence.type);
+  assert.equal(accepted.body.provider_state, "settled");
 
   const replayed = await api.request("POST", "/internal/provider/events", {
     key: OPERATOR_KEY,
@@ -68,6 +68,19 @@ test("settled provider account credits are exact, tenant-bound, signed and repla
     key: BOOTSTRAP_KEY,
   });
   assert.equal(balance.body.balance.amount, "125.37");
+
+  const notFinal = await api.request("POST", "/internal/provider/events", {
+    key: OPERATOR_KEY,
+    body: signed({
+      ...evidence,
+      event_id: "account-credit-pending",
+      amount: { amount: "10.00", currency: "EUR" },
+      provider_reference: "bank-credit-pending",
+      provider_state: "pending",
+    }),
+  });
+  assert.equal(notFinal.status, 422);
+  assert.match(notFinal.body.detail, /provider_state=settled/);
 
   const badSignature = await api.request("POST", "/internal/provider/events", {
     key: OPERATOR_KEY,
