@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import PhoneScreen, {
   type Screen as LegacyScreen,
   type FxQuote,
@@ -136,32 +136,11 @@ export default function Device({
   fxQuote?: FxQuote | null;
   fxErr?: boolean;
 }) {
-  const host = useRef<HTMLDivElement | null>(null);
-  const [resolvedId, setResolvedId] = useState(id);
-
-  useEffect(() => {
-    if (id !== "deposit-onchain") {
-      setResolvedId(id);
-      return;
-    }
-    const productCard = host.current?.closest(".bb-screen-grid > div");
-    const cardText = productCard?.textContent ?? "";
-    if (cardText.includes("QR & payment links")) {
-      setResolvedId("merchant-qr");
-      return;
-    }
-    if (cardText.includes("Wallets") && cardText.includes("/v2/wallets")) {
-      setResolvedId("wallet-product");
-      return;
-    }
-    setResolvedId(id);
-  }, [id]);
-
-  if (LEGACY.has(resolvedId)) {
+  if (LEGACY.has(id)) {
     return (
-      <div ref={host} style={{ width: 348, height: 682, flex: "none" }}>
+      <div style={{ width: 348, height: 682, flex: "none" }}>
         <PhoneScreen
-          screen={resolvedId as LegacyScreen}
+          screen={id as LegacyScreen}
           fxQuote={fxQuote}
           fxErr={fxErr}
         />
@@ -169,15 +148,21 @@ export default function Device({
     );
   }
 
-  const entry = screenById(resolvedId);
-  if (!entry) return <div ref={host} />;
-  const Body = entry.Component;
-
-  return (
-    <div ref={host}>
-      <DeviceShell>
-        <Body />
+  const entry = screenById(id);
+  if (!entry) {
+    return (
+      <DeviceShell badge="UNKNOWN SCREEN">
+        <div style={{ padding: 24, color: "#7A8296", fontFamily: MONO }}>
+          {id}
+        </div>
       </DeviceShell>
-    </div>
+    );
+  }
+
+  const Body = entry.Component;
+  return (
+    <DeviceShell>
+      <Body />
+    </DeviceShell>
   );
 }
