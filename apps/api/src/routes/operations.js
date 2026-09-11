@@ -13,9 +13,7 @@ import {
   fromMinor,
   route,
 } from "../kernel.js";
-import {
-  BANKING_SCHEMA_MIGRATIONS,
-} from "../schema.js";
+import { BANKING_SCHEMA_MIGRATIONS } from "../schema.js";
 import {
   providerAttempts,
   providerOutboxStatus,
@@ -26,7 +24,8 @@ import { providerPayloadEncryptionReady } from "../provider-payload-crypto.js";
 import { webhookOutboxStatus } from "../webhook-outbox.js";
 import { bankingEnv } from "../runtime-env.js";
 
-const STARTED_AT = new Date().toISOString();
+const STARTED_AT_MS = Date.now();
+const STARTED_AT = new Date(STARTED_AT_MS).toISOString();
 const SCHEMA_VERSION = BANKING_SCHEMA_MIGRATIONS.at(-1)?.version ?? 0;
 
 function aggregateBalances(rows) {
@@ -61,7 +60,13 @@ function finishedAttemptLatency() {
   return {
     samples: durations.length,
     avg_ms: Math.round(sum / durations.length),
-    p95_ms: durations[Math.min(durations.length - 1, Math.ceil(durations.length * 0.95) - 1)],
+    p95_ms:
+      durations[
+        Math.min(
+          durations.length - 1,
+          Math.ceil(durations.length * 0.95) - 1,
+        )
+      ],
     max_ms: durations.at(-1),
   };
 }
@@ -74,7 +79,10 @@ function auditMetrics() {
   for (const record of records) {
     if (record.outcome === "failed") {
       failedCommands += 1;
-      if (Array.isArray(record.ledger_transactions) && record.ledger_transactions.length) {
+      if (
+        Array.isArray(record.ledger_transactions) &&
+        record.ledger_transactions.length
+      ) {
         failedFinancialCommands += 1;
       }
     }
@@ -88,13 +96,23 @@ function auditMetrics() {
   };
 }
 
+function safeCheck(check) {
+  try {
+    return !!check();
+  } catch {
+    return false;
+  }
+}
+
 function readiness() {
   const checks = {
     database_schema: SCHEMA_VERSION > 0,
     provider_transport:
-      BANK_API_MODE !== "production" || providerTransportAvailable(),
+      BANK_API_MODE !== "production" ||
+      safeCheck(() => providerTransportAvailable()),
     provider_payload_encryption:
-      BANK_API_MODE !== "production" || providerPayloadEncryptionReady(),
+      BANK_API_MODE !== "production" ||
+      safeCheck(() => providerPayloadEncryptionReady()),
     provider_inbound_auth:
       BANK_API_MODE !== "production" ||
       String(bankingEnv("BANK_PROVIDER_INBOUND_SECRET", "")).length >= 32,
@@ -110,7 +128,10 @@ route(
     status: "ok",
     mode: BANK_API_MODE,
     started_at: STARTED_AT,
-    uptime_seconds: Math.max(0, Math.floor(process.uptime())),
+    uptime_seconds: Math.max(
+      0,
+      Math.floor((Date.now() - STARTED_AT_MS) / 1000),
+    ),
     schema_version: SCHEMA_VERSION,
     source_commit: bankingEnv("BLUEBALLS_GIT_SHA", "development"),
   }),
@@ -168,7 +189,9 @@ route(
       },
       balances: {
         accounts: aggregateBalances([...db.accounts.values()]),
-        wallets: aggregateBalances(db.wallets ? [...db.wallets.values()] : []),
+        wallets: aggregateBalances(
+          db.wallets ? [...db.wallets.values()] : [],
+        ),
       },
       audit: auditMetrics(),
       provider: {
