@@ -4,7 +4,21 @@ import { createApiFixture } from "./helpers/api-process.js";
 
 const BOOTSTRAP_KEY = "bb_production_bootstrap_test_secret_0123456789abcdef";
 
-test("production mode bootstraps explicitly and disables sandbox shortcuts", async (t) => {
+async function assertSandboxOnly(api, method, path, body = undefined) {
+  const response = await api.request(method, path, {
+    key: BOOTSTRAP_KEY,
+    ...(body === undefined ? {} : { body }),
+  });
+  assert.equal(
+    response.status,
+    403,
+    `${method} ${path} should fail closed in production: ${JSON.stringify(response.body)}`,
+  );
+  assert.match(response.body.detail, /sandbox-only/);
+  return response;
+}
+
+test("production mode bootstraps explicitly and disables sandbox/reference controls", async (t) => {
   const api = await createApiFixture({
     env: {
       BANK_API_MODE: "production",
@@ -33,12 +47,12 @@ test("production mode bootstraps explicitly and disables sandbox shortcuts", asy
   });
   assert.equal(customer.status, 201);
 
-  const fakeVerify = await api.request(
+  await assertSandboxOnly(
+    api,
     "POST",
     `/v2/customers/${customer.body.id}/verify`,
-    { key: BOOTSTRAP_KEY, body: { decision: "approved" } },
+    { decision: "approved" },
   );
-  assert.equal(fakeVerify.status, 403);
 
   const account = await api.request("POST", "/v2/accounts", {
     key: BOOTSTRAP_KEY,
@@ -46,23 +60,42 @@ test("production mode bootstraps explicitly and disables sandbox shortcuts", asy
   });
   assert.equal(account.status, 201);
 
-  const fakeCredit = await api.request(
+  await assertSandboxOnly(
+    api,
     "POST",
     `/v2/accounts/${account.body.id}/credit`,
-    { key: BOOTSTRAP_KEY, body: { amount: "100.00" } },
+    { amount: "100.00" },
   );
-  assert.equal(fakeCredit.status, 403);
 
-  const scenarios = await api.request("GET", "/v2/sandbox/scenarios", {
-    key: BOOTSTRAP_KEY,
-  });
-  assert.equal(scenarios.status, 403);
-
-  const mandate = await api.request("POST", "/v2/mandates", {
-    key: BOOTSTRAP_KEY,
-    body: { customer: customer.body.id, currency: "EUR" },
-  });
-  assert.equal(mandate.status, 403);
+  const blocked = [
+    ["POST", "/v2/destinations/dst_reference/verify", { name: "Reference" }],
+    ["POST", "/v2/cards/crd_reference/freeze", { reason: "reference" }],
+    ["POST", "/v2/cards/crd_reference/unfreeze", {}],
+    ["PATCH", "/v2/cards/crd_reference/controls", { spend_limits: {} }],
+    ["GET", "/v2/cards/crd_reference/transactions"],
+    ["GET", "/v2/cards/crd_reference/statements"],
+    ["POST", "/v2/cards/crd_reference/authorisations", {}],
+    ["GET", "/v2/authorisations"],
+    ["POST", "/v2/disputes", {}],
+    ["POST", "/v2/vaults", {}],
+    ["GET", "/v2/vaults"],
+    ["POST", "/v2/credit", {}],
+    ["GET", "/v2/credit"],
+    ["POST", "/v2/links", { currency: "EUR" }],
+    ["GET", "/v2/links/lnk_reference"],
+    ["POST", "/v2/mandates", {}],
+    ["GET", "/v2/mandates/mnd_reference"],
+    ["POST", "/v2/subscriptions", {}],
+    ["GET", "/v2/subscriptions"],
+    ["POST", "/v2/quotes", {}],
+    ["GET", "/v2/rates"],
+    ["POST", "/v2/fx/quote", {}],
+    ["GET", "/v2/fx/depth"],
+    ["GET", "/v2/sandbox/scenarios"],
+  ];
+  for (const [method, path, body] of blocked) {
+    await assertSandboxOnly(api, method, path, body);
+  }
 });
 
 test("fresh production state refuses to boot without a bootstrap admin secret", async () => {
