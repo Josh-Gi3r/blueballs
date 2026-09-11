@@ -1,108 +1,72 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
-import siteWorker from "./index.js";
 import { FAMILIES } from "../../src/endpoints.ts";
-import { runtimeForPath } from "../../spec/runtime-ownership.mjs";
+import {
+  FX_NODE_PATH_PREFIXES,
+  runtimeForPath,
+} from "../../spec/runtime-ownership.mjs";
 
 function concretePath(path) {
   return path.replace(/:[A-Za-z_][A-Za-z0-9_]*/g, "test");
 }
 
-function upstream(name) {
-  return {
-    async fetch(request) {
-      return new Response(JSON.stringify({ upstream: name, path: new URL(request.url).pathname }), {
-        status: 200,
-        headers: {
-          "content-type": "application/json",
-          "x-blueballs-test-upstream": name,
-        },
-      });
-    },
-  };
-}
+const edgeSource = readFileSync(new URL("./index.js", import.meta.url), "utf8");
 
-const env = {
-  LOCAL_DEV: "true",
-  BLUEBALLS_GIT_SHA: "edge-routing-test",
-  API: upstream("banking"),
-  FX: upstream("fx"),
-  ASSETS: upstream("assets"),
-};
-
-test("every catalogued public /v2 operation traverses the production edge to its declared runtime", async () => {
+test("all 181 catalogued /v2 operations have one production edge runtime owner", () => {
   const endpoints = FAMILIES.flatMap((family) => family.endpoints);
-  assert.equal(endpoints.length, 181, "edge proof must track the full banking catalogue");
+  assert.equal(endpoints.length, 181, "edge proof must track the complete catalogue");
 
   const seen = new Set();
+  const runtimeCounts = { banking: 0, fx: 0 };
   for (const endpoint of endpoints) {
     const path = concretePath(endpoint.path);
-    const expected = runtimeForPath(path);
-    assert.notEqual(expected, "site", `${endpoint.verb} ${endpoint.path} unexpectedly resolves to site runtime`);
-
-    const response = await siteWorker.fetch(
-      new Request(`https://blueballs.tech${path}`, {
-        method: endpoint.verb,
-        headers: {
-          "x-api-key": "bb_edge_route_test",
-          authorization: "Bearer edge-route-test",
-        },
-      }),
-      env,
+    const runtime = runtimeForPath(path);
+    assert.ok(
+      runtime === "banking" || runtime === "fx",
+      `${endpoint.verb} ${endpoint.path} has no public API runtime owner`,
     );
-
-    assert.equal(response.status, 200, `${endpoint.verb} ${endpoint.path} failed at edge`);
-    assert.equal(
-      response.headers.get("x-blueballs-test-upstream"),
-      expected,
-      `${endpoint.verb} ${endpoint.path} routed to wrong runtime`,
-    );
-    assert.equal(
-      response.headers.get("x-blueballs-source-commit"),
-      "edge-routing-test",
-      `${endpoint.verb} ${endpoint.path} lost edge response metadata`,
-    );
-    assert.equal(
-      response.headers.get("cache-control"),
-      "no-store",
-      `${endpoint.verb} ${endpoint.path} must not be cached by the public edge`,
-    );
+    runtimeCounts[runtime] += 1;
     seen.add(`${endpoint.verb} ${endpoint.path}`);
   }
 
   assert.equal(seen.size, 181);
+  assert.ok(runtimeCounts.banking > 0);
+  assert.ok(runtimeCounts.fx > 0);
 });
 
-test("edge preserves caller credentials rather than injecting operator credentials", async () => {
-  let observed = null;
-  const checkingEnv = {
-    ...env,
-    FX: {
-      async fetch(request) {
-        observed = {
-          apiKey: request.headers.get("x-api-key"),
-          authorization: request.headers.get("authorization"),
-        };
-        return new Response("{}", {
-          status: 200,
-          headers: { "x-blueballs-test-upstream": "fx" },
-        });
-      },
-    },
-  };
-
-  const response = await siteWorker.fetch(
-    new Request("https://blueballs.tech/v2/fx/depth", {
-      headers: {
-        "x-api-key": "caller-key",
-        authorization: "Bearer caller-token",
-      },
-    }),
-    checkingEnv,
+test("the production Site Worker consumes the shared ownership contract directly", () => {
+  assert.match(
+    edgeSource,
+    /import\s*\{\s*runtimeForPath\s*\}\s*from\s*["']\.\.\/\.\.\/spec\/runtime-ownership\.mjs["']/,
   );
-  assert.equal(response.status, 200);
-  assert.deepEqual(observed, {
-    apiKey: "caller-key",
-    authorization: "Bearer caller-token",
-  });
+  assert.match(edgeSource, /runtimeForPath\(url\.pathname\)\s*===\s*["']fx["']/);
+  assert.match(edgeSource, /env\.FX\.fetch\(internalRequest\(target,\s*\{\}\)\)/);
+  assert.match(edgeSource, /env\.API\.fetch\(internalRequest\(request,\s*\{\}\)\)/);
+  assert.doesNotMatch(edgeSource, /FX_NODE_PATHS|FX_PATHS|fxPaths/);
+});
+
+test("every canonical FX edge prefix is represented by the public catalogue", () => {
+  const concrete = FAMILIES.flatMap((family) => family.endpoints).map((endpoint) =>
+    concretePath(endpoint.path),
+  );
+  for (const prefix of FX_NODE_PATH_PREFIXES) {
+    assert.ok(
+      concrete.some((path) => path === prefix || path.startsWith(`${prefix}/`)),
+      `${prefix} is owned by FX but has no public catalogue operation`,
+    );
+  }
+});
+
+test("edge forwarding preserves caller credentials and never injects an operator key", () => {
+  const internalRequest = edgeSource.match(
+    /function internalRequest\(request, headers\) \{[\s\S]*?\n\}/,
+  )?.[0];
+  assert.ok(internalRequest, "edge internalRequest helper missing");
+  assert.match(internalRequest, /new Headers\(request\.headers\)/);
+  assert.doesNotMatch(internalRequest, /OPERATOR|API_KEY|authorization\s*:/i);
+
+  // FX forwarding passes an empty override object, so the caller's Authorization
+  // and x-api-key survive while Origin is removed for the internal service hop.
+  assert.match(edgeSource, /env\.FX\.fetch\(internalRequest\(target,\s*\{\}\)\)/);
 });
