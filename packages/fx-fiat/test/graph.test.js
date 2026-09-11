@@ -50,7 +50,7 @@ function fiatIntent(
     rail: "DUITNOW",
     providerId: "fiat-provider",
     policyAuthorizationId: "auth-fiat",
-    createdAt: NOW,
+    createdAt: NOW - 1_000,
     expiresAt: NOW + 60_000,
     nonce: id,
   };
@@ -103,6 +103,7 @@ test("mixed fiat-token route explicitly reports mixed finality", () => {
       fromAsset: "MYR",
       toAsset: "USDC",
       providerId: "fiat-provider",
+      settlementWindowMs: 5_000,
     }),
   );
   graph.upsertEdge(
@@ -117,6 +118,7 @@ test("mixed fiat-token route explicitly reports mixed finality", () => {
       fromAsset: "EURC",
       toAsset: "EUR",
       providerId: "issuer",
+      settlementWindowMs: 30_000,
     }),
   );
 
@@ -130,6 +132,28 @@ test("mixed fiat-token route explicitly reports mixed finality", () => {
     "ATOMIC",
     "ASYNC_EXTERNAL",
   ]);
+});
+
+test("settlement edges reject self-routes malformed windows and non-object metadata", () => {
+  const graph = new SettlementGraph();
+  assert.throws(
+    () => graph.upsertEdge(edge({ toAsset: "USDC" })),
+    /different assets/,
+  );
+  assert.throws(
+    () => graph.upsertEdge(edge({ settlementWindowMs: -1 })),
+    /settlementWindowMs/,
+  );
+  assert.throws(
+    () => graph.upsertEdge(edge({ metadata: [] })),
+    /metadata must be an object/,
+  );
+});
+
+test("route cannot reuse one edge as if it were independent capacity", () => {
+  const graph = new SettlementGraph();
+  graph.upsertEdge(edge({ edgeId: "a" }));
+  assert.throws(() => graph.analyzeRoute(["a", "a"]), /cannot reuse/);
 });
 
 test("unavailable or unauthorized edge cannot enter route", () => {
