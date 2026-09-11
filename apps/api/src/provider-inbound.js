@@ -3,7 +3,8 @@
  * Outbound provider jobs cover commands Blueballs initiates. Real institutions
  * also receive provider-originated facts such as settled account credits and
  * custody deposits. This module applies only canonical, already-settled evidence
- * delivered through the operator-authenticated internal route.
+ * delivered through the private operator route and signed with the dedicated
+ * provider-inbound secret.
  */
 import { createHash } from "node:crypto";
 import {
@@ -13,25 +14,20 @@ import {
   setCommandContext,
   toMinor,
 } from "./lib.js";
+import {
+  canonicalProviderInboundBody,
+  verifyProviderInboundBody,
+} from "./provider-inbound-auth.js";
 
 const SUPPORTED = new Set([
   "payments.account_credit_settled",
   "custody.wallet_deposit_settled",
 ]);
 
-function stable(value) {
-  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stable(value[key])}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function fingerprint(body) {
-  return createHash("sha256").update(stable(body)).digest("hex");
+  return createHash("sha256")
+    .update(canonicalProviderInboundBody(body))
+    .digest("hex");
 }
 
 function required(body, name) {
@@ -102,6 +98,11 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
     );
   }
 
+  // The generic operator credential protects the private route. The dedicated
+  // provider signature protects the financial evidence itself, giving inbound
+  // money two independent deployment-owned authentication controls.
+  verifyProviderInboundBody(body);
+
   const eventId = String(required(body, "event_id"));
   if (!/^[A-Za-z0-9._:-]{6,200}$/.test(eventId)) {
     throw new ApiError(
@@ -134,6 +135,9 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
     throw new ApiError("not-found", 404, `No tenant ${tenantId}`);
   }
 
+  // Authentication metadata is intentionally excluded from the evidence
+  // fingerprint. A legitimate retry can carry a fresh timestamp/signature while
+  // still representing the exact same durable provider fact.
   const hash = fingerprint(body);
   const prior = inboundEvents.get(eventId);
   if (prior) {
