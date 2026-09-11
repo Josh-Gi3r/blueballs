@@ -50,6 +50,11 @@ export function assertResourceLifecycle({ method, pattern, ctx, db }) {
     return;
   }
 
+  if (method === "POST" && pattern === "/v2/applications") {
+    if (body.customer) activeCustomer(db, body.customer, key);
+    return;
+  }
+
   if (method === "POST" && pattern === "/v2/cards") {
     const customer = activeCustomer(db, body.customer, key);
     const account = openAccount(db, body.account, key);
