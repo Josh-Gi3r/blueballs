@@ -37,6 +37,71 @@ function asAmount(value) {
   return amount;
 }
 
+function assertStringList(values, field) {
+  if (!Array.isArray(values)) throw new TypeError(`${field} must be an array`);
+  for (const value of values) {
+    if (typeof value !== "string" || value.length === 0) {
+      throw new TypeError(`${field} entries must be non-empty strings`);
+    }
+  }
+}
+
+function validatePolicyShape(policy) {
+  assertStringList(policy.enabledParticipantTypes, "enabledParticipantTypes");
+  assertStringList(policy.allowedAssets, "allowedAssets");
+  assertStringList(policy.allowedCorridors, "allowedCorridors");
+  assertStringList(policy.blockedJurisdictions, "blockedJurisdictions");
+
+  for (const type of policy.enabledParticipantTypes) {
+    if (!PARTICIPANT_TYPES.has(type))
+      throw new RangeError(`unsupported participant type: ${type}`);
+  }
+
+  if (
+    !policy.requiredCredentials ||
+    typeof policy.requiredCredentials !== "object" ||
+    Array.isArray(policy.requiredCredentials)
+  ) {
+    throw new TypeError("requiredCredentials must be an object");
+  }
+  for (const [type, credentials] of Object.entries(policy.requiredCredentials)) {
+    if (!PARTICIPANT_TYPES.has(type))
+      throw new RangeError(`unsupported credential participant type: ${type}`);
+    assertStringList(credentials, `requiredCredentials.${type}`);
+  }
+
+  if (
+    !policy.maxTicketByType ||
+    typeof policy.maxTicketByType !== "object" ||
+    Array.isArray(policy.maxTicketByType)
+  ) {
+    throw new TypeError("maxTicketByType must be an object");
+  }
+  for (const [type, value] of Object.entries(policy.maxTicketByType)) {
+    if (!PARTICIPANT_TYPES.has(type))
+      throw new RangeError(`unsupported ticket participant type: ${type}`);
+    asAmount(value);
+  }
+
+  const assets = new Set(policy.allowedAssets);
+  for (const corridor of policy.allowedCorridors) {
+    const parts = corridor.split("/");
+    if (
+      parts.length !== 2 ||
+      !parts[0] ||
+      !parts[1] ||
+      parts[0] === parts[1]
+    ) {
+      throw new RangeError(`invalid allowed corridor: ${corridor}`);
+    }
+    if (!assets.has(parts[0]) || !assets.has(parts[1])) {
+      throw new RangeError(
+        `allowed corridor ${corridor} references an asset outside allowedAssets`,
+      );
+    }
+  }
+}
+
 export class FxPolicyEngine {
   constructor({ path = ":memory:", now = () => Date.now() } = {}) {
     this.now = now;
@@ -134,11 +199,25 @@ export class FxPolicyEngine {
       maxTicketByType: policy.maxTicketByType ?? {},
       authorizationTtlMs: policy.authorizationTtlMs,
     };
-    for (const type of normalized.enabledParticipantTypes) {
-      if (!PARTICIPANT_TYPES.has(type))
-        throw new RangeError(`unsupported participant type: ${type}`);
-    }
+    validatePolicyShape(normalized);
+
     const snapshotHash = hashSnapshot(normalized);
+    const existing = this.db
+      .prepare("SELECT * FROM fx_policy WHERE singleton = 1")
+      .get();
+    if (existing?.snapshot_hash === snapshotHash) {
+      return { ...normalized, snapshotHash };
+    }
+    if (
+      existing &&
+      existing.policy_id === normalized.policyId &&
+      normalized.version <= Number(existing.version)
+    ) {
+      throw new RangeError(
+        "policy version must increase when policy content changes",
+      );
+    }
+
     this.db
       .prepare(
         `
@@ -508,6 +587,15 @@ export class FxPolicyEngine {
       policy.policyId !== row.policy_id ||
       policy.version !== row.policy_version
     ) {
+      return { valid: false, reason: "POLICY_CHANGED" };
+    }
+    let decisionSnapshot;
+    try {
+      decisionSnapshot = parseJson(row.decision_snapshot_json);
+    } catch {
+      return { valid: false, reason: "AUTHORIZATION_CORRUPT" };
+    }
+    if (decisionSnapshot.policySnapshotHash !== policy.snapshotHash) {
       return { valid: false, reason: "POLICY_CHANGED" };
     }
     return { valid: true, authorizationId };
