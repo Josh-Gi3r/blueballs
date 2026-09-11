@@ -28,15 +28,23 @@ provider-neutral foreign-exchange runtime in one repository.
 The engineering target is production-grade core infrastructure: financial state
 must be exact, atomic, retry-safe, tenant-isolated, observable and contract-tested.
 The current pre-1.0 line is being hardened against that standard; remaining
-release blockers and their machine-verifiable acceptance criteria are tracked in
+release evidence and external gates are tracked in
 [PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md).
 
 A deploying institution still owns what cannot safely or legally be universal:
 licences, regulated providers, credentials, jurisdiction-specific policy,
-customer protections and deployment operations. Banks, identity providers, card
-issuers, payment rails, custody systems and liquidity venues connect through
-versioned deployment-owned adapters; inclusion in the provider directory never
-implies a partnership or live integration.
+human IAM, customer protections and deployment operations. Banks, identity
+providers, card issuers, payment rails, custody systems and liquidity venues
+connect through versioned deployment-owned adapters; inclusion in the provider
+directory never implies a partnership or live integration.
+
+Blueballs deliberately keeps executable reference/simulation operations in the
+same catalogue. `BANK_API_MODE=production` fails closed before any operation that
+would otherwise pretend an unconnected processor, mandate engine, lending/savings
+policy, document store or historical FX compatibility workflow is production.
+The machine-readable boundary lives in
+[`spec/banking/operation-modes.mjs`](spec/banking/operation-modes.mjs) and is
+explained in [`docs/OPERATION-MODES.md`](docs/OPERATION-MODES.md).
 
 ## What is included
 
@@ -47,17 +55,20 @@ implies a partnership or live integration.
 - Atomic financial command boundaries covering resource state, ledger, events,
   outboxes, idempotency and audit correlation.
 - Durable provider and webhook outboxes with retry/reconciliation semantics.
-- Provider-neutral production adapters for payments, cards, receiving details,
-  identity and custody, plus signed provider-originated settlement facts.
+- Provider-neutral production adapters for payments, card issuance, receiving
+  details, identity and custody, plus signed provider-originated settlement
+  facts.
+- Scoped machine credentials plus signed named-human attribution from an
+  institution-owned IAM/session gateway.
 - A sandbox builder for creating and testing tenant-isolated product models.
 - A canonical FX runtime for policy, pricing, liquidity selection, reservation
   and settlement state.
-- Optional Solidity contracts for token backing, authorization, cancellation
-  and atomic settlement.
+- Optional Solidity contracts for token backing, authorization, cancellation and
+  atomic settlement.
 - A dependency-free JavaScript FX SDK and OpenAPI contracts.
 - Node.js/SQLite and Cloudflare Workers/Durable Objects runtimes.
-- Production health/readiness/metrics, verified SQLite backup/restore tooling and
-  release/security gates.
+- Production health/readiness/metrics, verified SQLite backup/restore tooling,
+  migration/restart/eviction tests and release/security gates.
 
 ## Explore the product
 
@@ -127,7 +138,8 @@ has not been configured. A simulation on the public site is never evidence that
 a production adapter is connected.
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md) for data ownership, runtime topology and
-extension boundaries.
+extension boundaries, and [`docs/SCALING.md`](docs/SCALING.md) for the supported
+single-writer shard and future tenant-sharding model.
 
 ## Financial and security boundaries
 
@@ -143,6 +155,9 @@ extension boundaries.
   idempotency and explicit ambiguous/reconciliation states.
 - Production provider and webhook signing payloads are encrypted before durable
   persistence; provider-originated settlement facts are independently signed.
+- Human session authentication remains deployment-owned; optional signed actor
+  assertions preserve named-person attribution without exposing backend machine
+  credentials to browsers.
 - FX liquidity is policy-checked before it can compete on price.
 - A firm FX quote exists only after all selected capacity is reserved.
 - Fiat submission and settlement remain distinct states.
@@ -175,15 +190,16 @@ pnpm lint
 pnpm test:api
 pnpm test:fx
 pnpm test:workers
-pnpm security:secrets
-pnpm security:dependencies
+pnpm stress:chaos
+pnpm security:release
+pnpm security:container   # Docker required
 ```
 
-The hosted gate additionally exercises the reference container/Compose topology,
-Cloudflare runtime/eviction tests, Foundry fuzz/invariants and CodeQL. The banking
-suite emits a machine-readable operation-coverage artifact and fails if a
-success-capable documented operation never returns a schema-valid success during
-the integration suite.
+The hosted gate additionally builds/scans the reference container, validates the
+Compose topology, exercises Cloudflare runtime/eviction tests, runs Foundry
+fuzz/invariants and performs CodeQL. The banking suite emits a machine-readable
+operation-coverage artifact and fails if a success-capable documented operation
+never returns a schema-valid success during the integration suite.
 
 A release is considered verified only when the exact release checkout passes the
 local gate, the required hosted gate is green for that SHA, and the release
@@ -191,9 +207,9 @@ evidence described in [PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md) is
 retained. A successful frontend build, static OpenAPI file or screenshot is not
 financial-runtime evidence.
 
-Foundry is required for the Solidity test suite. Docker and Wrangler are needed
-for their respective deployment workflows. See [TESTING.md](TESTING.md) for the
-complete setup.
+See [TESTING.md](TESTING.md), [`docs/LOAD-CHAOS.md`](docs/LOAD-CHAOS.md) and
+[`docs/SECURITY-VERIFICATION.md`](docs/SECURITY-VERIFICATION.md) for the complete
+verification model.
 
 ## Documentation
 
@@ -202,6 +218,9 @@ complete setup.
 | [VISION.md](VISION.md) | Product direction and boundaries |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Components, ownership and extension points |
 | [PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md) | Production release blockers and acceptance criteria |
+| [docs/OPERATION-MODES.md](docs/OPERATION-MODES.md) | Production-safe vs sandbox/reference API boundary |
+| [docs/IAM.md](docs/IAM.md) | Machine credentials, human IAM assertions, step-up and dual control |
+| [docs/SCALING.md](docs/SCALING.md) | Single-writer shards, tenant routing and scale-out invariants |
 | [SANDBOX.md](SANDBOX.md) | Sandbox Builder product and API |
 | [apps/api/README.md](apps/api/README.md) | Banking runtime |
 | [apps/fx-node/README.md](apps/fx-node/README.md) | FX runtime |
@@ -212,14 +231,16 @@ complete setup.
 | [docs/partners/README.md](docs/partners/README.md) | Provider directory standards |
 | [OPERATIONS.md](OPERATIONS.md) | Deployment and operations entry point |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | SRE, monitoring, backup/restore and DR runbook |
+| [docs/PRODUCTION-OPERATIONS.md](docs/PRODUCTION-OPERATIONS.md) | HA, RPO/RTO, DR and secret rotation standard |
+| [docs/LOAD-CHAOS.md](docs/LOAD-CHAOS.md) | Load, soak, restart and chaos procedure |
+| [docs/SECURITY-VERIFICATION.md](docs/SECURITY-VERIFICATION.md) | Local/hosted security verification and external review bar |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and production boundaries |
 
 ## Contributing
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before
-changing public contracts, ledger behavior, policy, pricing or settlement
-state.
+changing public contracts, ledger behavior, policy, pricing or settlement state.
 
 ## License
 
