@@ -10,10 +10,13 @@
     "PORT": "5281",
     "PUBLIC_SITE_URL": "https://blueballs.tech",
     "CORS_ORIGINS": "https://blueballs.tech",
-    "TRUST_PROXY": "false",
-    "WEBHOOK_DELIVERY_MODE": "disabled"
-    ,"BLUEBALLS_GIT_SHA": "development"
-    ,"SANDBOX_KEY_LIFETIME_HOURS": "24"
+    // Cloudflare is the trusted ingress for this Worker and overwrites
+    // cf-connecting-ip. Without this, the Node-compatible server may rate-limit
+    // every Worker request under the same internal/unknown socket address.
+    "TRUST_PROXY": "true",
+    "WEBHOOK_DELIVERY_MODE": "disabled",
+    "BLUEBALLS_GIT_SHA": "development",
+    "SANDBOX_KEY_LIFETIME_HOURS": "24"
   },
   "durable_objects": {
     "bindings": [
