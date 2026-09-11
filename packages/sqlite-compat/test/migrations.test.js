@@ -71,6 +71,66 @@ test("a failed migration rolls back its schema/data change and version marker", 
   assert.equal(table, undefined);
 });
 
+test("an interrupted data-transforming migration can restart safely without double-applying data", (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "blueballs-migration-restart-"));
+  const path = join(dir, "schema.sqlite");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const v1 = {
+    version: 1,
+    name: "create_accounts",
+    up(db) {
+      db.exec("CREATE TABLE migration_accounts (id TEXT PRIMARY KEY, cents INTEGER NOT NULL)");
+      db.prepare("INSERT INTO migration_accounts (id, cents) VALUES (?, ?)").run("acc_one", 100);
+    },
+  };
+  const interruptedV2 = {
+    version: 2,
+    name: "normalize_account_values",
+    up(db) {
+      db.prepare("UPDATE migration_accounts SET cents = cents + 25 WHERE id = ?").run("acc_one");
+      db.prepare("INSERT INTO migration_accounts (id, cents) VALUES (?, ?)").run("acc_two", 50);
+      throw new Error("simulated process interruption");
+    },
+  };
+
+  let database = new DatabaseSync(path);
+  migrate(database, "banking-test", [v1]);
+  assert.throws(
+    () => migrate(database, "banking-test", [v1, interruptedV2]),
+    /simulated process interruption/,
+  );
+  assert.equal(database.prepare("SELECT cents FROM migration_accounts WHERE id = ?").get("acc_one").cents, 100);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM migration_accounts").get().count, 1);
+  assert.deepEqual(
+    appliedMigrations(database, "banking-test").map((row) => Number(row.version)),
+    [1],
+  );
+  database.close();
+
+  // A restarted binary may retry an unapplied migration with the same immutable
+  // version/name. The earlier partial data changes must not survive or duplicate.
+  const repairedV2 = {
+    version: 2,
+    name: "normalize_account_values",
+    up(db) {
+      db.prepare("UPDATE migration_accounts SET cents = cents + 25 WHERE id = ?").run("acc_one");
+      db.prepare("INSERT INTO migration_accounts (id, cents) VALUES (?, ?)").run("acc_two", 50);
+    },
+  };
+  database = new DatabaseSync(path);
+  t.after(() => database.close());
+  const applied = migrate(database, "banking-test", [v1, repairedV2]);
+  assert.deepEqual(applied.map((row) => Number(row.version)), [1, 2]);
+  assert.equal(database.prepare("SELECT cents FROM migration_accounts WHERE id = ?").get("acc_one").cents, 125);
+  assert.equal(database.prepare("SELECT cents FROM migration_accounts WHERE id = ?").get("acc_two").cents, 50);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM migration_accounts").get().count, 2);
+
+  migrate(database, "banking-test", [v1, repairedV2]);
+  assert.equal(database.prepare("SELECT cents FROM migration_accounts WHERE id = ?").get("acc_one").cents, 125);
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM migration_accounts").get().count, 2);
+});
+
 test("older code fails closed against a newer applied schema", (t) => {
   const database = withDatabase(t);
   const v1 = {
