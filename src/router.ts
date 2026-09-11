@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 
 /** Minimal history-API router. Real URLs so every screen is linkable,
- *  refreshable and back-button friendly — no framework needed. */
+ * refreshable and back-button friendly — no framework needed.
+ *
+ * Navigation is broadcast through popstate after pushState so every mounted
+ * route boundary observes the same location change. Blueballs has a top-level
+ * SiteRoot router plus page-level consumers of usePath(); keeping those routers
+ * in sync is required for cross-shell routes such as /cards and /ecosystem.
+ */
 export function usePath(): [string, (p: string) => void] {
   const [path, setPath] = useState(() => window.location.pathname);
 
@@ -12,9 +18,12 @@ export function usePath(): [string, (p: string) => void] {
   }, []);
 
   const go = (p: string) => {
-    if (p === window.location.pathname) return;
+    if (p === window.location.pathname) {
+      window.scrollTo(0, 0);
+      return;
+    }
     window.history.pushState({}, "", p);
-    setPath(p);
+    window.dispatchEvent(new PopStateEvent("popstate"));
     window.scrollTo(0, 0);
   };
 
