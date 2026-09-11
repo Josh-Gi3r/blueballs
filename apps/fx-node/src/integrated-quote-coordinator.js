@@ -53,8 +53,15 @@ export class IntegratedQuoteCoordinator {
   } = {}) {
     if (!market || typeof market.getRoute !== "function")
       throw new TypeError("FxMarketService required");
-    if (!policyEngine || typeof policyEngine.authorize !== "function")
-      throw new TypeError("FxPolicyEngine required");
+    if (
+      !policyEngine ||
+      typeof policyEngine.authorize !== "function" ||
+      typeof policyEngine.verifyAuthorization !== "function"
+    ) {
+      throw new TypeError(
+        "FxPolicyEngine with authorize() and verifyAuthorization() required",
+      );
+    }
     if (!privateAdapter || typeof privateAdapter.listSlices !== "function") {
       throw new TypeError("PrivateMarketLiquidityAdapter required");
     }
@@ -153,9 +160,31 @@ export class IntegratedQuoteCoordinator {
         "customer is not eligible for this FX request",
         "POLICY_REJECTED",
         { reasons: decision.reasons },
+        403,
       );
     }
     return decision;
+  }
+
+  #assertCustomerAuthorization(quote) {
+    const authorizationId = quote.route.customerAuthorization?.authorizationId;
+    if (typeof authorizationId !== "string" || authorizationId.length === 0) {
+      throw errorWithCode(
+        "quote has no customer policy authorization",
+        "POLICY_AUTHORIZATION_INVALID",
+        undefined,
+        403,
+      );
+    }
+    const verification = this.policyEngine.verifyAuthorization(authorizationId);
+    if (!verification || verification.valid !== true) {
+      throw errorWithCode(
+        "customer policy authorization is no longer valid",
+        "POLICY_AUTHORIZATION_INVALID",
+        { reason: verification?.reason ?? "INVALID" },
+        403,
+      );
+    }
   }
 
   #markReservedLegsSubmitted(quote, submissionRef) {
@@ -238,7 +267,7 @@ export class IntegratedQuoteCoordinator {
     const desired = BigInt(String(exactOutput));
     if (desired <= 0n) throw new RangeError("exactOutput must be positive");
     if (!this.assetFor(inputAsset) || !this.assetFor(outputAsset)) {
-      throw errorWithCode("unknown reference asset", "VALIDATION_ERROR");
+      throw errorWithCode("unknown reference asset", "VALIDATION_ERROR", undefined, 400);
     }
 
     const now = this.now();
@@ -270,7 +299,7 @@ export class IntegratedQuoteCoordinator {
       });
     } catch (error) {
       if (error.code === "NO_LIQUIDITY") throw error;
-      throw errorWithCode(error.message, "NO_LIQUIDITY");
+      throw errorWithCode(error.message, "NO_LIQUIDITY", undefined, 409);
     }
 
     const reserved = await reservePlan({
@@ -417,6 +446,7 @@ export class IntegratedQuoteCoordinator {
       throw new Error(`quote cannot execute from ${quote.row.state}`);
     if (quote.row.expires_at <= this.now()) throw new Error("quote expired");
 
+    this.#assertCustomerAuthorization(quote);
     for (const leg of quote.route.reserved.legs) {
       const adapter = this.#adapterFor(leg.sourceType);
       if (typeof adapter.validateReserved === "function") {
