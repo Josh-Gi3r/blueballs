@@ -114,13 +114,22 @@ jobs:
       - run: make -C packages/fx-contracts ci
 
   container:
-    name: Reference container and Compose
+    name: Reference container, Compose and vulnerability scan
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - run: docker compose -f compose.reference.yml config --quiet
       - run: docker build --pull=false -f Dockerfile.reference -t blueballs/reference:${{ github.sha }} .
+      - name: Reject high/critical vulnerabilities in the reference image
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.66.0 image \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            blueballs/reference:${{ github.sha }}
 
   security:
     name: Secrets, dependencies and CodeQL
