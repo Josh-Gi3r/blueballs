@@ -1,17 +1,14 @@
 # Testing and Verification
 
-Blueballs keeps verification in the repository so contributors and operators can
-run the same correctness gates. Focused tests are useful during development; a
-release candidate requires the complete exact-checkout gate plus hosted
-`Production gate` evidence.
+Blueballs keeps its assurance model inside the repository so contributors, operators and institutions can reproduce the same gates from an exact checkout.
 
 ## Toolchain
 
-- Node.js 24.15 or newer within the pinned 24.x line
+- Node.js 24.15.x within the pinned 24.x line
 - pnpm from the root `packageManager` field
-- Foundry for Solidity tests and controlled EVM proof
-- Docker with Compose for reference-image / topology verification
-- Wrangler / Cloudflare Vitest for Worker and Durable Object checks
+- Foundry for Solidity unit, fuzz and invariant tests
+- Docker + Compose for reference topology and image scanning
+- Wrangler / Cloudflare Vitest for Worker and Durable Object runtime parity
 
 Install exactly from the lockfile:
 
@@ -19,41 +16,50 @@ Install exactly from the lockfile:
 pnpm install --frozen-lockfile
 ```
 
-## Complete repository gate
+## Standard engineering gate
 
 ```bash
 pnpm verify
 ```
 
-The root gate covers, directly or through the component suites:
+This gate covers:
 
-- banking HTTP workflows, tenant-negative cases, exact money, idempotency,
-  double-entry rollback and concurrency/double-spend invariants;
-- all 181 public banking catalogue operations for route/access coverage, with
-  successful schema-valid lifecycle evidence required for every success-capable
-  operation and deliberate fail-closed evidence for adapter-required operations;
-- request, query, success-response and documented-example validation against the
-  same contracts that generate banking OpenAPI;
+- build and TypeScript compilation;
+- syntax, ESLint and formatting;
+- complete banking API test suite;
+- all 181 public banking operations for route/access/lifecycle coverage;
+- schema-valid success evidence for success-capable operations;
+- exact-money, idempotency, double-entry rollback and concurrent-spend invariants;
+- tenant isolation and resource lifecycle boundaries;
 - command/request/audit/ledger/event correlation;
-- restart persistence, financial restart boundaries and consistent banking
-  snapshot/restore;
-- versioned migration ordering, atomic rollback and interruption/restart retry;
-- provider gateway finality, encryption, conformance fixtures, inbound HMAC
-  settlement evidence and reconciliation behavior;
-- webhook durable outbox/restart behavior and encrypted signing-secret storage;
-- all canonical FX package/node suites and exact-money compatibility paths;
-- Durable Object transaction rollback plus financial state across object
-  eviction;
-- all 181 public `/v2` catalogue paths against the shared production edge runtime
-  ownership contract;
-- ESLint, formatting, catalogue/schema/permission/runtime-ownership drift gates;
-- OpenAPI lint, generated TypeScript SDK declarations and FX SDK tarball boundary;
-- Foundry format, build, unit, fuzz and invariant checks;
-- Compose configuration validity.
+- provider finality, encryption, reconciliation and inbound signed settlement;
+- webhook durable outbox/restart/encryption behavior;
+- canonical FX package/node suites;
+- production FX runtime adapter conformance;
+- Cloudflare Worker/Durable Object transaction and eviction behavior;
+- public edge runtime ownership for all banking catalogue paths;
+- OpenAPI request/response/example drift gates;
+- generated banking TypeScript declarations and FX SDK package boundary;
+- Foundry format/build/unit/fuzz/invariant checks;
+- Compose topology validation;
+- live scratch-API tenant and money-movement checks.
 
-A Docker image build, container CVE scan and hosted CodeQL run need their
-respective release-machine/host environments and are enforced by the hosted
-production workflow. They are not implied by a frontend build or Compose parse.
+## Full release gate
+
+```bash
+pnpm verify:release
+```
+
+The release profile requires a clean checkout and adds:
+
+- tracked-secret scan;
+- production dependency advisory audit;
+- CycloneDX dependency inventory;
+- financial restart/chaos suite;
+- disposable banking + FX load proof;
+- reference-container build and HIGH/CRITICAL vulnerability scan.
+
+The release script records the exact commit, Git tree, runtime versions, lockfile digest, API operation coverage, load evidence, SBOM digest and per-gate results in `artifacts/verification-report.json`.
 
 ## Focused development commands
 
@@ -67,10 +73,8 @@ pnpm build:openapi
 pnpm lint:openapi
 pnpm security:release
 pnpm stress:chaos
+pnpm stress:release
 ```
-
-Use `pnpm run` to see the exact commands available at the current commit. Before
-claiming a focused pass, state which surface was actually executed.
 
 For Solidity only:
 
@@ -85,79 +89,89 @@ pnpm dev
 node examples/banking-quickstart.mjs http://localhost:5290
 ```
 
-## API operation coverage artifact
+## API operation coverage
 
-`pnpm test:api` records successful real HTTP calls by operation ID and writes:
+`pnpm test:api` records successful HTTP calls by operation ID and writes:
 
 ```text
 artifacts/api-operation-coverage.json
 ```
 
-The suite fails if any success-capable catalogue operation never produces a
-schema-valid 2xx response. Adapter-required operations are classified explicitly
-and must instead prove documented fail-closed behavior without their regulated
-adapter.
+The API suite is lifecycle-aware: a documented success-capable operation must actually return a schema-valid success during the integration suite rather than merely exist in the router.
 
-Do not substitute router reachability for this artifact.
+## Restart, recovery and migrations
 
-## Recovery and migration proof
-
-Banking recovery is executable:
+Banking recovery tooling is executable:
 
 ```bash
 pnpm backup:banking -- --source <bank.sqlite> --destination <backup.sqlite>
 pnpm restore:banking -- --backup <backup.sqlite> --destination <restored.sqlite>
 ```
 
-The automated recovery test validates SQLite integrity, schema version and exact
-ledger-derived money after restore. Migration tests additionally prove a failed
-data-transforming migration rolls back completely and can be retried after a
-process/database restart without double-applying rows.
+Automated recovery tests validate SQLite integrity, schema version and exact ledger-derived money after restore. Migration tests prove failed data transforms roll back atomically and can be retried after restart without double-applying state.
 
-## Load and chaos
-
-Use the deterministic failure bundle:
+The deterministic failure bundle is:
 
 ```bash
 pnpm stress:chaos
 ```
 
-Use the disposable-environment load harness:
+It exercises banking restart boundaries, webhook durability, recovery, FX lifecycle behavior and Cloudflare Durable Object financial eviction.
+
+## Load proof
+
+For a self-contained release check:
 
 ```bash
-LOAD_MODE=both LOAD_DURATION_SECONDS=300 LOAD_CONCURRENCY=25 \
-BANK_API_KEY=... BANK_ACCOUNT_ID=... pnpm stress:load
+pnpm stress:release
 ```
 
-See [`docs/LOAD-CHAOS.md`](docs/LOAD-CHAOS.md) for acceptance criteria. Never run
-the banking mutation harness against customer production data.
+This command starts disposable banking and FX runtimes, provisions a funded banking account, drives concurrent banking and FX traffic, requires the configured error-rate threshold, and writes:
+
+```text
+artifacts/load-report.json
+```
+
+For custom soak profiles against a disposable environment:
+
+```bash
+LOAD_MODE=both \
+LOAD_DURATION_SECONDS=300 \
+LOAD_CONCURRENCY=25 \
+BANK_API_KEY=... \
+BANK_ACCOUNT_ID=... \
+pnpm stress:load
+```
+
+See [`docs/LOAD-CHAOS.md`](docs/LOAD-CHAOS.md) for acceptance criteria.
 
 ## Security verification
 
 ```bash
 pnpm security:release
-pnpm security:container   # Docker required
+pnpm security:container
 pnpm sbom
 ```
 
-Hosted CI repeats dependency/secret checks, scans the reference image and runs
-CodeQL. See [`docs/SECURITY-VERIFICATION.md`](docs/SECURITY-VERIFICATION.md).
-Independent application/contract review remains mandatory before a public 1.0
-production-certification claim.
+`security:release` checks tracked credentials, production dependency advisories and lint rules. `security:container` builds the pinned reference image and scans it with the pinned Trivy container. `pnpm sbom` writes the CycloneDX inventory used in release evidence.
 
-## Release verification
+See [`docs/SECURITY-VERIFICATION.md`](docs/SECURITY-VERIFICATION.md).
 
-A release candidate must satisfy all of the following:
+## Release evidence
 
-1. exact checkout is clean and pinned to the intended commit;
-2. `pnpm install --frozen-lockfile` succeeds;
-3. `pnpm verify` succeeds and retained release proof names the commit;
-4. generated contracts/SDK artifacts show no source drift;
-5. reference image builds and Compose validates;
-6. Foundry gate passes;
-7. hosted `Production gate` for the exact commit is green;
-8. API operation coverage artifact is retained;
-9. security/SBOM evidence is retained;
-10. `main` protection requires the production status check and review policy.
+A full release verification produces or validates:
 
-The tagged release procedure and artifact list live in [`RELEASE.md`](RELEASE.md).
+1. exact commit and Git tree;
+2. clean checkout before and after the gate;
+3. pinned Node/pnpm identity;
+4. lockfile SHA-256;
+5. banking operation coverage;
+6. OpenAPI/SDK source synchronization;
+7. Foundry unit/fuzz/invariant pass;
+8. Cloudflare runtime/eviction pass;
+9. recovery and migration pass;
+10. security/dependency/container pass;
+11. load/chaos pass;
+12. CycloneDX inventory.
+
+The tagged release procedure lives in [`RELEASE.md`](RELEASE.md).
