@@ -24,10 +24,25 @@ const SUPPORTED = new Set([
   "custody.wallet_deposit_settled",
 ]);
 
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
 function fingerprint(body) {
-  return createHash("sha256")
-    .update(canonicalProviderInboundBody(body))
-    .digest("hex");
+  return sha256(canonicalProviderInboundBody(body));
+}
+
+function settlementKey(body) {
+  // Provider references are required to identify one final external settlement.
+  // A gateway with several upstream providers should supply a stable `source` so
+  // references that are only unique inside one provider namespace do not collide.
+  return sha256(
+    canonicalProviderInboundBody({
+      source: body.source ?? "default",
+      type: body.type,
+      provider_reference: body.provider_reference,
+    }),
+  );
 }
 
 function required(body, name) {
@@ -69,7 +84,14 @@ function ownedResource(collection, id, tenantId, noun) {
   return row;
 }
 
-function compactRecord({ body, money, resourceType, receivedAt, hash }) {
+function compactRecord({
+  body,
+  money,
+  resourceType,
+  receivedAt,
+  hash,
+  externalSettlementKey,
+}) {
   return {
     id: body.event_id,
     object: "provider_inbound_event",
@@ -81,10 +103,25 @@ function compactRecord({ body, money, resourceType, receivedAt, hash }) {
     provider_reference: body.provider_reference,
     provider_state: body.provider_state,
     source: body.source ?? null,
+    settlement_key: externalSettlementKey,
     fingerprint: hash,
     received_at: receivedAt,
     owner: body.tenant_id,
   };
+}
+
+function priorProviderSettlement(inboundEvents, body, externalSettlementKey) {
+  for (const prior of inboundEvents.values()) {
+    // New records carry a hashed canonical namespace key. The fallback preserves
+    // protection for pre-key records created by an earlier pre-1.0 binary.
+    const same = prior.settlement_key
+      ? prior.settlement_key === externalSettlementKey
+      : prior.type === body.type &&
+        String(prior.provider_reference) === String(body.provider_reference) &&
+        String(prior.source ?? "default") === String(body.source ?? "default");
+    if (same) return prior;
+  }
+  return null;
 }
 
 /** Apply one provider event. The caller supplies the versioned persistent map so
@@ -158,6 +195,24 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
       );
     }
     return { ...prior, replayed: true };
+  }
+
+  // Event IDs are transport replay identities. Provider reference identity is a
+  // second, independent money-safety boundary: one settled upstream movement may
+  // not be credited twice merely because a buggy gateway assigned a fresh event
+  // ID on retry.
+  const externalSettlementKey = settlementKey(body);
+  const priorSettlement = priorProviderSettlement(
+    inboundEvents,
+    body,
+    externalSettlementKey,
+  );
+  if (priorSettlement) {
+    throw new ApiError(
+      "conflict",
+      409,
+      `Provider settlement ${providerReference} was already applied as event ${priorSettlement.id}`,
+    );
   }
 
   const money = exactPositiveMoney(body);
@@ -263,6 +318,7 @@ export function applyProviderInboundEvent({ body, db, inboundEvents, mode }) {
     resourceType,
     receivedAt,
     hash,
+    externalSettlementKey,
   });
   inboundEvents.set(eventId, record);
   return record;
