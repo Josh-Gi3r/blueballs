@@ -1,13 +1,14 @@
 import { ApiError } from "./lib.js";
+import { bankingEnv } from "./runtime-env.js";
 
-const configuredMode = process.env.WEBHOOK_DELIVERY_MODE || "disabled";
+const configuredMode = String(bankingEnv("WEBHOOK_DELIVERY_MODE", "disabled"));
 if (!["disabled", "allowlist"].includes(configuredMode)) {
   throw new Error("WEBHOOK_DELIVERY_MODE must be disabled or allowlist");
 }
 export const WEBHOOK_DELIVERY_MODE = configuredMode;
 
 const allowedTargets = new Set(
-  String(process.env.WEBHOOK_ALLOWED_HOSTS || "")
+  String(bankingEnv("WEBHOOK_ALLOWED_HOSTS", ""))
     .split(",")
     .map((target) => target.trim().toLowerCase())
     .filter(Boolean),
@@ -18,8 +19,12 @@ if (WEBHOOK_DELIVERY_MODE === "allowlist" && allowedTargets.size === 0) {
   );
 }
 
-const MAX_CONCURRENCY = Number(process.env.WEBHOOK_MAX_CONCURRENCY || 8);
-if (!Number.isSafeInteger(MAX_CONCURRENCY) || MAX_CONCURRENCY < 1 || MAX_CONCURRENCY > 256) {
+const MAX_CONCURRENCY = Number(bankingEnv("WEBHOOK_MAX_CONCURRENCY", 8));
+if (
+  !Number.isSafeInteger(MAX_CONCURRENCY) ||
+  MAX_CONCURRENCY < 1 ||
+  MAX_CONCURRENCY > 256
+) {
   throw new Error("WEBHOOK_MAX_CONCURRENCY must be an integer between 1 and 256");
 }
 
