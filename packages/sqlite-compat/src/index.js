@@ -2,8 +2,10 @@
  * Small compatibility layer for the synchronous SQLite subset used by Blueballs.
  *
  * Local Node processes keep using node:sqlite. A Cloudflare Durable Object calls
- * setWorkerSql() before loading the API runtime, which swaps in its durable,
- * synchronous SQLite storage without changing the banking/FX domain code.
+ * setWorkerSql() before loading the API runtime and before every request/alarm.
+ * Worker statements therefore resolve the currently rebound durable storage at
+ * operation time, which preserves the long-lived in-isolate Node server across
+ * Durable Object recreation/eviction without retaining a stale storage object.
  */
 import { DatabaseSync as NodeDatabaseSync } from "node:sqlite";
 
@@ -23,6 +25,15 @@ export function setWorkerSql(storage) {
   workerStorage = storage;
 }
 
+function currentWorkerStorage() {
+  if (!workerStorage) {
+    throw new Error(
+      "Durable Object SQLite storage is not bound; call setWorkerSql(storage) before database work",
+    );
+  }
+  return workerStorage;
+}
+
 function assertSynchronous(result) {
   if (result && typeof result.then === "function") {
     throw new TypeError("transactionSync callback must be synchronous");
@@ -31,25 +42,24 @@ function assertSynchronous(result) {
 }
 
 class WorkerStatement {
-  constructor(sql, storage) {
+  constructor(sql) {
     this.sql = sql;
-    this.storage = storage;
   }
 
   all(...bindings) {
-    return this.storage.sql.exec(this.sql, ...bindings).toArray();
+    return currentWorkerStorage().sql.exec(this.sql, ...bindings).toArray();
   }
 
   get(...bindings) {
-    return this.storage.sql.exec(this.sql, ...bindings).toArray()[0];
+    return currentWorkerStorage().sql.exec(this.sql, ...bindings).toArray()[0];
   }
 
   iterate(...bindings) {
-    return this.storage.sql.exec(this.sql, ...bindings);
+    return currentWorkerStorage().sql.exec(this.sql, ...bindings);
   }
 
   run(...bindings) {
-    const cursor = this.storage.sql.exec(this.sql, ...bindings);
+    const cursor = currentWorkerStorage().sql.exec(this.sql, ...bindings);
     cursor.toArray();
     return { changes: cursor.rowsWritten ?? 0, lastInsertRowid: 0 };
   }
@@ -59,12 +69,10 @@ export class DatabaseSync {
   constructor(path, options) {
     if (workerStorage) {
       this.worker = true;
-      this.storage = workerStorage;
       this.native = null;
       return;
     }
     this.worker = null;
-    this.storage = null;
     // node:sqlite on Node 22 rejects an explicit `undefined` options argument
     // ("The \"options\" argument must be an object"), while Node 24 tolerates it.
     // Callers that pass no options must therefore reach the native constructor
@@ -91,13 +99,11 @@ export class DatabaseSync {
         "Durable Object transaction-control SQL is unsupported; use transactionSync(callback)",
       );
     }
-    return this.storage.sql.exec(sql);
+    return currentWorkerStorage().sql.exec(sql);
   }
 
   prepare(sql) {
-    return this.native
-      ? this.native.prepare(sql)
-      : new WorkerStatement(sql, this.storage);
+    return this.native ? this.native.prepare(sql) : new WorkerStatement(sql);
   }
 
   transactionSync(callback) {
@@ -114,7 +120,7 @@ export class DatabaseSync {
         throw error;
       }
     }
-    return this.storage.transactionSync(() => assertSynchronous(callback()));
+    return currentWorkerStorage().transactionSync(() => assertSynchronous(callback()));
   }
 
   close() {
