@@ -55,24 +55,17 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "POST /v2/subscriptions",
     "GET /v2/subscriptions",
 
-    // Historical banking-runtime FX/reference compatibility. Production FX is
-    // owned by the canonical FX node/provider integrations, never these fixture
-    // prices, local LP pools or manual settlement controls.
+    // Historical banking-runtime FX compatibility mutations. Public reference
+    // market-data reads remain readable/indicative, but tenant/operator state,
+    // quoting, execution and liquidity controls are sandbox/reference-only.
     "POST /v2/quotes",
     "GET /v2/quotes/:id",
     "POST /v2/quotes/:id/execute",
-    "GET /v2/rates",
-    "GET /v2/pairs",
-    "GET /v2/assets",
-    "GET /v2/corridors",
     "POST /v2/fx/quote",
     "POST /v2/fx/route",
     "POST /v2/ramps/on",
     "POST /v2/ramps/off",
     "GET /v2/ramps",
-    "GET /v2/fx/depth",
-    "GET /v2/fx/price",
-    "GET /v2/fx/pricing-model",
     "POST /v2/fx/rfq",
     "GET /v2/fx/rfq",
     "POST /v2/fx/rfq/:id/accept",
@@ -88,7 +81,6 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "GET /v2/fx/lp",
     "GET /v2/fx/lp/earnings",
     "POST /v2/fx/lp/:id/withdraw",
-    "GET /v2/fx/lp/pools",
 
     // Builder/reference simulation surfaces.
     "POST /v2/builder/projects",
