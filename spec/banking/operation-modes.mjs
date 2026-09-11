@@ -21,10 +21,13 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
 
     // Document payloads use the local inline document model. Production identity
     // submission itself is provider-backed; document binary storage is delegated
-    // to the deployment's encrypted object/document infrastructure.
+    // to the deployment's encrypted object/document infrastructure. The EDD
+    // endpoint includes a sandbox decision shortcut, so production decisions come
+    // only from the configured identity provider outcome contract.
     "POST /v2/applications/:id/documents",
     "GET /v2/applications/:id/documents/:did",
     "DELETE /v2/applications/:id/documents/:did",
+    "POST /v2/applications/:id/edd",
 
     // Card issuance is provider-backed in production. Network authorisation,
     // processor controls and disputes stay in the sandbox until their dedicated
