@@ -8,12 +8,14 @@ const SOURCE_TYPES = [
   "BANK_TREASURY",
   "BANK_PRINCIPAL",
 ];
+const INDEX_SCALE = 1_000_000n;
 
 function abs(value) {
   return value < 0n ? -value : value;
 }
 
 function seeded(seed) {
+  if (!Number.isSafeInteger(seed)) throw new RangeError("seed must be a safe integer");
   let state = BigInt(seed) & 0xffffffffn;
   return () => {
     state = (1664525n * state + 1013904223n) & 0xffffffffn;
@@ -25,8 +27,32 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function sourceKey(source) {
-  return `${source.sourceType}:${source.sourceId}`;
+function decimalScale(value, name) {
+  const text = String(value);
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(text)) {
+    throw new RangeError(`${name} must be a positive decimal with up to 6 places`);
+  }
+  const [whole, fraction = ""] = text.split(".");
+  const scaled =
+    BigInt(whole) * INDEX_SCALE + BigInt(fraction.padEnd(6, "0") || "0");
+  if (scaled <= 0n) throw new RangeError(`${name} must be positive`);
+  return scaled;
+}
+
+function probability(value, name) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    throw new RangeError(`${name} must be between 0 and 1`);
+  }
+  return parsed;
+}
+
+function basisPoints(value, name) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > 10_000) {
+    throw new RangeError(`${name} must be an integer between 0 and 10000`);
+  }
+  return parsed;
 }
 
 function assertSource(source) {
@@ -34,6 +60,8 @@ function assertSource(source) {
     throw new RangeError(`invalid sourceType ${source.sourceType}`);
   if (typeof source.sourceId !== "string" || !source.sourceId)
     throw new TypeError("sourceId required");
+  if (typeof source.online !== "boolean")
+    throw new TypeError(`source ${source.sourceId} online must be boolean`);
   for (const field of [
     "capacityBuy",
     "capacitySell",
@@ -45,9 +73,12 @@ function assertSource(source) {
     if (BigInt(String(source[field])) <= 0n)
       throw new RangeError(`${field} must be positive`);
   }
+  if (source.privateCapacityBps !== undefined) {
+    basisPoints(source.privateCapacityBps, "privateCapacityBps");
+  }
 }
 
-function makeSlice(source, direction, now, principalCapacity) {
+function makeSlice(source, direction, now, principalCapacity, referenceIndex) {
   if (!source.online) return null;
   let capacity = BigInt(
     direction === "BUY_B" ? source.capacityBuy : source.capacitySell,
@@ -60,6 +91,31 @@ function makeSlice(source, direction, now, principalCapacity) {
     capacity = capacity < principalCapacity ? capacity : principalCapacity;
   }
   if (capacity <= 0n) return null;
+
+  let inputNumerator = BigInt(
+    direction === "BUY_B"
+      ? source.inputNumeratorBuy
+      : source.inputNumeratorSell,
+  );
+  let inputDenominator = BigInt(
+    direction === "BUY_B"
+      ? source.inputDenominatorBuy
+      : source.inputDenominatorSell,
+  );
+
+  // Bank-principal pricing is the simulator's reference-price consumer. A move
+  // in B/A raises A required to buy B and symmetrically reduces B required to
+  // buy A. Keep the shock entirely fixed-point so repeated seeded runs are exact.
+  if (source.sourceType === "BANK_PRINCIPAL") {
+    if (direction === "BUY_B") {
+      inputNumerator *= referenceIndex;
+      inputDenominator *= INDEX_SCALE;
+    } else {
+      inputNumerator *= INDEX_SCALE;
+      inputDenominator *= referenceIndex;
+    }
+  }
+
   return {
     sourceType: source.sourceType,
     sourceId: source.sourceId,
@@ -67,16 +123,8 @@ function makeSlice(source, direction, now, principalCapacity) {
     inputAsset: direction === "BUY_B" ? "A" : "B",
     outputAsset: direction === "BUY_B" ? "B" : "A",
     maxOutput: capacity.toString(),
-    inputNumerator: String(
-      direction === "BUY_B"
-        ? source.inputNumeratorBuy
-        : source.inputNumeratorSell,
-    ),
-    inputDenominator: String(
-      direction === "BUY_B"
-        ? source.inputDenominatorBuy
-        : source.inputDenominatorSell,
-    ),
+    inputNumerator: inputNumerator.toString(),
+    inputDenominator: inputDenominator.toString(),
     policyAuthorizationId: `sim-auth:${source.sourceId}`,
     expiresAt: now + 1_000_000,
   };
@@ -89,9 +137,18 @@ function pct(n, d) {
 export function runSimulation(config) {
   if (!config || typeof config !== "object")
     throw new TypeError("config required");
-  const rng = seeded(config.seed ?? 1);
-  const sources = clone(config.sources ?? []);
+  const seed = config.seed ?? 1;
+  const rng = seeded(seed);
+  if (!Array.isArray(config.sources)) throw new TypeError("sources must be an array");
+  if (!Array.isArray(config.requests)) throw new TypeError("requests must be an array");
+  if (config.events !== undefined && !Array.isArray(config.events))
+    throw new TypeError("events must be an array");
+
+  const sources = clone(config.sources);
   sources.forEach(assertSource);
+  if (new Set(sources.map((source) => source.sourceId)).size !== sources.length) {
+    throw new Error("sourceId values must be unique so events are unambiguous");
+  }
 
   const hardLimit = BigInt(String(config.principalHardLimit ?? "0"));
   if (hardLimit <= 0n)
@@ -99,20 +156,33 @@ export function runSimulation(config) {
 
   const state = {
     referenceAvailable: true,
-    referenceIndex: Number(config.referenceIndex ?? 1),
-    settlementFailureProbability: Number(
+    referenceIndex: decimalScale(config.referenceIndex ?? "1", "referenceIndex"),
+    settlementFailureProbability: probability(
       config.settlementFailureProbability ?? 0,
+      "settlementFailureProbability",
     ),
     principalExposureB: BigInt(String(config.initialPrincipalExposureB ?? "0")),
-    peakPrincipalExposureAbs: 0n,
   };
   if (abs(state.principalExposureB) > hardLimit)
     throw new Error("initial principal exposure exceeds hard limit");
 
-  const events = [...(config.events ?? [])].sort((a, b) => a.at - b.at);
-  const requests = config.requests ?? [];
+  const requests = config.requests;
+  const events = clone(config.events ?? []);
+  for (const event of events) {
+    if (
+      !Number.isSafeInteger(event.at) ||
+      event.at < 0 ||
+      event.at > requests.length
+    ) {
+      throw new RangeError(
+        `event at must be an integer between 0 and ${requests.length}`,
+      );
+    }
+  }
+  events.sort((a, b) => a.at - b.at);
+
   const metrics = {
-    seed: config.seed ?? 1,
+    seed,
     requestedOrders: 0,
     filledOrders: 0,
     requestedVolume: 0n,
@@ -133,22 +203,30 @@ export function runSimulation(config) {
     else if (event.type === "REFERENCE_AVAILABLE")
       state.referenceAvailable = true;
     else if (event.type === "CHAIN_CONGESTION")
-      state.settlementFailureProbability = Number(
+      state.settlementFailureProbability = probability(
         event.failureProbability ?? 0.25,
+        "failureProbability",
       );
     else if (event.type === "CHAIN_RECOVERY")
-      state.settlementFailureProbability = Number(
+      state.settlementFailureProbability = probability(
         event.failureProbability ?? 0,
+        "failureProbability",
       );
-    else if (event.type === "PRICE_SHOCK")
-      state.referenceIndex *= Number(event.multiplier ?? 1);
-    else {
+    else if (event.type === "PRICE_SHOCK") {
+      const multiplier = decimalScale(event.multiplier ?? "1", "price shock multiplier");
+      state.referenceIndex = (state.referenceIndex * multiplier) / INDEX_SCALE;
+      if (state.referenceIndex <= 0n)
+        throw new Error("price shock produced a non-positive reference index");
+    } else {
       const source = sources.find((s) => s.sourceId === event.sourceId);
       if (!source) throw new Error(`event source not found: ${event.sourceId}`);
       if (event.type === "SOURCE_OFFLINE") source.online = false;
       else if (event.type === "SOURCE_ONLINE") source.online = true;
       else if (event.type === "CANCELLATION_STORM")
-        source.privateCapacityBps = Number(event.remainingBps ?? 1_000);
+        source.privateCapacityBps = basisPoints(
+          event.remainingBps ?? 1_000,
+          "remainingBps",
+        );
       else if (event.type === "CANCELLATION_RECOVERY")
         source.privateCapacityBps = 10_000;
       else throw new Error(`unknown event type: ${event.type}`);
@@ -184,6 +262,7 @@ export function runSimulation(config) {
         direction,
         i,
         principalCapacity > 0n ? principalCapacity : 0n,
+        state.referenceIndex,
       );
       if (slice) slices.push(slice);
     }
@@ -240,7 +319,11 @@ export function runSimulation(config) {
     }
   }
 
-  while (eventIndex < events.length) applyEvent(events[eventIndex++]);
+  while (eventIndex < events.length && events[eventIndex].at === requests.length) {
+    applyEvent(events[eventIndex++]);
+  }
+  if (eventIndex !== events.length)
+    throw new Error("SIMULATION_INVARIANT: unapplied event remained after final request");
 
   if (abs(state.principalExposureB) > hardLimit)
     throw new Error("SIMULATION_INVARIANT: principal hard limit exceeded");
@@ -267,6 +350,6 @@ export function runSimulation(config) {
     rejections: metrics.rejections,
     settlementFailures: metrics.settlementFailures,
     referenceOutageRequests: metrics.referenceOutageRequests,
-    referenceIndex: state.referenceIndex,
+    referenceIndex: Number(state.referenceIndex) / Number(INDEX_SCALE),
   };
 }
