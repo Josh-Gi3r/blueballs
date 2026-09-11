@@ -20,6 +20,46 @@ function quoteSqlString(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
+function validateMigrationHistory(database, { requireCurrentSchema }) {
+  const applied = database
+    .prepare(
+      "SELECT version, name FROM blueballs_schema_migrations WHERE component = ? ORDER BY version",
+    )
+    .all("banking")
+    .map((row) => ({ version: Number(row.version), name: row.name }));
+  if (!applied.length)
+    throw new Error("Backup has no banking schema migration history");
+
+  for (let index = 0; index < applied.length; index += 1) {
+    const row = applied[index];
+    const expectedVersion = index + 1;
+    if (row.version !== expectedVersion) {
+      throw new Error(
+        `Backup banking migration history is not contiguous; expected version ${expectedVersion}, found ${row.version}`,
+      );
+    }
+    const declared = BANKING_SCHEMA_MIGRATIONS[index];
+    if (!declared) {
+      throw new Error(
+        `Backup contains banking migration ${row.version} (${row.name}) newer than this checkout`,
+      );
+    }
+    if (declared.name !== row.name) {
+      throw new Error(
+        `Backup banking migration ${row.version} was applied as ${row.name}, but this checkout declares ${declared.name}`,
+      );
+    }
+  }
+
+  const latest = applied.at(-1);
+  if (requireCurrentSchema && latest.version !== LATEST_SCHEMA_VERSION) {
+    throw new Error(
+      `Backup schema is banking/${latest.version}; this checkout requires banking/${LATEST_SCHEMA_VERSION}`,
+    );
+  }
+  return latest;
+}
+
 export function validateBankingDatabase(path, { requireCurrentSchema = true } = {}) {
   const database = new DatabaseSync(resolve(path), { readOnly: true });
   try {
@@ -35,22 +75,12 @@ export function validateBankingDatabase(path, { requireCurrentSchema = true } = 
     if (!migrationTable) {
       throw new Error("Backup is not a versioned Blueballs banking database");
     }
-    const migration = database
-      .prepare(
-        "SELECT version, name FROM blueballs_schema_migrations WHERE component = ? ORDER BY version DESC LIMIT 1",
-      )
-      .get("banking");
-    if (!migration) throw new Error("Backup has no banking schema migration history");
-    if (requireCurrentSchema && Number(migration.version) !== LATEST_SCHEMA_VERSION) {
-      throw new Error(
-        `Backup schema is banking/${migration.version}; this checkout requires banking/${LATEST_SCHEMA_VERSION}`,
-      );
-    }
+    const latest = validateMigrationHistory(database, { requireCurrentSchema });
     return {
       integrity: "ok",
       schema_component: "banking",
-      schema_version: Number(migration.version),
-      schema_name: migration.name,
+      schema_version: latest.version,
+      schema_name: latest.name,
     };
   } finally {
     database.close();
@@ -67,7 +97,8 @@ export async function backupBankingDatabase({ source, destination }) {
   if (sourcePath === destinationPath) {
     throw new Error("Backup source and destination must be different paths");
   }
-  if (!(await exists(sourcePath))) throw new Error(`Banking database not found: ${sourcePath}`);
+  if (!(await exists(sourcePath)))
+    throw new Error(`Banking database not found: ${sourcePath}`);
   if (await exists(destinationPath)) {
     throw new Error(`Backup destination already exists: ${destinationPath}`);
   }
@@ -98,7 +129,8 @@ export async function restoreBankingDatabase({ backup, destination, force = fals
   if (backupPath === destinationPath) {
     throw new Error("Backup and restore destination must be different paths");
   }
-  if (!(await exists(backupPath))) throw new Error(`Backup not found: ${backupPath}`);
+  if (!(await exists(backupPath)))
+    throw new Error(`Backup not found: ${backupPath}`);
   const verification = validateBankingDatabase(backupPath);
   if ((await exists(destinationPath)) && !force) {
     throw new Error(
