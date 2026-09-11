@@ -21,7 +21,7 @@ function intent(id = "fiat-1") {
     rail: "DUITNOW",
     providerId: "provider-1",
     policyAuthorizationId: "auth-1",
-    createdAt: NOW,
+    createdAt: NOW - 1_000,
     expiresAt: NOW + 60_000,
     nonce: "1",
   };
@@ -38,8 +38,8 @@ function attestation(i, overrides = {}) {
     amount: i.amount,
     payerRefHash: hashRef(i.payerAccountRef),
     payeeRefHash: hashRef(i.payeeAccountRef),
-    settledAt: NOW + 1_000,
-    issuedAt: NOW + 1_100,
+    settledAt: NOW - 100,
+    issuedAt: NOW,
     expiresAt: NOW + 30_000,
     status: "VERIFIED",
     proofRef: "opaque:proof",
@@ -55,11 +55,14 @@ function submitted(store, id = "fiat-1") {
   return i;
 }
 
-test("fiat intent hash is deterministic bytes32 hex", () => {
+test("fiat intent hash is deterministic bytes32 hex and requires explicit nonce", () => {
   const first = hashFiatIntent(intent());
   const second = hashFiatIntent({ ...intent() });
   assert.equal(first, second);
   assert.match(first, /^0x[0-9a-f]{64}$/);
+  const missing = intent("missing-nonce");
+  delete missing.nonce;
+  assert.throws(() => hashFiatIntent(missing), /nonce required/);
 });
 
 test("external fiat intent cannot be cancelled after submission", () => {
@@ -93,6 +96,31 @@ test("verified attestation must match exact intent economics and counterparties"
   }
 });
 
+test("future-dated payment evidence is rejected", () => {
+  for (const [field, value] of [
+    ["settledAt", NOW + 1],
+    ["issuedAt", NOW + 1],
+  ]) {
+    const store = new FiatSettlementStore({ now: () => NOW });
+    store.registerVerifier({ verifierId: "verifier-1", verifierType: "TEE" });
+    const i = submitted(store, `future-${field}`);
+    assert.throws(
+      () => store.acceptAttestation(attestation(i, { [field]: value })),
+      new RegExp(`${field} invalid`),
+    );
+    assert.equal(store.getIntent(i.intentId).state, "SUBMITTED");
+    store.close();
+  }
+});
+
+test("observed payment timestamp cannot be in the future", () => {
+  const store = new FiatSettlementStore({ now: () => NOW });
+  const i = submitted(store, "future-observation");
+  assert.throws(() => store.observePayment(i.intentId, NOW + 1), /observedAt invalid/);
+  assert.equal(store.getIntent(i.intentId).state, "SUBMITTED");
+  store.close();
+});
+
 test("disabled verifier cannot attest a fiat payment", () => {
   const store = new FiatSettlementStore({ now: () => NOW });
   store.registerVerifier({
@@ -108,9 +136,10 @@ test("disabled verifier cannot attest a fiat payment", () => {
   store.close();
 });
 
-test("one payment id cannot satisfy two intents", () => {
+test("one provider payment id cannot satisfy two intents even through different verifiers", () => {
   const store = new FiatSettlementStore({ now: () => NOW });
   store.registerVerifier({ verifierId: "verifier-1", verifierType: "TEE" });
+  store.registerVerifier({ verifierId: "verifier-2", verifierType: "BANK_API" });
 
   const first = submitted(store, "first");
   store.acceptAttestation(attestation(first, { paymentId: "shared-payment" }));
@@ -119,7 +148,11 @@ test("one payment id cannot satisfy two intents", () => {
   assert.throws(
     () =>
       store.acceptAttestation(
-        attestation(second, { paymentId: "shared-payment" }),
+        attestation(second, {
+          attestationId: "att-second-other-verifier",
+          verifierId: "verifier-2",
+          paymentId: "shared-payment",
+        }),
       ),
     (error) => error.code === "PAYMENT_REPLAY",
   );
@@ -127,7 +160,7 @@ test("one payment id cannot satisfy two intents", () => {
   store.close();
 });
 
-test("duplicate attestation delivery is idempotent", () => {
+test("duplicate attestation delivery is idempotent only for identical evidence", () => {
   const store = new FiatSettlementStore({ now: () => NOW });
   store.registerVerifier({
     verifierId: "verifier-1",
@@ -139,30 +172,42 @@ test("duplicate attestation delivery is idempotent", () => {
     duplicate: false,
     attestationId: proof.attestationId,
   });
-  assert.deepEqual(store.acceptAttestation(proof), {
+  assert.deepEqual(store.acceptAttestation({ ...proof }), {
     duplicate: true,
     attestationId: proof.attestationId,
   });
+  assert.throws(
+    () => store.acceptAttestation({ ...proof, proofRef: "different-proof" }),
+    /different evidence/,
+  );
   assert.equal(store.getIntent(i.intentId).state, "VERIFIED");
   store.close();
 });
 
-test("verified intent settles once and duplicate settlement event is idempotent", () => {
+test("verified intent settles once and settlement event ids cannot cross intents", () => {
   const store = new FiatSettlementStore({ now: () => NOW });
   store.registerVerifier({
     verifierId: "verifier-1",
     verifierType: "INTERNAL_LEDGER",
   });
-  const i = submitted(store);
-  store.acceptAttestation(attestation(i));
+  const first = submitted(store, "settle-first");
+  store.acceptAttestation(attestation(first));
 
-  assert.deepEqual(store.settleVerifiedIntent(i.intentId, "event-1"), {
+  assert.deepEqual(store.settleVerifiedIntent(first.intentId, "event-1"), {
     duplicate: false,
   });
-  assert.equal(store.getIntent(i.intentId).state, "SETTLED");
-  assert.deepEqual(store.settleVerifiedIntent(i.intentId, "event-1"), {
+  assert.equal(store.getIntent(first.intentId).state, "SETTLED");
+  assert.deepEqual(store.settleVerifiedIntent(first.intentId, "event-1"), {
     duplicate: true,
   });
+
+  const second = submitted(store, "settle-second");
+  store.acceptAttestation(attestation(second));
+  assert.throws(
+    () => store.settleVerifiedIntent(second.intentId, "event-1"),
+    (error) => error.code === "PAYMENT_REPLAY",
+  );
+  assert.equal(store.getIntent(second.intentId).state, "VERIFIED");
   store.close();
 });
 
