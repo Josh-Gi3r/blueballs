@@ -57,7 +57,7 @@ export function BrandLockup({
   return (
     <a
       className="bb-brand-lockup"
-      href="/"
+      href="/home"
       aria-label="Blueballs home"
       style={{ color: "inherit", textDecoration: "none" }}
     >
