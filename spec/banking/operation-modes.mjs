@@ -9,14 +9,51 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "POST /v2/customers/:id/verify",
     "POST /v2/accounts/:id/credit",
     "POST /v2/wallets/:id/credit",
-    "POST /v2/cards/:id/authorisations",
     "POST /v2/transfers/:id/settle",
     "POST /v2/destinations/:id/verify",
 
-    // Recurring/direct-debit fixtures are not a production payment engine until
-    // a mandate-consent/provider execution capability is connected.
+    // Card issuance itself is provider-backed in production. Network
+    // authorisation/transaction ingestion, controls and disputes are still
+    // reference workflows and must not pretend a local state change reached a
+    // real processor.
+    "POST /v2/cards/:id/freeze",
+    "POST /v2/cards/:id/unfreeze",
+    "PATCH /v2/cards/:id/controls",
+    "GET /v2/cards/:id/transactions",
+    "GET /v2/cards/:id/statements",
+    "POST /v2/cards/:id/authorisations",
+    "GET /v2/authorisations/:id",
+    "GET /v2/authorisations",
+    "POST /v2/authorisations/:id/approve",
+    "POST /v2/authorisations/:id/decline",
+    "POST /v2/disputes",
+    "GET /v2/disputes/:id",
+    "GET /v2/disputes",
+    "POST /v2/disputes/:id/evidence",
+
+    // Savings/credit economics are reference product models until a deployment
+    // supplies institution-approved rate, accrual/posting and credit-risk
+    // policy rather than caller-configured/reference terms.
+    "POST /v2/vaults",
+    "GET /v2/vaults/:id",
+    "GET /v2/vaults",
+    "POST /v2/vaults/:id/deposit",
+    "POST /v2/vaults/:id/withdraw",
+    "DELETE /v2/vaults/:id",
+    "POST /v2/credit",
+    "GET /v2/credit/:id",
+    "GET /v2/credit",
+    "POST /v2/credit/:id/draw",
+    "POST /v2/credit/:id/repay",
+
+    // Payment-link and recurring-payment fixtures do not execute through a
+    // connected production collection/mandate provider yet.
+    "POST /v2/links",
+    "GET /v2/links/:id",
     "POST /v2/mandates",
+    "GET /v2/mandates/:id",
     "POST /v2/subscriptions",
+    "GET /v2/subscriptions",
 
     // Historical banking-runtime FX/reference compatibility. Production FX is
     // owned by the canonical FX node/provider integrations, never these fixture
