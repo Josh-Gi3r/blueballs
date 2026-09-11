@@ -1,5 +1,5 @@
-import { env, evictDurableObject } from "cloudflare:test";
-import { exports } from "cloudflare:workers";
+import { evictDurableObject } from "cloudflare:test";
+import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 
 const INSTANCE = "blueballs-public-sandbox-v2";
