@@ -42,3 +42,22 @@ test("transactionSync rolls back and propagates the original exception", () => {
   assert.deepEqual(db.prepare("SELECT value FROM values_table").all(), []);
   db.close();
 });
+
+test("transactionSync rejects async callbacks before committing staged writes", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec("CREATE TABLE values_table (value TEXT NOT NULL)");
+
+  assert.throws(
+    () =>
+      db.transactionSync(() => {
+        db.prepare("INSERT INTO values_table (value) VALUES (?)").run(
+          "must roll back",
+        );
+        return Promise.resolve("too late");
+      }),
+    /callback must be synchronous/,
+  );
+
+  assert.deepEqual(db.prepare("SELECT value FROM values_table").all(), []);
+  db.close();
+});
