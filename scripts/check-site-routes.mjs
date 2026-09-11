@@ -61,7 +61,7 @@ assert.match(
 );
 
 // Cross-shell navigation is one location contract: both SiteRoot and page-level
-// route consumers must observe the same History API transition.
+// route consumers observe the same History API transition through usePath().
 assert.match(
   router,
   /history\.pushState\([\s\S]*dispatchEvent\(new PopStateEvent\("popstate"\)\)/,
@@ -69,13 +69,23 @@ assert.match(
 );
 assert.match(
   siteRoot,
-  /if \(path === "\/cards"\) return <DirectoryShell page="cards" \/>/,
+  /const \[path, navigate\] = usePath\(\)/,
+  "SiteRoot must use the shared browser-location router",
+);
+assert.match(
+  siteRoot,
+  /if \(path === "\/cards"\)[\s\S]{0,120}<DirectoryShell page="cards" navigate=\{navigate\} \/>/,
   "SiteRoot must own the canonical /cards page",
 );
 assert.match(
   siteRoot,
-  /if \(path === "\/ecosystem"\) return <DirectoryShell page="ecosystem" \/>/,
+  /if \(path === "\/ecosystem"\)[\s\S]{0,120}<DirectoryShell page="ecosystem" navigate=\{navigate\} \/>/,
   "SiteRoot must own the canonical /ecosystem page",
+);
+assert.match(
+  siteRoot,
+  /\["Stablecoin FX", "\/fx"\][\s\S]{0,180}\["Developers", "\/developers"\][\s\S]{0,180}\["Cards", "\/cards"\][\s\S]{0,180}\["Providers", "\/ecosystem"\]/,
+  "directory pages must keep the same primary menu sequence as the main site",
 );
 assert.match(
   brand,
@@ -144,5 +154,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: cross-shell navigation is synchronized and Cards has one canonical public implementation",
+  "site route contract: shared navigation is synchronized and Cards has one canonical public implementation",
 );
