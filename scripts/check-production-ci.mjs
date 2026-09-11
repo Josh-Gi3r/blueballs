@@ -23,6 +23,7 @@ if (!existsSync(workflowPath)) {
     ["frozen dependency install", /pnpm install --frozen-lockfile/],
     ["banking API proof", /pnpm test:api/],
     ["Worker runtime proof", /pnpm test:workers/],
+    ["financial restart\/chaos proof", /pnpm stress:chaos/],
     ["FX proof", /pnpm test:fx/],
     ["Solidity fuzz\/invariant gate", /make -C packages\/fx-contracts ci/],
     ["reference container build", /docker build[^\n]*Dockerfile\.reference/],
@@ -39,12 +40,12 @@ if (!existsSync(workflowPath)) {
   }
 
   if (
-    !/needs:\s*\[[^\]]*banking_api[^\]]*workers[^\]]*fx[^\]]*contracts[^\]]*container[^\]]*security[^\]]*\]/s.test(
+    !/needs:\s*\[[^\]]*banking_api[^\]]*workers[^\]]*resilience[^\]]*fx[^\]]*contracts[^\]]*container[^\]]*security[^\]]*\]/s.test(
       source,
     )
   ) {
     failures.push(
-      `${workflowPath}: final gate does not depend on every production test/security family`,
+      `${workflowPath}: final gate does not depend on every production test/security/resilience family`,
     );
   }
 }
@@ -63,5 +64,5 @@ if (failures.length) {
 }
 
 console.log(
-  "production CI contract: hosted build, runtime, container and security gates present and locally enforced",
+  "production CI contract: hosted build, runtime, resilience, container and security gates present and locally enforced",
 );
