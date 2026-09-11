@@ -17,6 +17,7 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
     error IntentExpired();
     error InvalidTakerSignature();
     error PolicyAuthorizationInvalid();
+    error PolicyAuthorizationMismatch();
     error NonceAlreadyUsed();
     error EmptyRoute();
     error WrongAssetPair();
@@ -39,6 +40,13 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
         "TakerIntent(address taker,address inputToken,address outputToken,uint256 maxInput,uint256 minOutput,address recipient,uint64 deadline,uint256 nonce,bytes32 policyAuthorizationHash)"
     );
 
+    /// @dev Institution policy authorizes these exact taker constraints before the
+    /// taker signs the final TakerIntent containing the resulting authorization hash.
+    /// The EIP-712 domain binds the authorization to this router deployment and chain.
+    bytes32 public constant POLICY_INTENT_TYPEHASH = keccak256(
+        "PolicyIntent(address taker,address inputToken,address outputToken,uint256 maxInput,uint256 minOutput,address recipient,uint64 deadline,uint256 nonce)"
+    );
+
     FxSettlement public immutable settlement;
     PolicyAuthorizationRegistry public immutable policyRegistry;
     mapping(address taker => mapping(uint256 nonce => bool used)) public usedNonce;
@@ -57,6 +65,27 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
         return _hashTypedDataV4(_hashTakerIntentStruct(intent));
     }
 
+    /// @notice Exact institution-policy authorization hash for this intent's constraints.
+    /// @dev Excludes only policyAuthorizationHash itself so policy can authorize first;
+    /// the taker subsequently signs the full intent including this returned hash.
+    function hashPolicyIntent(FxTypes.TakerIntent calldata intent) public view returns (bytes32) {
+        return _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    POLICY_INTENT_TYPEHASH,
+                    intent.taker,
+                    intent.inputToken,
+                    intent.outputToken,
+                    intent.maxInput,
+                    intent.minOutput,
+                    intent.recipient,
+                    intent.deadline,
+                    intent.nonce
+                )
+            )
+        );
+    }
+
     /// @notice Execute a route. Anyone may submit it, but customer and institution authority are both required.
     /// @dev Every external state change rolls back if final max-input/min-output checks fail.
     function execute(
@@ -68,7 +97,12 @@ contract AtomicRouter is EIP712, ReentrancyGuard {
         if (block.timestamp > intent.deadline) revert IntentExpired();
         if (fills.length == 0) revert EmptyRoute();
         if (usedNonce[intent.taker][intent.nonce]) revert NonceAlreadyUsed();
-        if (!policyRegistry.isValid(intent.policyAuthorizationHash)) {
+
+        bytes32 expectedPolicyAuthorizationHash = hashPolicyIntent(intent);
+        if (intent.policyAuthorizationHash != expectedPolicyAuthorizationHash) {
+            revert PolicyAuthorizationMismatch();
+        }
+        if (!policyRegistry.isValid(expectedPolicyAuthorizationHash)) {
             revert PolicyAuthorizationInvalid();
         }
 
