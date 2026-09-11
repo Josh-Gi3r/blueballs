@@ -5,12 +5,15 @@ function args(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const value = argv[i];
-    if (value === "--db") out.source = argv[++i];
-    else if (value === "--out") out.destination = argv[++i];
+    if (value === "--db" || value === "--source") out.source = argv[++i];
+    else if (value === "--out" || value === "--destination")
+      out.destination = argv[++i];
     else throw new Error(`Unknown argument ${value}`);
   }
   if (!out.source || !out.destination) {
-    throw new Error("Usage: node scripts/backup-banking.mjs --db <blueballs.sqlite> --out <backup.sqlite>");
+    throw new Error(
+      "Usage: node scripts/backup-banking.mjs (--db|--source) <blueballs.sqlite> (--out|--destination) <backup.sqlite>",
+    );
   }
   return out;
 }
