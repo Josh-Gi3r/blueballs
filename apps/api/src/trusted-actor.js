@@ -6,9 +6,13 @@
  * to the authenticated machine credential AND exact request intent so it cannot
  * be replayed onto a different body/query during its clock-skew window.
  */
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { ApiError } from "./lib.js";
 import { bankingEnv } from "./runtime-env.js";
+import {
+  trustedActorMessage,
+  trustedActorRequestHash,
+} from "../../../spec/trusted-actor-signing.mjs";
 
 const ACTOR_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,199}$/;
 const ASSURANCE = new Set(["normal", "step_up"]);
@@ -50,50 +54,6 @@ function equalHex(actual, expected) {
   const left = Buffer.from(actual, "hex");
   const right = Buffer.from(expected, "hex");
   return left.length === right.length && timingSafeEqual(left, right);
-}
-
-function canonical(value) {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, canonical(value[key])]),
-    );
-  }
-  return value;
-}
-
-export function trustedActorRequestHash({ body = {}, url }) {
-  const query = url
-    ? [...url.searchParams.entries()].sort(([ak, av], [bk, bv]) =>
-        ak === bk ? av.localeCompare(bv) : ak.localeCompare(bk),
-      )
-    : [];
-  return createHash("sha256")
-    .update(JSON.stringify(canonical({ body, query })))
-    .digest("hex");
-}
-
-export function trustedActorMessage({
-  timestamp,
-  credentialId,
-  method,
-  path,
-  actorId,
-  assurance,
-  requestHash,
-}) {
-  return [
-    "v1",
-    timestamp,
-    credentialId,
-    method,
-    path,
-    actorId,
-    assurance,
-    requestHash,
-  ].join("\n");
 }
 
 /** Return null when no human assertion is present. Partial/invalid assertions
@@ -181,3 +141,5 @@ export function trustedActorFromRequest({
     asserted_at: new Date(seconds * 1000).toISOString(),
   });
 }
+
+export { trustedActorMessage, trustedActorRequestHash };
