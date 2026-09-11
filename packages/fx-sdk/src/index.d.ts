@@ -226,7 +226,8 @@ export interface FiatIntent {
 
 export interface BlueballsFxClientOptions {
   baseUrl: string;
-  apiKey: string;
+  /** Optional for public reference/health calls; required by authenticated methods. */
+  apiKey?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -236,14 +237,19 @@ export class BlueballsFxError extends Error {
   details?: unknown;
   constructor(
     message: string,
-    options?: { code?: string; status?: number; details?: unknown },
+    options?: {
+      code?: string;
+      status?: number;
+      details?: unknown;
+      cause?: unknown;
+    },
   );
 }
 
 export class BlueballsFxClient {
   constructor(options: BlueballsFxClientOptions);
 
-  health(): Promise<{ status: string; service: string; runtime?: string }>;
+  health(): Promise<{ status: string; service: string; runtime?: string; source_commit?: string }>;
   referenceStatus(): Promise<ReferenceStatus>;
   referencePolicy(): Promise<Record<string, unknown>>;
   referenceMarket(): Promise<ReferenceMarket>;
@@ -291,7 +297,7 @@ export class BlueballsFxClient {
   ): Promise<FxQuote & { execution: Record<string, unknown> }>;
   getRoute(routeId: string): Promise<FxRoute>;
 
-  createFiatIntent(intent: Record<string, unknown>): Promise<FiatIntent>;
+  createFiatIntent(intent: FiatIntent): Promise<FiatIntent>;
   getFiatIntent(intentId: string): Promise<FiatIntent>;
   reserveFiatIntent(intentId: string): Promise<FiatIntent>;
   submitFiatIntent(
