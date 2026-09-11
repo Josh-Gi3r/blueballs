@@ -122,12 +122,36 @@ test("risk positions and reservations survive restart", () => {
   }
 });
 
-test("reconfiguring a limit cannot strand an already-over-limit settled position", () => {
+test("reconfiguring a limit cannot strand projected exposure", () => {
   const risk = book();
-  risk.setSettledPosition("USD", "800");
+  risk.setSettledPosition("USD", "700");
+  risk.reserve({
+    quoteId: "q1",
+    deltas: { USD: "200" },
+    expiresAt: NOW + 10_000,
+  });
   assert.throws(
-    () => risk.configureAsset("USD", "799"),
-    /below current settled position/,
+    () => risk.configureAsset("USD", "899"),
+    /below current projected position/,
   );
+  assert.equal(risk.getPosition("USD").hardLimit, "1000");
+  risk.configureAsset("USD", "900");
+  assert.equal(risk.getPosition("USD").hardLimit, "900");
+  risk.close();
+});
+
+test("manual settled-position updates cannot invalidate active reservations", () => {
+  const risk = book();
+  risk.reserve({
+    quoteId: "q1",
+    deltas: { USD: "300" },
+    expiresAt: NOW + 10_000,
+  });
+  assert.throws(
+    () => risk.setSettledPosition("USD", "701"),
+    /active reservations exceeds hard limit/,
+  );
+  risk.setSettledPosition("USD", "700");
+  assert.equal(risk.getPosition("USD").projected, "1000");
   risk.close();
 });
