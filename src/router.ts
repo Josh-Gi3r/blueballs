@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /** Minimal history-API router. Real URLs so every screen is linkable,
  * refreshable and back-button friendly — no framework needed.
@@ -17,7 +17,7 @@ export function usePath(): [string, (p: string) => void] {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  const go = (p: string) => {
+  const go = useCallback((p: string) => {
     if (p === window.location.pathname) {
       window.scrollTo(0, 0);
       return;
@@ -25,7 +25,7 @@ export function usePath(): [string, (p: string) => void] {
     window.history.pushState({}, "", p);
     window.dispatchEvent(new PopStateEvent("popstate"));
     window.scrollTo(0, 0);
-  };
+  }, []);
 
   return [path, go];
 }
