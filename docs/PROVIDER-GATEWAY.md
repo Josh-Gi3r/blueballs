@@ -11,8 +11,8 @@ callbacks into the protocol below.
 
 The machine-readable capability source of truth is
 [`spec/provider-capabilities.mjs`](../spec/provider-capabilities.mjs). Build
-verification fails when production intent, outcome and documentation surfaces
-drift from that contract.
+verification fails when production intent, outcome, deterministic conformance
+fixtures and documentation drift from that contract.
 
 ## Configuration
 
@@ -22,6 +22,8 @@ BANK_PROVIDER_GATEWAY_URL=https://provider-gateway.example.org/blueballs
 BANK_PROVIDER_GATEWAY_TOKEN=<secret from deployment secret manager>
 BANK_PROVIDER_PAYLOAD_KEY=<32-byte key encoded as 64 hex chars or base64>
 # or use BANK_PROVIDER_PAYLOAD_KEYS + BANK_PROVIDER_PAYLOAD_ACTIVE_KEY_ID
+BANK_PROVIDER_INBOUND_SECRET=<separate high-entropy HMAC secret>
+BANK_PROVIDER_INBOUND_MAX_SKEW_SECONDS=300
 ```
 
 Blueballs refuses a provider-dependent production command with `503` when no
@@ -39,7 +41,7 @@ rotation can retain old decryption keys until no queued jobs reference them. The
 payload is decrypted only immediately before the gateway request is sent. A
 production job containing a plaintext test envelope is rejected.
 
-## Request
+## Outbound request
 
 Blueballs sends one JSON envelope:
 
@@ -226,8 +228,8 @@ A production wallet send first moves value from the wallet into
 command is `funds_reserved`, not externally settled. Final provider success must
 return `funds_state: "settled"`; Blueballs then moves the reservation to
 `external:settled:custody`. Safe failures refund from custody clearing back to the
-wallet. Unknown or submitted funds state opens reconciliation and never mints a
-refund speculatively.
+wallet. Unknown or submitted funds state opens reconciliation and never creates
+a speculative refund.
 
 Wallet sends released by an approval chain use this same custody path; approval
 execution does not bypass provider settlement.
@@ -235,8 +237,8 @@ execution does not bypass provider settlement.
 ## Provider-originated settled events
 
 Outbound jobs are not enough for a real institution. Banks and custodians also
-originate facts such as an incoming bank payment or on-chain deposit. Blueballs
-accepts those through the private, operator-authenticated service endpoint:
+originate facts such as incoming bank payments or on-chain deposits. Blueballs
+accepts those through a private service endpoint:
 
 ```text
 POST /internal/provider/events
@@ -244,52 +246,56 @@ X-API-Key: <operator credential>
 ```
 
 This path is intentionally not part of the public `/v2` catalogue or public
-OpenAPI. Deploy it only on the trusted provider/service network in addition to
-operator authentication.
+OpenAPI. It has **two independent authentication controls**: the private route
+requires the operator credential, and the canonical event body must also be
+signed using the separate `BANK_PROVIDER_INBOUND_SECRET`.
+
+The body includes:
+
+```json
+{
+  "authentication": {
+    "timestamp": "1789123456",
+    "signature": "v1=<64-hex-hmac-sha256>"
+  }
+}
+```
+
+The signature is HMAC-SHA256 over
+`<timestamp>.<canonical JSON body excluding authentication>`. The default maximum
+clock skew is 300 seconds. A bad or stale signature returns `401`. The deployment
+provider gateway should first verify the upstream bank/custodian callback using
+that vendor's own authentication and only then normalize/sign the Blueballs event.
 
 Current canonical inbound event types are:
 
 ### `payments.account_credit_settled`
 
-```json
-{
-  "event_id": "bank-event-000001",
-  "tenant_id": "ten_...",
-  "type": "payments.account_credit_settled",
-  "resource_id": "acc_...",
-  "amount": { "amount": "125.37", "currency": "EUR" },
-  "rail": "sepa_instant",
-  "provider_reference": "bank-credit-123",
-  "provider_state": "settled"
-}
-```
-
-The event credits the tenant-owned account through balanced double-entry ledger
+The canonical payload includes `event_id`, `tenant_id`, `resource_id`, an exact
+money object, rail/provider reference and settled provider state. The accepted
+event credits the tenant-owned account through balanced double-entry ledger
 postings only after the provider says the credit is settled.
 
 ### `custody.wallet_deposit_settled`
 
-```json
-{
-  "event_id": "custody-event-000001",
-  "tenant_id": "ten_...",
-  "type": "custody.wallet_deposit_settled",
-  "resource_id": "wal_...",
-  "amount": { "amount": "100.00", "currency": "USDC" },
-  "network": "base",
-  "provider_reference": "chain-tx-123",
-  "provider_state": "settled"
-}
-```
+The canonical payload includes `event_id`, tenant/wallet, exact money, network and
+provider reference. The accepted event posts from the external custody network
+account to the canonical wallet only when the wallet/tenant/currency controls
+match.
 
 Inbound provider `event_id` is a durable idempotency identity. Replaying the same
 ID with the same canonical evidence is harmless and does not post money twice.
-Reusing an ID with different evidence returns `409` and posts nothing. Tenant,
-resource ownership and currency must all match before value is credited.
+Reusing an ID with different evidence returns `409` and posts nothing.
+Authentication timestamp/signature are excluded from the evidence fingerprint so
+a legitimate retry may be freshly signed without becoming a second financial
+event.
 
-The current private endpoint accepts only canonical **settled** event types. A
-provider adapter should not translate mempool observation, payment initiation or
-other non-final evidence into one of these event types.
+The endpoint accepts only canonical **settled** event types. A provider adapter
+must not translate mempool observation, payment initiation or other non-final
+evidence into one of these event types.
+
+See [`PROVIDER-INBOUND.md`](PROVIDER-INBOUND.md) for the complete signing, replay
+and rotation contract.
 
 ## Durability and reconciliation
 
@@ -308,15 +314,16 @@ state machine.
 
 ## Security
 
-- Keep gateway, bootstrap, operator and payload-encryption credentials in
-  deployment secret storage.
+- Keep gateway, bootstrap, operator, inbound-HMAC and payload-encryption
+  credentials in deployment secret storage.
+- Do not reuse the operator credential as `BANK_PROVIDER_INBOUND_SECRET`.
 - Do not put credentials in provider payloads or adapter results.
 - Never log full request/response payloads by default; they may contain customer
   or payment information.
 - Use least-privilege provider credentials per deployment/environment.
-- Restrict `/internal/provider/events` at the network/service layer as well as
-  requiring the operator credential.
-- Verify the upstream provider's own callback signature/authentication in the
+- Restrict `/internal/provider/events` at the network/service layer in addition
+  to its operator credential and dedicated HMAC signature.
+- Verify the upstream provider's callback signature/authentication in the
   deployment-owned gateway before translating it to a Blueballs canonical event.
 - Retain retired provider-payload encryption keys until no durable outbox record
   references their key ID.
@@ -325,5 +332,6 @@ state machine.
 - Never expose provider-specific raw errors directly to customers. Map them to
   canonical states and stable error codes.
 
-See [ADAPTER-STANDARD.md](ADAPTER-STANDARD.md) for the wider adapter maturity and
-conformance standard.
+See [`PROVIDER-CONFORMANCE.md`](PROVIDER-CONFORMANCE.md) for the executable
+capability contract and [`ADAPTER-STANDARD.md`](ADAPTER-STANDARD.md) for the
+wider adapter maturity standard.
