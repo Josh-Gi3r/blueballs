@@ -67,7 +67,22 @@ test("production mode bootstraps explicitly and disables sandbox/reference contr
     { amount: "100.00" },
   );
 
+  const application = await api.request("POST", "/v2/applications", {
+    key: BOOTSTRAP_KEY,
+    body: { type: "individual", customer: customer.body.id },
+  });
+  assert.equal(application.status, 201);
+
   const blocked = [
+    [
+      "POST",
+      `/v2/applications/${application.body.id}/documents`,
+      { type: "identity_document", content: "cmVmZXJlbmNl" },
+    ],
+    [
+      "GET",
+      `/v2/applications/${application.body.id}/documents/doc_reference`,
+    ],
     ["POST", "/v2/destinations/dst_reference/verify", { name: "Reference" }],
     ["POST", "/v2/cards/crd_reference/freeze", { reason: "reference" }],
     ["POST", "/v2/cards/crd_reference/unfreeze", {}],
@@ -81,6 +96,10 @@ test("production mode bootstraps explicitly and disables sandbox/reference contr
     ["GET", "/v2/vaults"],
     ["POST", "/v2/credit", {}],
     ["GET", "/v2/credit"],
+    ["POST", "/v2/statements", { account: account.body.id, format: "json" }],
+    ["GET", "/v2/statements/stm_reference"],
+    ["GET", "/v2/fees/config"],
+    ["PUT", "/v2/fees/config", { payout_account: account.body.id }],
     ["POST", "/v2/links", { currency: "EUR" }],
     ["GET", "/v2/links/lnk_reference"],
     ["POST", "/v2/mandates", {}],
@@ -95,8 +114,6 @@ test("production mode bootstraps explicitly and disables sandbox/reference contr
     await assertSandboxOnly(api, method, path, body);
   }
 
-  // Non-mutating public compatibility data may remain readable as explicitly
-  // indicative/reference information. It is never execution or a lockable quote.
   const rates = await api.request("GET", "/v2/rates");
   assert.equal(rates.status, 200);
   const depth = await api.request("GET", "/v2/fx/depth");
