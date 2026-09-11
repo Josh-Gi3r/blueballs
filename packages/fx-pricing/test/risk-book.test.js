@@ -54,7 +54,7 @@ test("multi-asset reservation is atomic on any failed leg", () => {
   risk.close();
 });
 
-test("release and expiry return risk capacity exactly once", () => {
+test("release and expiry return only active risk capacity exactly once", () => {
   const risk = book();
   risk.reserve({
     quoteId: "q1",
@@ -69,6 +69,87 @@ test("release and expiry return risk capacity exactly once", () => {
   assert.equal(risk.expire(NOW + 1), 1);
   assert.equal(risk.expire(NOW + 1), 0);
   assert.equal(risk.getPosition("USD").reserved, "0");
+  risk.close();
+});
+
+test("submitted principal exposure survives release and expiry until reconciliation", () => {
+  const risk = book();
+  risk.reserve({
+    quoteId: "q-submitted",
+    deltas: { USD: "400", EUR: "-300" },
+    expiresAt: NOW + 1,
+  });
+  assert.deepEqual(risk.markSubmitted("q-submitted"), {
+    quoteId: "q-submitted",
+    duplicate: false,
+    rows: 2,
+  });
+  assert.equal(risk.getPosition("USD").reserved, "400");
+  assert.equal(risk.release("q-submitted"), 0);
+  assert.equal(risk.expire(NOW + 100_000), 0);
+  assert.equal(risk.getPosition("USD").reserved, "400");
+
+  assert.deepEqual(risk.markSubmitted("q-submitted"), {
+    quoteId: "q-submitted",
+    duplicate: true,
+  });
+  assert.deepEqual(
+    risk.settle({ quoteId: "q-submitted", eventId: "evt-submitted" }),
+    { duplicate: false },
+  );
+  assert.equal(risk.getPosition("USD").reserved, "0");
+  assert.equal(risk.getPosition("USD").settled, "400");
+  assert.equal(risk.getPosition("EUR").settled, "-300");
+  risk.close();
+});
+
+test("submitted principal exposure can fail only through reconciliation", () => {
+  const risk = book();
+  risk.reserve({
+    quoteId: "q-failed",
+    deltas: { USD: "250" },
+    expiresAt: NOW + 10_000,
+  });
+  risk.markSubmitted("q-failed");
+  assert.deepEqual(
+    risk.fail({
+      quoteId: "q-failed",
+      eventId: "evt-failed",
+      reason: "VENUE_REJECTED",
+    }),
+    { duplicate: false, released: 1, reason: "VENUE_REJECTED" },
+  );
+  assert.equal(risk.getPosition("USD").reserved, "0");
+  assert.deepEqual(
+    risk.fail({
+      quoteId: "q-failed",
+      eventId: "evt-failed",
+      reason: "VENUE_REJECTED",
+    }),
+    { duplicate: true, released: 0 },
+  );
+  risk.close();
+});
+
+test("principal finality event identity cannot cross quote or outcome", () => {
+  const risk = book();
+  risk.reserve({ quoteId: "q1", deltas: { USD: "100" }, expiresAt: NOW + 10_000 });
+  risk.reserve({ quoteId: "q2", deltas: { EUR: "100" }, expiresAt: NOW + 10_000 });
+  risk.settle({ quoteId: "q1", eventId: "shared-event" });
+  assert.throws(
+    () => risk.settle({ quoteId: "q2", eventId: "shared-event" }),
+    (error) => error.code === "FINALITY_EVENT_COLLISION" && error.status === 409,
+  );
+  assert.throws(
+    () =>
+      risk.fail({
+        quoteId: "q2",
+        eventId: "shared-event",
+        reason: "REJECTED",
+      }),
+    (error) => error.code === "FINALITY_EVENT_COLLISION",
+  );
+  assert.equal(risk.getPosition("EUR").reserved, "100");
   risk.close();
 });
 
@@ -102,11 +183,13 @@ test("risk positions and reservations survive restart", () => {
       deltas: { USD: "200" },
       expiresAt: NOW + 10_000,
     });
+    first.markSubmitted("q1");
     first.close();
 
     const second = book(path);
     assert.equal(second.getPosition("USD").settled, "100");
     assert.equal(second.getPosition("USD").reserved, "200");
+    assert.equal(second.expire(NOW + 100_000), 0);
     assert.throws(
       () =>
         second.reserve({
@@ -140,7 +223,7 @@ test("reconfiguring a limit cannot strand projected exposure", () => {
   risk.close();
 });
 
-test("manual settled-position updates cannot invalidate active reservations", () => {
+test("manual settled-position updates cannot invalidate reserved exposure", () => {
   const risk = book();
   risk.reserve({
     quoteId: "q1",
@@ -149,7 +232,7 @@ test("manual settled-position updates cannot invalidate active reservations", ()
   });
   assert.throws(
     () => risk.setSettledPosition("USD", "701"),
-    /active reservations exceeds hard limit/,
+    /reserved exposure exceeds hard limit/,
   );
   risk.setSettledPosition("USD", "700");
   assert.equal(risk.getPosition("USD").projected, "1000");
