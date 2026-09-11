@@ -88,6 +88,18 @@ export function migrate(database, component, migrations) {
     );
   }
 
+  // A migration table with holes is corruption, not an invitation to run older
+  // schema transforms underneath newer ones. Fail before touching domain data.
+  for (let index = 0; index < applied.length; index += 1) {
+    const expectedVersion = index + 1;
+    const actualVersion = Number(applied[index].version);
+    if (actualVersion !== expectedVersion) {
+      throw new Error(
+        `${component} migration history is not contiguous; expected applied version ${expectedVersion}, found ${actualVersion}`,
+      );
+    }
+  }
+
   for (const row of applied) {
     const migration = declared.find((candidate) => candidate.version === Number(row.version));
     if (!migration) {
