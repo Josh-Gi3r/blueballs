@@ -28,6 +28,26 @@ if (production && (!configuredApiKey || configuredApiKey.length < 32)) {
 }
 const apiKey = configuredApiKey ?? "bb_test_local_fx";
 
+const configuredOperatorApiKey = process.env.FX_NODE_OPERATOR_API_KEY;
+if (
+  production &&
+  (!configuredOperatorApiKey || configuredOperatorApiKey.length < 32)
+) {
+  throw new Error(
+    "FX_NODE_OPERATOR_API_KEY must contain at least 32 characters in production mode",
+  );
+}
+if (
+  production &&
+  configuredOperatorApiKey === configuredApiKey
+) {
+  throw new Error(
+    "FX_NODE_OPERATOR_API_KEY must be distinct from FX_NODE_API_KEY in production mode",
+  );
+}
+const operatorApiKey = configuredOperatorApiKey ?? apiKey;
+const sourceCommit = process.env.BLUEBALLS_GIT_SHA ?? "development";
+
 const corsDefault = production
   ? ""
   : "http://localhost:5280,http://127.0.0.1:5280";
@@ -52,8 +72,10 @@ if (mode === "reference-sandbox") {
     scenario: runtime.scenario,
     monetary: runtime.monetary,
     apiKey,
+    operatorApiKey,
     publicDepth: true,
     corsOrigins,
+    sourceCommit,
   });
 } else if (mode === "private-sandbox") {
   const dbPath = process.env.FX_NODE_DB ?? "./blueballs-fx.db";
@@ -84,8 +106,10 @@ if (mode === "reference-sandbox") {
     quotes,
     fiat,
     apiKey,
+    operatorApiKey,
     corsOrigins,
     publicDepth: true,
+    sourceCommit,
   });
 } else {
   runtime = await loadProductionRuntime();
@@ -95,8 +119,10 @@ if (mode === "reference-sandbox") {
     fiat: runtime.fiat,
     executionAdapter: runtime.executionAdapter,
     apiKey,
+    operatorApiKey,
     corsOrigins,
     publicDepth: runtime.publicDepth === true,
+    sourceCommit,
   });
 }
 
@@ -105,9 +131,13 @@ console.log(
   `Blueballs FX node (${mode.toUpperCase()}) listening on http://${address.address}:${address.port}`,
 );
 console.log(
-  `API key: ${configuredApiKey ? "configured" : "local sandbox default"}`,
+  `Client API key: ${configuredApiKey ? "configured" : "local sandbox default"}`,
+);
+console.log(
+  `Operator API key: ${configuredOperatorApiKey ? "configured separately" : "local sandbox default"}`,
 );
 console.log(`Browser origins: ${corsOrigins.join(", ") || "none"}`);
+console.log(`Source commit: ${sourceCommit}`);
 console.log(
   production
     ? "Execution: production adapter active"
