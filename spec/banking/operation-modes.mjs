@@ -1,16 +1,59 @@
-/** Operations that exist to make the public/local sandbox executable and must
- * never become an accidental production control plane. */
+/** Operations that exist to make the public/local sandbox or historical
+ * compatibility surfaces executable and must never become an accidental
+ * production control plane. Production external effects live behind the
+ * provider gateway or canonical FX node instead. */
 export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
   new Set([
+    // Public sandbox/bootstrap shortcuts.
     "POST /v2/auth/signup",
     "POST /v2/customers/:id/verify",
     "POST /v2/accounts/:id/credit",
     "POST /v2/wallets/:id/credit",
     "POST /v2/cards/:id/authorisations",
     "POST /v2/transfers/:id/settle",
+    "POST /v2/destinations/:id/verify",
+
+    // Recurring/direct-debit fixtures are not a production payment engine until
+    // a mandate-consent/provider execution capability is connected.
+    "POST /v2/mandates",
+    "POST /v2/subscriptions",
+
+    // Historical banking-runtime FX/reference compatibility. Production FX is
+    // owned by the canonical FX node/provider integrations, never these fixture
+    // prices, local LP pools or manual settlement controls.
+    "POST /v2/quotes",
+    "GET /v2/quotes/:id",
+    "POST /v2/quotes/:id/execute",
+    "GET /v2/rates",
+    "GET /v2/pairs",
+    "GET /v2/assets",
+    "GET /v2/corridors",
+    "POST /v2/fx/quote",
+    "POST /v2/fx/route",
     "POST /v2/ramps/on",
     "POST /v2/ramps/off",
-    "POST /v2/mandates",
+    "GET /v2/ramps",
+    "GET /v2/fx/depth",
+    "GET /v2/fx/price",
+    "GET /v2/fx/pricing-model",
+    "POST /v2/fx/rfq",
+    "GET /v2/fx/rfq",
+    "POST /v2/fx/rfq/:id/accept",
+    "POST /v2/fx/intents",
+    "GET /v2/fx/intents",
+    "POST /v2/fx/intents/:id/cancel",
+    "GET /v2/fx/fills",
+    "POST /v2/fx/net",
+    "GET /v2/fx/batches",
+    "GET /v2/fx/appetite",
+    "PUT /v2/fx/appetite",
+    "POST /v2/fx/lp",
+    "GET /v2/fx/lp",
+    "GET /v2/fx/lp/earnings",
+    "POST /v2/fx/lp/:id/withdraw",
+    "GET /v2/fx/lp/pools",
+
+    // Builder/reference simulation surfaces.
     "POST /v2/builder/projects",
     "GET /v2/builder/projects",
     "GET /v2/builder/projects/:id",
