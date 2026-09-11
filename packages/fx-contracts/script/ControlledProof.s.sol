@@ -127,6 +127,7 @@ contract ControlledProof is Script {
         FxTypes.MakerOrder memory order = _makerOrder();
         bytes memory makerSignature = _sign(makerKey, settlement.hashMakerOrder(order));
         FxTypes.TakerIntent memory intent = _takerIntent();
+        intent.policyAuthorizationHash = router.hashPolicyIntent(intent);
         bytes memory takerSignature = _sign(takerKey, router.hashTakerIntent(intent));
 
         FxTypes.MakerFill[] memory fills = new FxTypes.MakerFill[](1);
@@ -171,7 +172,7 @@ contract ControlledProof is Script {
             recipient: taker,
             deadline: uint64(block.timestamp + 1 days),
             nonce: 1,
-            policyAuthorizationHash: keccak256("controlled-proof-policy")
+            policyAuthorizationHash: bytes32(0)
         });
     }
 
