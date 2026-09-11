@@ -63,6 +63,8 @@ export async function createApiFixture({ env = {}, nodeArgs = [] } = {}) {
   }
   const directory = await mkdtemp(join(tmpdir(), "blueballs-api-test-"));
   const databasePath = join(directory, "blueballs.sqlite");
+  let runtimeEnv = { ...env };
+  let runtimeNodeArgs = [...nodeArgs];
   let child = null;
   let baseUrl = null;
   let logs = "";
@@ -89,7 +91,7 @@ export async function createApiFixture({ env = {}, nodeArgs = [] } = {}) {
     const port = await allocatePort();
     baseUrl = `http://127.0.0.1:${port}`;
     logs = "";
-    child = spawn(process.execPath, [...nodeArgs, "src/server.js"], {
+    child = spawn(process.execPath, [...runtimeNodeArgs, "src/server.js"], {
       cwd: new URL("../..", import.meta.url),
       env: {
         ...process.env,
@@ -99,7 +101,7 @@ export async function createApiFixture({ env = {}, nodeArgs = [] } = {}) {
         SOURCE_RATE_LIMIT_PER_MIN: "10000",
         TENANT_RATE_LIMIT_PER_MIN: "10000",
         RESPONSE_CONTRACT_VALIDATION: "true",
-        ...env,
+        ...runtimeEnv,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -118,7 +120,25 @@ export async function createApiFixture({ env = {}, nodeArgs = [] } = {}) {
     child = null;
   }
 
-  async function restart() {
+  /** Restart the same durable database, optionally changing runtime config. This
+   * is intentionally used by mode/migration/recovery tests to prove restart
+   * behavior rather than creating a fresh fixture that hides persisted state. */
+  async function restart(options = {}) {
+    if (options.env !== undefined) {
+      if (!options.env || typeof options.env !== "object" || Array.isArray(options.env)) {
+        throw new TypeError("restart env must be an object");
+      }
+      runtimeEnv = { ...runtimeEnv, ...options.env };
+    }
+    if (options.nodeArgs !== undefined) {
+      if (
+        !Array.isArray(options.nodeArgs) ||
+        options.nodeArgs.some((arg) => typeof arg !== "string")
+      ) {
+        throw new TypeError("restart nodeArgs must be an array of strings");
+      }
+      runtimeNodeArgs = [...options.nodeArgs];
+    }
     await stop();
     return start();
   }
