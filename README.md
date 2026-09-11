@@ -44,6 +44,11 @@ implies a partnership or live integration.
   operations.
 - A banking API with 181 documented operations and exact decimal accounting.
 - A double-entry ledger whose balances are derived from postings.
+- Atomic financial command boundaries covering resource state, ledger, events,
+  outboxes, idempotency and audit correlation.
+- Durable provider and webhook outboxes with retry/reconciliation semantics.
+- Provider-neutral production adapters for payments, cards, receiving details,
+  identity and custody, plus signed provider-originated settlement facts.
 - A sandbox builder for creating and testing tenant-isolated product models.
 - A canonical FX runtime for policy, pricing, liquidity selection, reservation
   and settlement state.
@@ -51,6 +56,8 @@ implies a partnership or live integration.
   and atomic settlement.
 - A dependency-free JavaScript FX SDK and OpenAPI contracts.
 - Node.js/SQLite and Cloudflare Workers/Durable Objects runtimes.
+- Production health/readiness/metrics, verified SQLite backup/restore tooling and
+  release/security gates.
 
 ## Explore the product
 
@@ -72,7 +79,7 @@ Requirements:
 ```bash
 git clone https://github.com/Josh-Gi3r/blueballs.git
 cd blueballs
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
@@ -126,12 +133,16 @@ extension boundaries.
 
 - Monetary amounts cross API boundaries as decimal strings and are represented
   internally as integer minor units or atomic units.
-- Banking resource state, ledger postings, durable events and idempotency state
-  are committed as one request unit of work.
+- Banking resource state, ledger postings, durable events/outboxes, idempotency
+  and audit evidence are committed as one request unit of work.
 - Ledger postings must balance, and customer accounts cannot be overdrawn by a
   posting.
 - Tenant resources, events and idempotency records are isolated by a stable
   tenant principal.
+- Production external effects use durable provider intents, stable job-level
+  idempotency and explicit ambiguous/reconciliation states.
+- Production provider and webhook signing payloads are encrypted before durable
+  persistence; provider-originated settlement facts are independently signed.
 - FX liquidity is policy-checked before it can compete on price.
 - A firm FX quote exists only after all selected capacity is reserved.
 - Fiat submission and settlement remain distinct states.
@@ -148,8 +159,9 @@ its product and jurisdictions. See [SECURITY.md](SECURITY.md),
 
 ## Verification
 
-The repository does not depend on hosted GitHub Actions. The release authority is
-the complete local verification suite:
+A release requires **both** repository-local verification from the exact clean
+checkout and the hosted Production Gate for the same commit. Neither substitutes
+for the other.
 
 ```bash
 pnpm verify
@@ -163,16 +175,25 @@ pnpm lint
 pnpm test:api
 pnpm test:fx
 pnpm test:workers
+pnpm security:secrets
+pnpm security:dependencies
 ```
 
+The hosted gate additionally exercises the reference container/Compose topology,
+Cloudflare runtime/eviction tests, Foundry fuzz/invariants and CodeQL. The banking
+suite emits a machine-readable operation-coverage artifact and fails if a
+success-capable documented operation never returns a schema-valid success during
+the integration suite.
+
 A release is considered verified only when the exact release checkout passes the
-local gate and retains the release evidence described in
-[PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md). Hosted CI status, a successful
-frontend build or a generated OpenAPI file is not a substitute for that proof.
+local gate, the required hosted gate is green for that SHA, and the release
+evidence described in [PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md) is
+retained. A successful frontend build, static OpenAPI file or screenshot is not
+financial-runtime evidence.
 
 Foundry is required for the Solidity test suite. Docker and Wrangler are needed
-only for their respective deployment workflows. See [TESTING.md](TESTING.md)
-for the complete local setup.
+for their respective deployment workflows. See [TESTING.md](TESTING.md) for the
+complete setup.
 
 ## Documentation
 
@@ -185,8 +206,12 @@ for the complete local setup.
 | [apps/api/README.md](apps/api/README.md) | Banking runtime |
 | [apps/fx-node/README.md](apps/fx-node/README.md) | FX runtime |
 | [packages/fx-sdk/README.md](packages/fx-sdk/README.md) | JavaScript SDK |
+| [docs/PROVIDER-GATEWAY.md](docs/PROVIDER-GATEWAY.md) | Production provider protocol |
+| [docs/PROVIDER-CONFORMANCE.md](docs/PROVIDER-CONFORMANCE.md) | Adapter conformance standard |
+| [docs/PROVIDER-INBOUND.md](docs/PROVIDER-INBOUND.md) | Signed inbound settlement facts |
 | [docs/partners/README.md](docs/partners/README.md) | Provider directory standards |
-| [OPERATIONS.md](OPERATIONS.md) | Deployment, operations, backup and recovery |
+| [OPERATIONS.md](OPERATIONS.md) | Deployment and operations entry point |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | SRE, monitoring, backup/restore and DR runbook |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and production boundaries |
 
