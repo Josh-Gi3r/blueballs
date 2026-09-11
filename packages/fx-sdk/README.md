@@ -4,21 +4,45 @@ Dependency-free JavaScript client for the self-hostable Blueballs FX node.
 
 ## Repository use
 
+Public inspection and preview methods need only the node URL:
+
 ```js
 import { BlueballsFxClient } from './packages/fx-sdk/src/index.js';
 
+const publicFx = new BlueballsFxClient({
+  baseUrl: 'http://localhost:8788',
+});
+
+const status = await publicFx.referenceStatus();
+```
+
+Authenticated market/execution integrations provide the client credential:
+
+```js
 const fx = new BlueballsFxClient({
   baseUrl: 'http://localhost:8788',
-  apiKey: 'bb_test_local_fx',
+  apiKey: process.env.FX_NODE_API_KEY,
 });
 ```
+
+Operator/reconciliation services add a distinct operator credential:
+
+```js
+const ops = new BlueballsFxClient({
+  baseUrl: 'http://localhost:8788',
+  apiKey: process.env.FX_NODE_API_KEY,
+  operatorApiKey: process.env.FX_NODE_OPERATOR_API_KEY,
+});
+```
+
+The SDK keeps the two authorities separate: ordinary methods never send the operator credential, while authoritative quote reconciliation and fiat-finality methods require it.
 
 ## Customer-facing BRL to EUR trade
 
 Preview without reserving capacity:
 
 ```js
-const preview = await fx.previewReferenceTrade({
+const preview = await publicFx.previewReferenceTrade({
   inputAmount: '50000.00',
   from: 'BRL',
   to: 'EUR',
@@ -55,41 +79,43 @@ const current = await fx.getReferenceTrade(trade.id);
 const released = await fx.releaseReferenceTrade(trade.id);
 ```
 
-Execution is explicit:
+Execution submission is explicit:
 
 ```js
 await fx.executeReferenceTrade(trade.id);
 ```
 
-The default reference node rejects this with `EXECUTION_UNAVAILABLE` because no execution adapter is configured. It never creates a fake transaction hash.
+Production runtime composition sends this through the configured venue/provider/AtomicRouter execution adapter while Blueballs preserves the canonical `SUBMITTED` and reconciliation lifecycle.
 
 ## Inspect and alter the reference market
 
+Public inspection:
+
 ```js
-const status = await fx.referenceStatus();
-const policy = await fx.referencePolicy();
-const market = await fx.referenceMarket();
-const route = await fx.referenceSettlementRoute();
+const status = await publicFx.referenceStatus();
+const policy = await publicFx.referencePolicy();
+const market = await publicFx.referenceMarket();
+const route = await publicFx.referenceSettlementRoute();
 ```
 
-Apply a deterministic backend scenario:
+Authenticated scenario control:
 
 ```js
 await fx.applyReferenceScenario('issuer_policy_blocked');
 ```
 
-Available scenarios are returned by:
+Available scenarios are public:
 
 ```js
-const scenarios = await fx.referenceScenario();
+const scenarios = await publicFx.referenceScenario();
 ```
 
 Inspect eligible source slices without reserving them:
 
 ```js
-const liquidity = await fx.referenceLiquidity({
-  inputAsset: '0x0000000000000000000000000000000000000033', // internal BRL deposit claim
-  outputAsset: '0x0000000000000000000000000000000000000022', // EURC
+const liquidity = await publicFx.referenceLiquidity({
+  inputAsset: '0x0000000000000000000000000000000000000033',
+  outputAsset: '0x0000000000000000000000000000000000000022',
   exactOutput: '1000000000',
 });
 ```
@@ -102,11 +128,12 @@ const quote = await fx.quote({
   outputAsset,
   exactOutput: 100000000n,
   expiresInMs: 30_000,
-  participantId: 'sandbox-customer',
-  accountRef: 'sandbox-customer:wallet',
+  participantId: 'customer-or-integration-principal',
+  accountRef: 'attributed-account-ref',
 });
 
 const publicRoute = await fx.getRoute(quote.routeId);
+await fx.execute(quote.id);
 ```
 
 A firm quote is returned only after all selected sources reserve capacity.
@@ -128,17 +155,44 @@ await fx.cancelOrder(orderHash, { onChainInvalidated: true });
 
 Maker identity and signed payloads are not returned in public source allocations.
 
-## Fiat intents
+## Fiat intent and finality lifecycle
+
+Client/integration authority creates and submits the intent:
 
 ```js
 const intent = await fx.createFiatIntent(payload);
 await fx.reserveFiatIntent(intent.intentId);
 await fx.submitFiatIntent(intent.intentId, 'provider-submission-ref');
-await fx.attestFiat(attestation);
-await fx.settleFiatIntent(intent.intentId, 'canonical-event-id');
 ```
 
-Submission is not settlement. Fiat states remain explicit through observation, verification and final settlement.
+Operator/finality authority binds external evidence and records final settlement:
+
+```js
+await ops.attestFiat(attestation);
+await ops.settleFiatIntent(intent.intentId, 'canonical-event-id');
+```
+
+Quote reconciliation uses the same operator credential:
+
+```js
+await ops.confirmQuote(quote.id, {
+  eventId: 'provider-or-chain-event-id',
+  fills,
+});
+
+await ops.failQuote(quote.id, {
+  eventId: 'provider-or-chain-event-id',
+  reason: 'definitive-provider-failure',
+});
+```
+
+Submission is not settlement. Fiat and quote states remain explicit until authoritative evidence reaches the operator surface.
+
+## Exact amounts and transport safety
+
+Atomic monetary inputs accept integer strings, `bigint`, or positive safe-integer JavaScript numbers. Unsafe numbers are rejected before transport rather than silently losing precision.
+
+The client validates its base URL before sending credentials and normalizes network/protocol failures into structured `BlueballsFxError` values.
 
 ## Errors
 
@@ -166,10 +220,11 @@ The package exports `src/index.d.ts`, including types for:
 - market scenarios;
 - settlement edges and finality;
 - fiat intents;
+- separated client/operator credentials;
 - structured errors.
 
-## Publication status
+## Package assurance
 
-The package is prepared as the repository client for the `0.1.x` reference line. Before publishing to a public registry, the maintainers must create a signed release tag and run the release workflow described in `RELEASE.md`.
+The SDK package boundary is exercised by the repository verification gate, including dry-run package contents, public/authenticated request behavior, exact amount handling, transport errors and client/operator authority separation.
 
 See `apps/fx-node/openapi.yaml`, `spec/fx/ADAPTERS.md` and `spec/fx/PUBLIC-REFERENCE.md`.
