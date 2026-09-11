@@ -12,6 +12,13 @@ export const SANDBOX_ONLY_OPERATIONS = Object.freeze(
     "POST /v2/transfers/:id/settle",
     "POST /v2/destinations/:id/verify",
 
+    // Closing a production account may require revoking provider-backed receiving
+    // instruments. Cancelling a production transfer may require a provider/rail
+    // cancellation and cannot safely refund local clearing funds after submission
+    // has begun. Until those provider capabilities exist, both fail closed.
+    "DELETE /v2/accounts/:id",
+    "POST /v2/transfers/:id/cancel",
+
     // The reference application API stores uploaded base64 document contents
     // inline. Production deployments must use encrypted/object-store/provider
     // document handling rather than persist document binaries in these fixtures.
