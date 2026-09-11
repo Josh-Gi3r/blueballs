@@ -971,6 +971,7 @@ const FAMILY_MODULES = [
   ["payments.js", () => import("./routes/payments.js")],
   ["platform.js", () => import("./routes/platform.js")],
   ["products.js", () => import("./routes/products.js")],
+  ["operations.js", () => import("./routes/operations.js")],
 ];
 for (const [, load] of FAMILY_MODULES) await load();
 console.log(
