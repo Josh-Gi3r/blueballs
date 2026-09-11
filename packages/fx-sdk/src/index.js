@@ -1,9 +1,9 @@
 export class BlueballsFxError extends Error {
   constructor(
     message,
-    { code = "HTTP_ERROR", status = 0, details = undefined } = {},
+    { code = "HTTP_ERROR", status = 0, details = undefined, cause } = {},
   ) {
-    super(message);
+    super(message, cause === undefined ? undefined : { cause });
     this.name = "BlueballsFxError";
     this.code = code;
     this.status = status;
@@ -11,36 +11,94 @@ export class BlueballsFxError extends Error {
   }
 }
 
+function normalizedBaseUrl(value) {
+  if (typeof value !== "string" || value.length === 0)
+    throw new TypeError("baseUrl required");
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new TypeError("baseUrl must be an absolute HTTP(S) URL");
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new TypeError("baseUrl must use HTTP or HTTPS");
+  }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new TypeError(
+      "baseUrl must not contain credentials, query parameters or a fragment",
+    );
+  }
+  return parsed.toString().replace(/\/$/, "");
+}
+
+function atomicAmount(value, field = "amount") {
+  if (typeof value === "bigint") {
+    if (value <= 0n) throw new RangeError(`${field} must be positive`);
+    return value.toString();
+  }
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new RangeError(`${field} number must be a positive safe integer`);
+    }
+    return String(value);
+  }
+  if (typeof value === "string" && /^[1-9]\d*$/.test(value)) return value;
+  throw new TypeError(`${field} must be a positive integer string, bigint or safe integer`);
+}
+
+function requiredString(value, field) {
+  if (typeof value !== "string" || value.length === 0)
+    throw new TypeError(`${field} required`);
+  return value;
+}
+
 export class BlueballsFxClient {
   constructor({ baseUrl, apiKey, fetchImpl = globalThis.fetch } = {}) {
-    if (typeof baseUrl !== "string" || baseUrl.length === 0)
-      throw new TypeError("baseUrl required");
-    if (typeof apiKey !== "string" || apiKey.length === 0)
-      throw new TypeError("apiKey required");
+    if (apiKey !== undefined && (typeof apiKey !== "string" || apiKey.length === 0))
+      throw new TypeError("apiKey must be a non-empty string when provided");
     if (typeof fetchImpl !== "function")
       throw new TypeError("fetch implementation required");
-    this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.baseUrl = normalizedBaseUrl(baseUrl);
     this.apiKey = apiKey;
     this.fetch = fetchImpl;
   }
 
   async #request(path, { method = "GET", body, auth = true } = {}) {
-    const response = await this.fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        ...(auth ? { authorization: `Bearer ${this.apiKey}` } : {}),
-        ...(body !== undefined ? { "content-type": "application/json" } : {}),
-      },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    });
+    if (auth && !this.apiKey) {
+      throw new BlueballsFxError("FX API key required for this operation", {
+        code: "AUTH_REQUIRED",
+        status: 0,
+      });
+    }
+
+    let response;
+    try {
+      response = await this.fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers: {
+          ...(auth ? { authorization: `Bearer ${this.apiKey}` } : {}),
+          ...(body !== undefined ? { "content-type": "application/json" } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      });
+    } catch (cause) {
+      throw new BlueballsFxError("FX node request failed before a response arrived", {
+        code: "NETWORK_ERROR",
+        status: 0,
+        cause,
+      });
+    }
+
     let payload;
     try {
       payload = await response.json();
-    } catch {
+    } catch (cause) {
       throw new BlueballsFxError(
         `FX node returned non-JSON response (${response.status})`,
         {
+          code: "PROTOCOL_ERROR",
           status: response.status,
+          cause,
         },
       );
     }
@@ -62,36 +120,42 @@ export class BlueballsFxClient {
   }
 
   referenceStatus() {
-    return this.#request("/v2/fx/reference/status");
+    return this.#request("/v2/fx/reference/status", { auth: false });
   }
   referencePolicy() {
-    return this.#request("/v2/fx/reference/policy");
+    return this.#request("/v2/fx/reference/policy", { auth: false });
   }
   referenceMarket() {
-    return this.#request("/v2/fx/reference/market");
+    return this.#request("/v2/fx/reference/market", { auth: false });
   }
   referenceScenario() {
-    return this.#request("/v2/fx/reference/scenario");
+    return this.#request("/v2/fx/reference/scenario", { auth: false });
   }
   applyReferenceScenario(id) {
     return this.#request("/v2/fx/reference/scenario", {
       method: "POST",
-      body: { id },
+      body: { id: requiredString(id, "scenario id") },
     });
   }
   referenceLiquidity({ inputAsset, outputAsset, exactOutput }) {
-    const query = new URLSearchParams({ inputAsset, outputAsset });
+    const query = new URLSearchParams({
+      inputAsset: requiredString(inputAsset, "inputAsset"),
+      outputAsset: requiredString(outputAsset, "outputAsset"),
+    });
     if (exactOutput !== undefined)
-      query.set("exactOutput", String(exactOutput));
-    return this.#request(`/v2/fx/reference/liquidity?${query.toString()}`);
+      query.set("exactOutput", atomicAmount(exactOutput, "exactOutput"));
+    return this.#request(`/v2/fx/reference/liquidity?${query.toString()}`, {
+      auth: false,
+    });
   }
   referenceSettlementRoute() {
-    return this.#request("/v2/fx/reference/settlement-route");
+    return this.#request("/v2/fx/reference/settlement-route", { auth: false });
   }
   previewReferenceTrade(request) {
     return this.#request("/v2/fx/reference/trades/preview", {
       method: "POST",
       body: request,
+      auth: false,
     });
   }
   reserveReferenceTrade(request) {
@@ -102,18 +166,18 @@ export class BlueballsFxClient {
   }
   getReferenceTrade(tradeId) {
     return this.#request(
-      `/v2/fx/reference/trades/${encodeURIComponent(tradeId)}`,
+      `/v2/fx/reference/trades/${encodeURIComponent(requiredString(tradeId, "tradeId"))}`,
     );
   }
   releaseReferenceTrade(tradeId) {
     return this.#request(
-      `/v2/fx/reference/trades/${encodeURIComponent(tradeId)}`,
+      `/v2/fx/reference/trades/${encodeURIComponent(requiredString(tradeId, "tradeId"))}`,
       { method: "DELETE" },
     );
   }
   executeReferenceTrade(tradeId) {
     return this.#request(
-      `/v2/fx/reference/trades/${encodeURIComponent(tradeId)}/execute`,
+      `/v2/fx/reference/trades/${encodeURIComponent(requiredString(tradeId, "tradeId"))}/execute`,
       { method: "POST" },
     );
   }
@@ -122,11 +186,13 @@ export class BlueballsFxClient {
     return this.#request("/v2/fx/orders", { method: "POST", body: order });
   }
   listOrders(maker) {
-    return this.#request(`/v2/fx/orders?maker=${encodeURIComponent(maker)}`);
+    return this.#request(
+      `/v2/fx/orders?maker=${encodeURIComponent(requiredString(maker, "maker"))}`,
+    );
   }
   cancelOrder(orderHash, options = {}) {
     return this.#request(
-      `/v2/fx/orders/${encodeURIComponent(orderHash)}/cancel`,
+      `/v2/fx/orders/${encodeURIComponent(requiredString(orderHash, "orderHash"))}/cancel`,
       {
         method: "POST",
         body: options,
@@ -135,7 +201,7 @@ export class BlueballsFxClient {
   }
   depth({ inputAsset, outputAsset }) {
     return this.#request(
-      `/v2/fx/depth?inputAsset=${encodeURIComponent(inputAsset)}&outputAsset=${encodeURIComponent(outputAsset)}`,
+      `/v2/fx/depth?inputAsset=${encodeURIComponent(requiredString(inputAsset, "inputAsset"))}&outputAsset=${encodeURIComponent(requiredString(outputAsset, "outputAsset"))}`,
     );
   }
 
@@ -150,9 +216,9 @@ export class BlueballsFxClient {
     return this.#request("/v2/fx/quotes", {
       method: "POST",
       body: {
-        inputAsset,
-        outputAsset,
-        exactOutput: String(exactOutput),
+        inputAsset: requiredString(inputAsset, "inputAsset"),
+        outputAsset: requiredString(outputAsset, "outputAsset"),
+        exactOutput: atomicAmount(exactOutput, "exactOutput"),
         ...(expiresInMs === undefined ? {} : { expiresInMs }),
         ...(participantId === undefined ? {} : { participantId }),
         ...(accountRef === undefined ? {} : { accountRef }),
@@ -160,16 +226,20 @@ export class BlueballsFxClient {
     });
   }
   getQuote(quoteId) {
-    return this.#request(`/v2/fx/quotes/${encodeURIComponent(quoteId)}`);
+    return this.#request(
+      `/v2/fx/quotes/${encodeURIComponent(requiredString(quoteId, "quoteId"))}`,
+    );
   }
   execute(quoteId) {
     return this.#request(
-      `/v2/fx/quotes/${encodeURIComponent(quoteId)}/execute`,
+      `/v2/fx/quotes/${encodeURIComponent(requiredString(quoteId, "quoteId"))}/execute`,
       { method: "POST" },
     );
   }
   getRoute(routeId) {
-    return this.#request(`/v2/fx/routes/${encodeURIComponent(routeId)}`);
+    return this.#request(
+      `/v2/fx/routes/${encodeURIComponent(requiredString(routeId, "routeId"))}`,
+    );
   }
 
   createFiatIntent(intent) {
@@ -179,20 +249,22 @@ export class BlueballsFxClient {
     });
   }
   getFiatIntent(intentId) {
-    return this.#request(`/v2/fx/fiat/intents/${encodeURIComponent(intentId)}`);
+    return this.#request(
+      `/v2/fx/fiat/intents/${encodeURIComponent(requiredString(intentId, "intentId"))}`,
+    );
   }
   reserveFiatIntent(intentId) {
     return this.#request(
-      `/v2/fx/fiat/intents/${encodeURIComponent(intentId)}/reserve`,
+      `/v2/fx/fiat/intents/${encodeURIComponent(requiredString(intentId, "intentId"))}/reserve`,
       { method: "POST" },
     );
   }
   submitFiatIntent(intentId, submissionRef) {
     return this.#request(
-      `/v2/fx/fiat/intents/${encodeURIComponent(intentId)}/submit`,
+      `/v2/fx/fiat/intents/${encodeURIComponent(requiredString(intentId, "intentId"))}/submit`,
       {
         method: "POST",
-        body: { submissionRef },
+        body: { submissionRef: requiredString(submissionRef, "submissionRef") },
       },
     );
   }
@@ -204,10 +276,10 @@ export class BlueballsFxClient {
   }
   settleFiatIntent(intentId, eventId) {
     return this.#request(
-      `/v2/fx/fiat/intents/${encodeURIComponent(intentId)}/settle`,
+      `/v2/fx/fiat/intents/${encodeURIComponent(requiredString(intentId, "intentId"))}/settle`,
       {
         method: "POST",
-        body: { eventId },
+        body: eventId === undefined ? {} : { eventId: requiredString(eventId, "eventId") },
       },
     );
   }
