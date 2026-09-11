@@ -1,25 +1,39 @@
-# Release process
+# Release Process
 
-Blueballs releases are prepared and verified locally.
+Blueballs releases are built from reproducible repository evidence tied to an exact commit.
 
-## Requirements
+## 1. Prepare the candidate
 
-- the release commit is on `main` and the working tree is clean;
-- package versions and `CHANGELOG.md` agree;
-- generated OpenAPI files are current;
-- no credentials, customer data or local databases are present;
-- `pnpm verify` passes;
-- product screenshots and public documentation match the release;
-- production boundaries and required adapters are stated clearly.
+The release checkout should be on the intended `main` commit with a clean working tree. Package versions, changelog, generated OpenAPI/SDK artifacts and product documentation should describe the same source state.
 
-## Verify
+Install exactly from the lockfile:
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm verify
 ```
 
-Build the reference images on a machine with Docker:
+## 2. Run the full release profile
+
+```bash
+pnpm verify:release
+```
+
+This is the authoritative release gate. It runs the complete repository verification plus security/dependency checks, CycloneDX inventory, restart/chaos, disposable banking + FX load proof and reference-container vulnerability scanning.
+
+Evidence is written under `artifacts/`, including:
+
+```text
+verification-report.json
+api-operation-coverage.json
+load-report.json
+blueballs-sbom.cdx.json
+```
+
+`verification-report.json` binds the pass to the exact commit, Git tree, Node/pnpm versions and `pnpm-lock.yaml` digest.
+
+## 3. Build distribution artifacts
+
+Reference images:
 
 ```bash
 docker build -f apps/fx-node/Dockerfile -t blueballs-fx:0.1.0 .
@@ -27,52 +41,62 @@ docker build -f Dockerfile.reference -t blueballs-reference:0.1.0 .
 docker compose -f compose.reference.yml config >/dev/null
 ```
 
-Generate optional distribution artifacts:
+Contracts and SDK:
 
 ```bash
 make -C packages/fx-contracts abi
-node scripts/dependency-inventory.mjs artifacts/blueballs-sbom.cdx.json
 pnpm --dir packages/fx-sdk pack:check
 ```
 
-The controlled Anvil procedure is included in `pnpm verify`. It exercises the
-Solidity contracts on a local JSON-RPC node; it is not a production-network or
-external-audit claim.
+Dependency inventory:
 
-## Tag
+```bash
+pnpm sbom
+```
 
-Use an annotated signed tag when signing is available:
+## 4. Release identity
+
+Use an annotated signed tag when the maintainer signing setup is available:
 
 ```bash
 git tag -s v0.1.0 -m "Blueballs v0.1.0"
 git push origin v0.1.0
 ```
 
-If signed tags are unavailable, state that plainly in the release notes.
+The tag should resolve to the exact commit named in the retained verification report.
 
 ## Release contents
 
-A release may include:
+A Blueballs release can include:
 
-- the source revision and changelog;
+- source revision and changelog;
 - banking and FX OpenAPI contracts;
-- the packed FX SDK;
-- exported contract ABIs and checksums;
-- a CycloneDX dependency inventory;
-- container image references;
-- deployment and production-checklist notes.
+- FX SDK package;
+- exported Solidity ABIs and checksums;
+- CycloneDX dependency inventory;
+- reference container image digest;
+- exact-checkout verification report;
+- API operation coverage;
+- load/chaos evidence;
+- deployment and migration notes.
 
-Publishing packages, container images or a GitHub Release is a separate
-maintainer decision after the artifacts have been reviewed.
+## Publication checklist
+
+Before publishing:
+
+- confirm `pnpm verify:release` passed on the tagged candidate;
+- confirm the checkout remained clean after verification;
+- confirm generated OpenAPI/SDK artifacts match source;
+- confirm the release report names the expected commit and tree;
+- confirm container/SBOM digests are archived with the release;
+- document breaking changes and required migrations;
+- call out deployment adapter requirements when the release changes a provider contract.
 
 ## After publication
 
-- confirm the tag resolves to the intended commit;
-- verify published checksums and package contents;
-- document breaking changes, migrations and required adapters;
-- keep previous releases available for comparison;
-- open the next `Unreleased` changelog section.
+- verify the tag and published checksums;
+- keep prior releases available for comparison;
+- open the next `Unreleased` changelog section;
+- route security reports through the private process in [`SECURITY.md`](SECURITY.md).
 
-A Blueballs reference release identifies tested source; it does not imply
-regulatory approval, independent security review or production suitability for
-a particular institution.
+Blueballs release artifacts are designed so institutions and reviewers can independently reproduce the same source-level assurance profile on their own infrastructure.
