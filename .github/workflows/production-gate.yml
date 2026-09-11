@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 concurrency:
   group: production-gate-${{ github.workflow }}-${{ github.ref }}
@@ -67,7 +68,7 @@ jobs:
           retention-days: 30
 
   workers:
-    name: Cloudflare runtime parity
+    name: Cloudflare runtime parity and eviction
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -121,10 +122,42 @@ jobs:
       - run: docker compose -f compose.reference.yml config --quiet
       - run: docker build --pull=false -f Dockerfile.reference -t blueballs/reference:${{ github.sha }} .
 
+  security:
+    name: Secrets, dependencies and CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Scan tracked files for high-signal credentials
+        run: node scripts/scan-secrets.mjs
+      - name: Reject high/critical production dependency advisories
+        run: pnpm audit --prod --audit-level high
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - name: Build analyzable JavaScript/TypeScript surfaces
+        run: pnpm build
+      - name: Analyze with CodeQL
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
   production_gate:
     name: Production gate
     if: always()
-    needs: [quality, banking_api, workers, fx, contracts, container]
+    needs: [quality, banking_api, workers, fx, contracts, container, security]
     runs-on: ubuntu-latest
     steps:
       - name: Require every production check to pass
@@ -135,11 +168,13 @@ jobs:
           FX: ${{ needs.fx.result }}
           CONTRACTS: ${{ needs.contracts.result }}
           CONTAINER: ${{ needs.container.result }}
+          SECURITY: ${{ needs.security.result }}
         run: |
-          printf 'quality=%s\nbanking=%s\nworkers=%s\nfx=%s\ncontracts=%s\ncontainer=%s\n' "$QUALITY" "$BANKING" "$WORKERS" "$FX" "$CONTRACTS" "$CONTAINER"
+          printf 'quality=%s\nbanking=%s\nworkers=%s\nfx=%s\ncontracts=%s\ncontainer=%s\nsecurity=%s\n' "$QUALITY" "$BANKING" "$WORKERS" "$FX" "$CONTRACTS" "$CONTAINER" "$SECURITY"
           test "$QUALITY" = success
           test "$BANKING" = success
           test "$WORKERS" = success
           test "$FX" = success
           test "$CONTRACTS" = success
           test "$CONTAINER" = success
+          test "$SECURITY" = success
