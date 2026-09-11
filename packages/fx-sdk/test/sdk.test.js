@@ -50,11 +50,98 @@ test("public reference inspection and preview work without an API key", async ()
   await client.health();
   await client.referenceStatus();
   await client.previewReferenceTrade({ inputAmount: "50000.00" });
-  assert.equal(seen.every(({ options }) => !("authorization" in options.headers)), true);
+  assert.equal(
+    seen.every(({ options }) => !("authorization" in options.headers)),
+    true,
+  );
   await assert.rejects(
     () => client.reserveReferenceTrade({ inputAmount: "50000.00" }),
     (error) =>
-      error instanceof BlueballsFxError && error.code === "AUTH_REQUIRED" && error.status === 0,
+      error instanceof BlueballsFxError &&
+      error.code === "AUTH_REQUIRED" &&
+      error.status === 0,
+  );
+});
+
+test("operator finality methods use only the operator credential", async () => {
+  const seen = [];
+  const client = new BlueballsFxClient({
+    baseUrl: "https://fx.example.test",
+    apiKey: "client-key",
+    operatorApiKey: "operator-key",
+    fetchImpl: async (url, options) => {
+      seen.push({ url, options });
+      return jsonResponse({ ok: true });
+    },
+  });
+
+  await client.confirmQuote("quote/1", {
+    eventId: "chain-event-1",
+    fills: [{ orderHash: "0xabc" }],
+  });
+  await client.failQuote("quote-2", {
+    reason: "SETTLEMENT_REVERTED",
+  });
+  await client.attestFiat({ attestationId: "att-1" });
+  await client.settleFiatIntent("intent-1", "fiat-event-1");
+
+  assert.equal(
+    seen.every(
+      ({ options }) => options.headers.authorization === "Bearer operator-key",
+    ),
+    true,
+  );
+  assert.equal(
+    seen[0].url,
+    "https://fx.example.test/v2/fx/ops/quotes/quote%2F1/confirmed",
+  );
+  assert.deepEqual(JSON.parse(seen[0].options.body), {
+    eventId: "chain-event-1",
+    fills: [{ orderHash: "0xabc" }],
+  });
+});
+
+test("finality methods fail locally when operator authority is absent", async () => {
+  const client = new BlueballsFxClient({
+    baseUrl: "https://fx.example.test",
+    apiKey: "client-key",
+    fetchImpl: async () => {
+      throw new Error("network should not be reached");
+    },
+  });
+  for (const call of [
+    () => client.confirmQuote("q1", { eventId: "evt-1" }),
+    () => client.failQuote("q1", { reason: "failed" }),
+    () => client.attestFiat({}),
+    () => client.settleFiatIntent("i1", "evt-2"),
+  ]) {
+    await assert.rejects(
+      call,
+      (error) =>
+        error instanceof BlueballsFxError &&
+        error.code === "OPERATOR_AUTH_REQUIRED" &&
+        error.status === 0,
+    );
+  }
+});
+
+test("client operations never fall back to the operator key", async () => {
+  const client = new BlueballsFxClient({
+    baseUrl: "https://fx.example.test",
+    operatorApiKey: "operator-key",
+    fetchImpl: async () => {
+      throw new Error("network should not be reached");
+    },
+  });
+  await assert.rejects(
+    () =>
+      client.quote({
+        inputAsset: "USDC",
+        outputAsset: "EURC",
+        exactOutput: "1",
+      }),
+    (error) =>
+      error instanceof BlueballsFxError && error.code === "AUTH_REQUIRED",
   );
 });
 
@@ -103,6 +190,15 @@ test("SDK validates its transport base before sending secrets", () => {
       }),
     /HTTP or HTTPS/,
   );
+  assert.throws(
+    () =>
+      new BlueballsFxClient({
+        baseUrl: "https://fx.example.test",
+        operatorApiKey: "",
+        fetchImpl: async () => jsonResponse({}),
+      }),
+    /operatorApiKey must be a non-empty string/,
+  );
 });
 
 test("health request is intentionally unauthenticated", async () => {
@@ -110,6 +206,7 @@ test("health request is intentionally unauthenticated", async () => {
   const client = new BlueballsFxClient({
     baseUrl: "http://localhost:8788",
     apiKey: "secret-key",
+    operatorApiKey: "operator-key",
     fetchImpl: async (_url, options) => {
       headers = options.headers;
       return jsonResponse({ status: "ok" });
@@ -230,7 +327,10 @@ test("SDK exposes the connected public reference trade and scenario API", async 
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     inputAmount: "50000.00",
   });
-  assert.equal(requests[1].url, "http://localhost:8788/v2/fx/reference/trades");
+  assert.equal(
+    requests[1].url,
+    "http://localhost:8788/v2/fx/reference/trades",
+  );
   assert.deepEqual(JSON.parse(requests[2].options.body), {
     id: "issuer_policy_blocked",
   });
