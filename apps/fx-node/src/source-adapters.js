@@ -47,9 +47,6 @@ export class PrivateMarketLiquidityAdapter {
         maxOutput: level.availableSell,
         inputNumerator: level.buyAmount,
         inputDenominator: level.sellAmount,
-        // Individual signed orders retain their own authorisations. This aggregate
-        // marker exists only to satisfy the common planner schema; reservation and
-        // submission revalidate the underlying orders in FxMarketService.
         policyAuthorizationId: "private-market:underlying-orders",
         expiresAt,
         reservationPayload: { aggregate: true },
@@ -249,6 +246,7 @@ export class PrincipalLiquidityAdapter {
         `principal authorization invalid: ${authorization?.reason ?? "INVALID"}`,
       );
       error.code = "POLICY_AUTHORIZATION_INVALID";
+      error.status = 403;
       throw error;
     }
     const quoteId = `${routeId}:principal:${index}`;
@@ -292,15 +290,33 @@ export class PrincipalLiquidityAdapter {
 
   markSubmitted({ reservationHandle, submissionRef }) {
     requiredString(submissionRef, "submissionRef");
+    const rows = this.riskBook.db
+      .prepare(
+        "SELECT state FROM principal_reservations WHERE quote_id = ?",
+      )
+      .all(reservationHandle);
+    if (rows.length === 0) throw new Error("principal reservation not found");
+    if (rows.every((row) => row.state === "SUBMITTED")) {
+      return { reservationHandle, submissionRef, duplicate: true };
+    }
     this.validateReserved({ reservationHandle });
-    return { reservationHandle, submissionRef };
+    const result = this.riskBook.markSubmitted(reservationHandle);
+    return { reservationHandle, submissionRef, ...result };
   }
 
   confirm({ reservationHandle, eventId }) {
     return this.riskBook.settle({ quoteId: reservationHandle, eventId });
   }
 
-  fail({ reservationHandle, reason = "SETTLEMENT_FAILED" }) {
-    return this.riskBook.release(reservationHandle, reason);
+  fail({
+    reservationHandle,
+    eventId = null,
+    reason = "SETTLEMENT_FAILED",
+  }) {
+    return this.riskBook.fail({
+      quoteId: reservationHandle,
+      eventId,
+      reason,
+    });
   }
 }
