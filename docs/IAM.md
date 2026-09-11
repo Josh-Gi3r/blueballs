@@ -58,9 +58,16 @@ BANK_TRUSTED_ACTOR_MAX_SKEW_SECONDS=300
 ```
 
 The signature covers the timestamp, authenticated machine credential ID, HTTP
-method, exact request path, actor ID and assurance level. This binds the human
-identity to one credential and one operation. Partial, stale or forged
+method, exact request path, actor ID, assurance level **and a SHA-256 hash of the
+canonical JSON body plus sorted query parameters**. The same assertion therefore
+cannot be replayed onto a different amount, recipient, policy change or query
+during its clock-skew window. Partial, stale, forged or request-mismatched
 assertions fail closed with `401`.
+
+The side-effect-free canonical signing contract lives in
+[`spec/trusted-actor-signing.mjs`](../spec/trusted-actor-signing.mjs). A deployment
+gateway should use that exact canonicalization rather than inventing its own JSON
+serialization rules.
 
 When valid, command audit evidence records the human subject as `actor_id`. The
 `actor_scope` retains both the assurance level and the underlying machine
@@ -120,7 +127,8 @@ not the Blueballs banking API. The gateway should:
 1. validate the IdP session/token;
 2. evaluate role/entitlement and required assurance;
 3. use a narrowly-scoped Blueballs machine credential;
-4. sign the actor assertion immediately before forwarding the command;
+4. canonicalize the exact body/query and sign the actor assertion immediately
+   before forwarding the command;
 5. never expose the assertion signing secret or backend API key to the browser;
 6. expire/revoke sessions using the institution's IdP controls.
 
