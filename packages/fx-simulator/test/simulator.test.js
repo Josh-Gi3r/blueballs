@@ -78,10 +78,35 @@ test("issuer outage reduces issuer contribution", () => {
   assertPrincipalInvariant(outage);
 });
 
-test("price shock is recorded deterministically without violating exposure limits", () => {
-  const result = runSimulation(baselineScenarios().priceShock);
-  assert.equal(result.referenceIndex, 1.05);
-  assertPrincipalInvariant(result);
+test("price shock changes principal execution economics using fixed-point reference pricing", () => {
+  const principal = {
+    sourceType: "BANK_PRINCIPAL",
+    sourceId: "principal",
+    online: true,
+    capacityBuy: "1000000",
+    capacitySell: "1000000",
+    inputNumeratorBuy: "10020",
+    inputDenominatorBuy: "10000",
+    inputNumeratorSell: "10020",
+    inputDenominatorSell: "10000",
+  };
+  const base = {
+    seed: 17,
+    principalHardLimit: "50000",
+    sources: [principal],
+    requests: [
+      { direction: "BUY_B", outputAmount: "1000" },
+      { direction: "BUY_B", outputAmount: "1000" },
+    ],
+  };
+  const control = runSimulation({ ...base, events: [] });
+  const shocked = runSimulation({
+    ...base,
+    events: [{ at: 1, type: "PRICE_SHOCK", multiplier: "1.05" }],
+  });
+  assert.equal(shocked.referenceIndex, 1.05);
+  assert.ok(asBig(shocked.totalInput) > asBig(control.totalInput));
+  assertPrincipalInvariant(shocked);
 });
 
 test("cancellation storm reduces private-market routed volume", () => {
@@ -111,4 +136,39 @@ test("recovery scenario resumes filling after liquidity and reference service re
   assert.ok(result.referenceOutageRequests > 0);
   assert.ok(asBig(result.routeComposition.INSTITUTIONAL_LP) > 0n);
   assertPrincipalInvariant(result);
+});
+
+test("simulator rejects ambiguous sources and out-of-range event controls", () => {
+  const base = baselineScenarios().balanced;
+  assert.throws(
+    () => runSimulation({ ...base, sources: [base.sources[0], base.sources[0]] }),
+    /sourceId values must be unique/,
+  );
+  assert.throws(
+    () =>
+      runSimulation({
+        ...base,
+        events: [{ at: -1, type: "REFERENCE_UNAVAILABLE" }],
+      }),
+    /event at must be an integer/,
+  );
+  assert.throws(
+    () => runSimulation({ ...base, settlementFailureProbability: 1.1 }),
+    /between 0 and 1/,
+  );
+  assert.throws(
+    () =>
+      runSimulation({
+        ...base,
+        events: [
+          {
+            at: 0,
+            type: "CANCELLATION_STORM",
+            sourceId: "market",
+            remainingBps: 10_001,
+          },
+        ],
+      }),
+    /remainingBps/,
+  );
 });
