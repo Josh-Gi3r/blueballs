@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { BrandLockup } from "../Brand";
 import ProviderMatchPanel from "../ecosystem/ProviderMatchPanel";
 import { trackGrowthEvent } from "../growth/events";
@@ -10,7 +10,8 @@ type BlueprintPageProps = {
 };
 
 function Chips({ items }: { items: string[] }) {
-  if (items.length === 0) return <span className="shared-blueprint-empty">Not specified</span>;
+  if (items.length === 0)
+    return <span className="shared-blueprint-empty">Not specified</span>;
   return (
     <div className="shared-blueprint-chips">
       {items.map((item) => (
@@ -86,7 +87,11 @@ export default function BlueprintPage({ onNavigate }: BlueprintPageProps) {
   return (
     <main
       className="shared-blueprint-page"
-      style={{ "--blueprint-accent": blueprint.accent ?? "#0868FF" } as React.CSSProperties}
+      style={
+        {
+          "--blueprint-accent": blueprint.accent ?? "#0868FF",
+        } as CSSProperties
+      }
     >
       <header className="shared-blueprint-header">
         <button type="button" onClick={() => onNavigate("/home")}>
