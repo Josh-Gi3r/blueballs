@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { BrandLockup } from "../Brand";
 import ProviderMatchPanel from "../ecosystem/ProviderMatchPanel";
 import { trackGrowthEvent } from "../growth/events";
-import { decodeBlueprintShare, stashBlueprintFork } from "./share";
+import { decodeBlueprintShare, encodeBlueprintShare } from "./share";
 import "./BlueprintPage.css";
 
 type BlueprintPageProps = {
@@ -51,13 +51,12 @@ export default function BlueprintPage({ onNavigate }: BlueprintPageProps) {
 
   function forkBlueprint() {
     if (!blueprint) return;
-    const stored = stashBlueprintFork(blueprint);
+    const hash = encodeBlueprintShare(blueprint);
     trackGrowthEvent("blueprint_fork_start", {
-      stored,
       markets: blueprint.markets.length,
       capabilities: blueprint.capabilities.length,
     });
-    onNavigate("/sandbox");
+    onNavigate(`/sandbox${hash}`);
   }
 
   if (!blueprint) {
