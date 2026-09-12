@@ -35,7 +35,9 @@ body:
       label: Relevant Blueballs surfaces
       options:
         - label: Banking API and ledger
+        - label: Onboarding, identity or compliance
         - label: Payments, accounts or cards
+        - label: Wallets or custody
         - label: Provider adapters and orchestration
         - label: Stablecoin FX and treasury
         - label: Settlement contracts
