@@ -92,7 +92,7 @@ const STANDARD_PROOF = [
   "Disposable scratch financial behaviour and tenant isolation",
 ];
 const RELEASE_PROOF = [
-  "Tracked-secret and production dependency audit",
+  "Tracked-secret and full dependency audit",
   "CycloneDX dependency inventory",
   "Financial restart and chaos suite",
   "Disposable banking and FX load proof",
