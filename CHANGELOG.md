@@ -6,7 +6,7 @@ Tagged releases follow semantic versioning.
 
 ## [Unreleased]
 
-This cycle takes Blueballs far beyond the initial public release: a harder banking core, a real provider orchestration boundary, institution-owned FX production composition, stronger settlement contracts and reproducible release proof.
+This cycle takes Blueballs far beyond the initial public release: a harder banking core, a real provider orchestration boundary, institution-owned FX production composition, stronger settlement contracts, reusable financial-product Blueprints and public, source-linked release proof.
 
 ### Banking core
 
@@ -40,12 +40,22 @@ This cycle takes Blueballs far beyond the initial public release: a harder banki
 - **Vault and settlement invariants** cover solvency, surplus-only rescue, partial-fill accounting, cancellation and bounded withdrawal-delay incident controls.
 - **Foundry assurance** combines unit, fuzz and invariant testing for the token settlement kernel.
 
+### Product design, provider decisions and distribution
+
+- **Deterministic infrastructure matching** turns a Builder Blueprint into an explainable provider shortlist based on capability fit, declared market coverage and explicit rail evidence. Commercial relationships do not affect ranking.
+- **Persistent provider decisions** let builders shortlist and compare infrastructure, open official technical documentation, claim provider profiles and start a separate commercial provider route without turning the directory into pay-to-play.
+- **Shareable Blueprints** serialize only public-safe product architecture into a fragment link, so another builder can inspect and fork markets, currencies, capabilities and rails without exposing sandbox customers, balances, transactions, credentials or tenant state.
+- **The Blueprint Library** adds eight reusable product architectures across creator banking, freelancer finance, stablecoin treasury, remittance, cards, merchant settlement, community wallets and institution-owned FX.
+- **Implementation briefs** convert a Blueprint and user-selected provider shortlist into concrete workstreams and a copyable public-safe handoff for a technical team or Blueballs implementation engagement.
+- **Builder activation and demand signals** distinguish page intent from completed Blueprints, provisioned sandboxes, test payments, provider decisions, Blueprint distribution and implementation-intake starts using bounded first-party events.
+
 ### Release proof
 
 - **Repository-local release authority** now runs from the exact candidate checkout rather than depending on a hosted CI vendor.
 - **`pnpm verify:release`** combines build/types, banking and FX suites, Workers, OpenAPI/SDK contracts, Foundry, secrets/dependencies, SBOM, restart/chaos, disposable load proof and container scanning.
 - **Exact-checkout evidence** records the commit, Git tree, toolchain, lockfile digest, API operation coverage and release-gate results.
 - **Deployment parity guards** verify that the public site, banking API and FX runtime converge on the same source commit after promotion.
+- **Public Proof** exposes live site/banking/FX source parity from `/api/health` alongside source-linked verification, release and deployment gates. The public claims are checked against the repository scripts as part of publication truth.
 
 ## [0.1.0] - 2026-08-28
 
