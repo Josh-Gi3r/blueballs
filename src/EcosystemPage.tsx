@@ -26,10 +26,16 @@ const FILLER_COPY = [
 function initialShortlist() {
   if (typeof window === "undefined") return [] as string[];
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(SHORTLIST_KEY) || "[]");
+    const parsed = JSON.parse(
+      window.localStorage.getItem(SHORTLIST_KEY) || "[]",
+    );
     if (!Array.isArray(parsed)) return [];
     const valid = new Set(PROVIDERS.map((provider) => provider.id));
-    return parsed.filter((id): id is string => typeof id === "string" && valid.has(id)).slice(0, MAX_SHORTLIST);
+    return parsed
+      .filter(
+        (id): id is string => typeof id === "string" && valid.has(id),
+      )
+      .slice(0, MAX_SHORTLIST);
   } catch {
     return [] as string[];
   }
@@ -84,7 +90,9 @@ function ComparePanel({
             final availability with each provider.
           </p>
         </div>
-        <button type="button" onClick={onClose}>Close comparison</button>
+        <button type="button" onClick={onClose}>
+          Close comparison
+        </button>
       </div>
       <div className="eco-compare-grid">
         {providers.map((provider) => (
@@ -93,18 +101,39 @@ function ComparePanel({
             <h3>{provider.name}</h3>
             <p>{provider.provides}</p>
             <dl>
-              <div><dt>Access</dt><dd>{provider.access}</dd></div>
-              <div><dt>Sandbox</dt><dd>{provider.sandbox}</dd></div>
-              <div><dt>Technical</dt><dd>{provider.technicalStatus}</dd></div>
-              <div><dt>Regions</dt><dd>{provider.regions.join(" · ")}</dd></div>
-              <div><dt>Capabilities</dt><dd>{provider.capabilities.join(" · ")}</dd></div>
+              <div>
+                <dt>Access</dt>
+                <dd>{provider.access}</dd>
+              </div>
+              <div>
+                <dt>Sandbox</dt>
+                <dd>{provider.sandbox}</dd>
+              </div>
+              <div>
+                <dt>Technical</dt>
+                <dd>{provider.technicalStatus}</dd>
+              </div>
+              <div>
+                <dt>Regions</dt>
+                <dd>{provider.regions.join(" · ")}</dd>
+              </div>
+              <div>
+                <dt>Capabilities</dt>
+                <dd>{provider.capabilities.join(" · ")}</dd>
+              </div>
             </dl>
             <div className="eco-compare-links">
               <a
                 href={provider.docsUrl}
                 target="_blank"
                 rel="noreferrer"
-                onClick={() => trackGrowthEvent("provider_outbound", { provider: provider.id, destination: "docs", context: "compare" })}
+                onClick={() =>
+                  trackGrowthEvent("provider_outbound", {
+                    provider: provider.id,
+                    destination: "docs",
+                    context: "compare",
+                  })
+                }
               >
                 Technical docs ↗
               </a>
@@ -112,7 +141,13 @@ function ComparePanel({
                 href={provider.url}
                 target="_blank"
                 rel="noreferrer"
-                onClick={() => trackGrowthEvent("provider_outbound", { provider: provider.id, destination: "website", context: "compare" })}
+                onClick={() =>
+                  trackGrowthEvent("provider_outbound", {
+                    provider: provider.id,
+                    destination: "website",
+                    context: "compare",
+                  })
+                }
               >
                 Company ↗
               </a>
@@ -128,7 +163,10 @@ function ComparePanel({
         <button
           type="button"
           onClick={() => {
-            trackGrowthEvent("commercial_cta", { source: "provider_compare", providers: providers.length });
+            trackGrowthEvent("commercial_cta", {
+              source: "provider_compare",
+              providers: providers.length,
+            });
             onNavigate("/contact");
           }}
         >
@@ -161,7 +199,8 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return PROVIDERS.filter((provider) => {
-      const categoryMatch = active === "all" || provider.categories.includes(active);
+      const categoryMatch =
+        active === "all" || provider.categories.includes(active);
       if (!categoryMatch) return false;
       if (!q) return true;
       return [
@@ -182,10 +221,11 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
 
   const selectedCategory = active === "all" ? null : CATEGORY_MAP[active];
   const shortlistedProviders = useMemo(
-    () => shortlist.flatMap((id) => {
-      const provider = PROVIDERS.find((candidate) => candidate.id === id);
-      return provider ? [provider] : [];
-    }),
+    () =>
+      shortlist.flatMap((id) => {
+        const provider = PROVIDERS.find((candidate) => candidate.id === id);
+        return provider ? [provider] : [];
+      }),
     [shortlist],
   );
 
@@ -227,7 +267,11 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
           <div className="eco-hero-actions">
             <button
               type="button"
-              onClick={() => document.getElementById("eco-directory")?.scrollIntoView({ behavior: "smooth" })}
+              onClick={() =>
+                document
+                  .getElementById("eco-directory")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
             >
               Browse the directory
             </button>
@@ -236,7 +280,12 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
               target="_blank"
               rel="noreferrer"
               className="secondary"
-              onClick={() => trackGrowthEvent("provider_claim_start", { provider: "unselected", source: "directory_hero" })}
+              onClick={() =>
+                trackGrowthEvent("provider_claim_start", {
+                  provider: "unselected",
+                  source: "directory_hero",
+                })
+              }
             >
               Claim a provider profile
             </a>
@@ -256,17 +305,24 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             </div>
           </div>
         </div>
-        <CategoryMap active={active} setActive={(next) => {
-          setActive(next);
-          trackGrowthEvent("provider_filter", { category: next });
-        }} />
+        <CategoryMap
+          active={active}
+          setActive={(next) => {
+            setActive(next);
+            trackGrowthEvent("provider_filter", { category: next });
+          }}
+        />
       </section>
 
       {shortlistedProviders.length > 0 && (
         <section className="eco-shortlist-bar" aria-live="polite">
           <div>
             <span>YOUR SHORTLIST</span>
-            <strong>{shortlistedProviders.map((provider) => provider.name).join(" · ")}</strong>
+            <strong>
+              {shortlistedProviders
+                .map((provider) => provider.name)
+                .join(" · ")}
+            </strong>
             {notice && <small>{notice}</small>}
           </div>
           <div>
@@ -277,11 +333,16 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
                 setShowCompare(true);
                 trackGrowthEvent("provider_compare", {
                   providers: shortlistedProviders.length,
-                  provider_ids: shortlistedProviders.map((provider) => provider.id).join(","),
+                  provider_ids: shortlistedProviders
+                    .map((provider) => provider.id)
+                    .join(","),
                 });
               }}
             >
-              Compare {shortlistedProviders.length > 1 ? shortlistedProviders.length : "providers"}
+              Compare{" "}
+              {shortlistedProviders.length > 1
+                ? shortlistedProviders.length
+                : "providers"}
             </button>
             <button
               type="button"
@@ -310,7 +371,9 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
         <div className="eco-directory-head">
           <div>
             <span>PROVIDER DIRECTORY</span>
-            <h2>{selectedCategory ? selectedCategory.label : "Browse by service."}</h2>
+            <h2>
+              {selectedCategory ? selectedCategory.label : "Browse by service."}
+            </h2>
             <p>
               {selectedCategory
                 ? selectedCategory.description
@@ -321,7 +384,9 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             <span>SEARCH</span>
             <input
               value={query}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                setQuery(event.target.value)
+              }
               onBlur={() => {
                 if (query.trim()) {
                   trackGrowthEvent("provider_search", {
@@ -358,7 +423,13 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
               }}
             >
               <b>{category.label}</b>
-              <span>{PROVIDERS.filter((provider) => provider.categories.includes(category.id)).length}</span>
+              <span>
+                {
+                  PROVIDERS.filter((provider) =>
+                    provider.categories.includes(category.id),
+                  ).length
+                }
+              </span>
             </button>
           ))}
         </div>
@@ -371,13 +442,17 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             <div>
               <span>RELATED BLUEBALLS MODULES</span>
               <div>
-                {selectedCategory.blueballs.map((module) => <b key={module}>{module}</b>)}
+                {selectedCategory.blueballs.map((module) => (
+                  <b key={module}>{module}</b>
+                ))}
               </div>
             </div>
           </div>
         )}
         <div className="eco-results-line">
-          <span>{filtered.length} {filtered.length === 1 ? "listing" : "listings"}</span>
+          <span>
+            {filtered.length} {filtered.length === 1 ? "listing" : "listings"}
+          </span>
           <span>Reviewed against official provider information · 20 Aug 2026</span>
         </div>
         <div className="eco-provider-grid">
@@ -393,7 +468,9 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
           <EcosystemFillers count={filtered.length} columns={2} />
         </div>
         {filtered.length === 0 && (
-          <div className="eco-empty">No providers match “{query}” in this category.</div>
+          <div className="eco-empty">
+            No providers match “{query}” in this category.
+          </div>
         )}
       </section>
 
@@ -413,7 +490,12 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             href={claimDirectoryHref}
             target="_blank"
             rel="noreferrer"
-            onClick={() => trackGrowthEvent("provider_claim_start", { provider: "unselected", source: "directory_bottom" })}
+            onClick={() =>
+              trackGrowthEvent("provider_claim_start", {
+                provider: "unselected",
+                source: "directory_bottom",
+              })
+            }
           >
             Claim your profile
           </a>
@@ -421,7 +503,9 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             type="button"
             className="secondary"
             onClick={() => {
-              trackGrowthEvent("provider_partnership_start", { source: "directory_bottom" });
+              trackGrowthEvent("provider_partnership_start", {
+                source: "directory_bottom",
+              });
               onNavigate("/contact");
             }}
           >
