@@ -12,6 +12,9 @@ export type GrowthEventName =
   | "blueprint_share"
   | "blueprint_public_view"
   | "blueprint_fork_start"
+  | "implementation_brief_view"
+  | "implementation_brief_copy"
+  | "implementation_intake_start"
   | "builder_start"
   | "commercial_cta"
   | "commercial_contact_view";
