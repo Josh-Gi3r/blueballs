@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BrandLockup } from "../Brand";
 import { call, ensureKey } from "../api";
+import ProviderMatchPanel from "../ecosystem/ProviderMatchPanel";
 import "./sandbox.css";
 
 type Blueprint = {
@@ -774,6 +775,10 @@ export default function SandboxPage() {
                 </div>
               </article>
             </section>
+            <ProviderMatchPanel
+              blueprint={project.blueprint}
+              onNavigate={navigate}
+            />
           </div>
         )}
 

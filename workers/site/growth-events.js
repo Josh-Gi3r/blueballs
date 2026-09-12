@@ -8,6 +8,7 @@ const CLIENT_EVENTS = new Set([
   "provider_outbound",
   "provider_claim_start",
   "provider_partnership_start",
+  "blueprint_provider_matches_view",
   "builder_start",
   "commercial_cta",
   "commercial_contact_view",
