@@ -36,6 +36,7 @@ describe("implementation brief generation", () => {
     );
     expect(brief.providers.map((provider) => provider.id)).toEqual(["bridge"]);
     expect(brief.surfaces).toContain("Stablecoin FX and treasury");
+    expect(brief.surfaces).toContain("Settlement contracts");
   });
 
   it("produces a public-safe Markdown handoff for the existing intake", () => {
@@ -54,9 +55,15 @@ describe("implementation brief generation", () => {
       "https://blueballs.tech/blueprint#blueprint=test",
     );
 
-    expect(markdown).toContain("# Blueballs Implementation Brief — Regional Wallet");
-    expect(markdown).toContain("Provider discovery, due diligence and adapter selection");
+    expect(brief.surfaces).toContain("Wallets or custody");
+    expect(markdown).toContain(
+      "# Blueballs Implementation Brief — Regional Wallet",
+    );
+    expect(markdown).toContain(
+      "Provider discovery, due diligence and adapter selection",
+    );
     expect(markdown).toContain("Shared Blueprint");
+    expect(markdown).toContain("Inclusion is not a recommendation");
     expect(markdown).not.toContain("customer data");
   });
 });
