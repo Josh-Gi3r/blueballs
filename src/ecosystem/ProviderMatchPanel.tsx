@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { trackGrowthEvent } from "../growth/events";
-import { CATEGORY_MAP } from "./data";
+import { CATEGORY_MAP, PROVIDERS } from "./data";
 import { matchProvidersForBlueprint } from "./matching";
 import type { Provider } from "./types";
 import "./ProviderMatchPanel.css";
@@ -22,9 +22,17 @@ type ProviderMatchPanelProps = {
 function readShortlist() {
   if (typeof window === "undefined") return [] as string[];
   try {
-    const value = JSON.parse(window.localStorage.getItem(SHORTLIST_KEY) || "[]");
+    const value = JSON.parse(
+      window.localStorage.getItem(SHORTLIST_KEY) || "[]",
+    );
+    const providerIds = new Set(PROVIDERS.map((provider) => provider.id));
     return Array.isArray(value)
-      ? value.filter((item): item is string => typeof item === "string").slice(0, MAX_SHORTLIST)
+      ? value
+          .filter(
+            (item): item is string =>
+              typeof item === "string" && providerIds.has(item),
+          )
+          .slice(0, MAX_SHORTLIST)
       : [];
   } catch {
     return [] as string[];
@@ -53,7 +61,9 @@ function ProviderMatchCard({
   onToggle: () => void;
 }) {
   return (
-    <article className={`builder-provider-match${shortlisted ? " is-shortlisted" : ""}`}>
+    <article
+      className={`builder-provider-match${shortlisted ? " is-shortlisted" : ""}`}
+    >
       <div className="builder-provider-match-head">
         <div>
           <span>{categories.join(" · ")}</span>
@@ -113,12 +123,19 @@ export default function ProviderMatchPanel({
       capabilities: blueprint.capabilities.length,
       rails: blueprint.rails.length,
     });
-  }, [blueprint.capabilities.length, blueprint.markets.length, blueprint.rails.length, matches.length]);
+  }, [
+    blueprint.capabilities.length,
+    blueprint.markets.length,
+    blueprint.rails.length,
+    matches.length,
+  ]);
 
   const toggleShortlist = (provider: Provider) => {
     const selected = shortlist.includes(provider.id);
     if (!selected && shortlist.length >= MAX_SHORTLIST) {
-      setNotice(`Your provider shortlist already has ${MAX_SHORTLIST} companies.`);
+      setNotice(
+        `Your provider shortlist already has ${MAX_SHORTLIST} companies.`,
+      );
       return;
     }
     const next = selected
@@ -147,15 +164,7 @@ export default function ProviderMatchPanel({
             Blueprint. Commercial relationships do not affect the order.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            trackGrowthEvent("provider_directory_view", {
-              source: "blueprint_match",
-            });
-            onNavigate("/ecosystem");
-          }}
-        >
+        <button type="button" onClick={() => onNavigate("/ecosystem")}>
           Explore provider directory →
         </button>
       </div>
