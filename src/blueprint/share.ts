@@ -58,7 +58,8 @@ export function sanitizeSharedBlueprint(
     input.brand && typeof input.brand === "object" && !Array.isArray(input.brand)
       ? (input.brand as Record<string, unknown>)
       : null;
-  const accent = cleanAccent(brand?.accent);
+  const directAccent = (input as Record<string, unknown>).accent;
+  const accent = cleanAccent(brand?.accent) ?? cleanAccent(directAccent);
 
   if (!name || capabilities.length === 0) return null;
 
