@@ -70,3 +70,14 @@ test("edge forwarding preserves caller credentials and never injects an operator
   // and x-api-key survive while Origin is removed for the internal service hop.
   assert.match(edgeSource, /env\.FX\.fetch\(internalRequest\(target,\s*\{\}\)\)/);
 });
+
+test("growth events are owned by the public site edge, not the banking API", () => {
+  assert.match(
+    edgeSource,
+    /import\s*\{\s*handleGrowthEvent\s*\}\s*from\s*["']\.\/growth-events\.js["']/,
+  );
+  assert.match(
+    edgeSource,
+    /url\.pathname\s*===\s*["']\/api\/events["'][\s\S]*?handleGrowthEvent\(request,\s*env\)/,
+  );
+});
