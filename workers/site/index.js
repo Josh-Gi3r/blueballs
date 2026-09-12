@@ -7,6 +7,7 @@ import {
   robotsText,
   sitemapXml,
 } from "./crawler-pages.js";
+import { handleGrowthEvent } from "./growth-events.js";
 import { runtimeForPath } from "../../spec/runtime-ownership.mjs";
 import { getAgentByName } from "agents";
 export { NeobankBuilder } from "./neobank-builder.js";
@@ -136,6 +137,10 @@ async function handleRequest(request, env) {
 
   if (url.pathname === "/bulletin") {
     return Response.redirect(new URL("/developers", url).toString(), 301);
+  }
+
+  if (url.pathname === "/api/events") {
+    return handleGrowthEvent(request, env);
   }
 
   // Runtime ownership is defined once in spec/runtime-ownership.mjs. The edge
