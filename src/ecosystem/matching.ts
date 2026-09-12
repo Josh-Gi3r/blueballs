@@ -66,15 +66,14 @@ const MARKET_REGIONS: Record<string, string[]> = {
   MY: ["APAC", "Global"],
 };
 
+// Keys use the canonical values emitted by the Builder API, not display labels.
 const RAIL_TERMS: Record<string, string[]> = {
-  ACH: ["ach"],
-  SEPA: ["sepa"],
-  SWIFT: ["swift", "cross-border"],
-  FAST: ["fast", "singapore"],
-  "Faster Payments": ["faster payments", "uk"],
-  PayNow: ["paynow", "singapore"],
-  DuitNow: ["duitnow", "malaysia"],
-  Cards: ["card", "cards"],
+  ach: ["ach"],
+  sepa: ["sepa", "europe"],
+  sepa_instant: ["sepa instant", "sepa", "europe"],
+  faster_payments: ["faster payments", "uk"],
+  paynow: ["paynow", "singapore"],
+  wire: ["wire", "wires", "cross-border"],
 };
 
 function normalize(value: string) {
@@ -135,6 +134,8 @@ function scoreProvider(
     score += 4;
   } else if (matchedRegions.some((region) => normalize(region) === "global")) {
     score += 2;
+  } else if (!input.markets.includes("GLOBAL")) {
+    score -= 3;
   }
 
   const text = providerText(provider);
