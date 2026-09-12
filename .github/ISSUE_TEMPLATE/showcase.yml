@@ -1,0 +1,54 @@
+name: Built with Blueballs
+description: Share a product, adapter, experiment or financial primitive you built with Blueballs.
+title: "[Showcase] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Show what you built
+        Blueballs is open infrastructure. If you forked it, extended it, built an adapter, designed a product or used the financial primitives in something worth seeing, share it here.
+
+        This is a public GitHub issue. Only include information you are comfortable publishing.
+  - type: input
+    id: project
+    attributes:
+      label: Project
+      placeholder: Product, company, experiment or repository name
+    validations:
+      required: true
+  - type: textarea
+    id: built
+    attributes:
+      label: What did you build?
+      placeholder: Tell the community what the product or infrastructure does and which parts of Blueballs you used.
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Public link
+      placeholder: https://...
+  - type: checkboxes
+    id: surfaces
+    attributes:
+      label: Blueballs surfaces used
+      options:
+        - label: Banking API and ledger
+        - label: Cards or payments
+        - label: Provider adapters
+        - label: Stablecoin FX or treasury
+        - label: Settlement contracts
+        - label: Sandbox or product interfaces
+        - label: Other Blueballs primitives
+  - type: textarea
+    id: learnings
+    attributes:
+      label: What did you learn or change?
+      placeholder: Architecture choices, extensions, market adaptations, provider work or ideas others may find useful.
+  - type: checkboxes
+    id: public
+    attributes:
+      label: Public submission
+      options:
+        - label: I am comfortable sharing this information publicly in the Blueballs repository.
+          required: true
