@@ -10,6 +10,7 @@ const ALLOWED_EVENTS = new Set([
   "provider_partnership_start",
   "builder_start",
   "commercial_cta",
+  "commercial_contact_view",
 ]);
 
 const MAX_BODY_BYTES = 4096;
