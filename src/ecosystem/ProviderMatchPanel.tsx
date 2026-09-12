@@ -131,46 +131,46 @@ export default function ProviderMatchPanel({
     });
   };
 
-  if (matches.length === 0) return null;
-
   return (
     <>
-      <section className="builder-provider-panel">
-        <div className="builder-provider-panel-head">
-          <div>
-            <span>INFRASTRUCTURE MATCHES</span>
-            <h3>Providers that fit this Blueprint.</h3>
-            <p>
-              Ranked from the capabilities, markets and rails in this Builder
-              Blueprint. Commercial relationships do not affect the order.
-            </p>
+      {matches.length > 0 && (
+        <section className="builder-provider-panel">
+          <div className="builder-provider-panel-head">
+            <div>
+              <span>INFRASTRUCTURE MATCHES</span>
+              <h3>Providers that fit this Blueprint.</h3>
+              <p>
+                Ranked from the capabilities, markets and rails in this Builder
+                Blueprint. Commercial relationships do not affect the order.
+              </p>
+            </div>
+            <button type="button" onClick={() => onNavigate("/ecosystem")}>
+              Explore provider directory →
+            </button>
           </div>
-          <button type="button" onClick={() => onNavigate("/ecosystem")}>
-            Explore provider directory →
-          </button>
-        </div>
-        {notice && <div className="builder-provider-notice">{notice}</div>}
-        <div className="builder-provider-grid">
-          {matches.map((match) => (
-            <ProviderMatchCard
-              key={match.provider.id}
-              provider={match.provider}
-              reasons={match.reasons}
-              categories={match.matchedCategories.map(
-                (category) => CATEGORY_MAP[category].label,
-              )}
-              shortlisted={shortlist.includes(match.provider.id)}
-              onToggle={() => toggleShortlist(match.provider)}
-            />
-          ))}
-        </div>
-        <p className="builder-provider-method">
-          Matching is a discovery aid, not a recommendation. Blueballs uses
-          declared provider coverage and the current Blueprint; verify licensing,
-          commercial terms, technical fit and market availability with each
-          provider before launch.
-        </p>
-      </section>
+          {notice && <div className="builder-provider-notice">{notice}</div>}
+          <div className="builder-provider-grid">
+            {matches.map((match) => (
+              <ProviderMatchCard
+                key={match.provider.id}
+                provider={match.provider}
+                reasons={match.reasons}
+                categories={match.matchedCategories.map(
+                  (category) => CATEGORY_MAP[category].label,
+                )}
+                shortlisted={shortlist.includes(match.provider.id)}
+                onToggle={() => toggleShortlist(match.provider)}
+              />
+            ))}
+          </div>
+          <p className="builder-provider-method">
+            Matching is a discovery aid, not a recommendation. Blueballs uses
+            declared provider coverage and the current Blueprint; verify
+            licensing, commercial terms, technical fit and market availability
+            with each provider before launch.
+          </p>
+        </section>
+      )}
       <ImplementationBriefPanel
         blueprint={blueprint}
         source={source}
