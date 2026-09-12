@@ -59,9 +59,9 @@ export const STANDARD_PROOF: ProofItem[] = [
 
 export const FULL_RELEASE_PROOF: ProofItem[] = [
   {
-    title: "Tracked-secret and dependency audit",
+    title: "Tracked-secret and full dependency audit",
     detail:
-      "The full release profile scans tracked source for secrets and runs the production dependency audit before promotion.",
+      "The full release profile scans tracked source for secrets and audits production plus build/development dependencies for high-severity advisories before promotion.",
     source: `${REPO}/scripts/release-proof.mjs`,
   },
   {
