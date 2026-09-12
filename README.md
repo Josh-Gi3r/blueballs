@@ -17,6 +17,8 @@
   <a href="https://blueballs.tech/fx">FX Market</a> ·
   <a href="https://blueballs.tech/cards">Cards</a> ·
   <a href="https://blueballs.tech/ecosystem">Providers</a> ·
+  <a href="https://blueballs.tech/blueprint">Blueprints</a> ·
+  <a href="https://blueballs.tech/proof">Proof</a> ·
   <a href="https://blueballs.tech/sandbox">Build in the Sandbox</a> ·
   <a href="https://blueballs.tech/developers">API</a> ·
   <a href="https://blueballs.tech/contact">Build with Blueballs</a>
@@ -48,10 +50,10 @@ Clone it. Inspect it. Fork it. Connect the providers you want. Shape the product
 | **FX** | Policy-aware pricing, private and institutional liquidity, route construction, reservations, treasury/principal capacity, fiat evidence and execution adapters |
 | **Settlement** | Optional Blueballs AtomicRouter contracts for signed taker intent, maker liquidity, cancellation, segregated vault accounting and atomic token settlement |
 | **Money primitives** | A reference monetary engine for reserve-backed instruments, settlement receipts and coverage accounting |
-| **Product layer** | Interactive banking, cards, provider and FX experiences plus a Sandbox Builder for designing and exercising financial products |
+| **Product layer** | Interactive banking and FX experiences, Blueprint Library, provider decision tools, Cards market explorer, Sandbox Builder and generated implementation briefs |
 | **Runtime** | Node.js/SQLite and Cloudflare Workers/Durable Objects using shared financial contracts |
 | **Developer platform** | Generated OpenAPI, SDK contracts, provider conformance boundaries and executable examples |
-| **Release proof** | Exact-checkout verification covering lifecycle tests, restart/eviction, migrations, recovery, load/chaos, dependency inventory and container scanning |
+| **Release proof** | Public Proof plus exact-checkout verification covering lifecycle tests, restart/eviction, migrations, recovery, load/chaos, dependency inventory and container scanning |
 
 ## Not another neobank template
 
@@ -108,6 +110,20 @@ Explore the interactive market at **[blueballs.tech/fx](https://blueballs.tech/f
 The **Blueballs Sandbox Builder** turns product strategy into something executable.
 
 Start with a brief, define the audience and markets, choose currencies, capabilities and rails, shape the product, then exercise the same banking contracts that power the rest of the repository.
+
+A Blueprint can now move through the full decision and distribution loop:
+
+1. define markets, currencies, capabilities and rails;
+2. generate explainable provider matches from capability fit, declared market coverage and explicit rail evidence;
+3. shortlist infrastructure and inspect official technical documentation;
+4. provision an isolated sandbox and exercise protected-ledger journeys;
+5. share a public-safe Blueprint link and let another builder inspect or fork the architecture;
+6. generate a concrete implementation brief from the Blueprint and user-selected shortlist;
+7. take that brief into your own technical team or the Blueballs implementation route.
+
+Provider matching is deliberately non-commercial: sponsorship or commercial relationships do not affect ranking.
+
+Start from scratch or fork one of eight reusable architectures in the **[Blueprint Library](https://blueballs.tech/blueprint)**.
 
 The hosted Builder can help turn an idea into a focused product blueprint without giving an AI model arbitrary authority over customer money.
 
@@ -238,6 +254,8 @@ The full profile exercises build/types, lint/format, the banking lifecycle catal
 
 Machine-readable evidence is tied to the exact commit, Git tree and lockfile.
 
+**[Blueballs Proof](https://blueballs.tech/proof)** exposes live site, banking and FX source-SHA parity from `/api/health` and links directly to the verification, release and deployment gates in source. The public proof claims are themselves checked against those repository scripts by the publication-truth gate.
+
 Focused commands:
 
 ```bash
@@ -261,7 +279,7 @@ The project is deliberately provider-neutral and jurisdiction-flexible so seriou
 
 **Blueballs is free to use. If you want the project involved in product design, integration, deployment or operating architecture, [build with Blueballs](https://blueballs.tech/contact).**
 
-**[Explore Blueballs](https://blueballs.tech)** · **[Build in the Sandbox](https://blueballs.tech/sandbox)** · **[Read the API](https://blueballs.tech/developers)** · **[Build with Blueballs](https://blueballs.tech/contact)**
+**[Explore Blueballs](https://blueballs.tech)** · **[Blueprint Library](https://blueballs.tech/blueprint)** · **[Build in the Sandbox](https://blueballs.tech/sandbox)** · **[Proof](https://blueballs.tech/proof)** · **[Read the API](https://blueballs.tech/developers)** · **[Build with Blueballs](https://blueballs.tech/contact)**
 
 ## Documentation
 
@@ -271,6 +289,7 @@ The project is deliberately provider-neutral and jurisdiction-flexible so seriou
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, ownership and extension points |
 | [PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md) | Executable engineering assurance |
 | [SANDBOX.md](SANDBOX.md) | Sandbox Builder |
+| [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md) | Publish-ready v0.2 launch notes |
 | [apps/api/README.md](apps/api/README.md) | Banking runtime |
 | [apps/fx-node/README.md](apps/fx-node/README.md) | FX runtime and production composition |
 | [packages/fx-sdk/README.md](packages/fx-sdk/README.md) | JavaScript FX SDK |
