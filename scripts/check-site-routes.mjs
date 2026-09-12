@@ -142,6 +142,16 @@ assert.match(
   /href="\/home"/,
   "interior brand links must return to the canonical site home",
 );
+assert.match(
+  brand,
+  /href="\/blueprint"/,
+  "the full shared brand lockup must expose the Blueprint Library",
+);
+assert.match(
+  brand,
+  /href="\/proof"/,
+  "the full shared brand lockup must expose public Proof",
+);
 
 // Keep one public Cards implementation and one loaded Cards stylesheet.
 assert.match(
@@ -223,5 +233,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: executable client navigation stays synchronized, Cards has one canonical market-intelligence surface, Blueprints and Proof are public/crawlable product surfaces, and /contact is a first-class build route",
+  "site route contract: executable client navigation stays synchronized, Blueprints and Proof are discoverable from the shared brand, Cards has one canonical market-intelligence surface, and /contact is a first-class build route",
 );
