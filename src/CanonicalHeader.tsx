@@ -48,7 +48,10 @@ export default function CanonicalHeader({ children }: { children: ReactNode }) {
     >
       {showHeader && (
         <div className="bb-canonical-header-wrap">
-          <header className="bb-canonical-header" aria-label="Blueballs primary navigation">
+          <header
+            className="bb-canonical-header"
+            aria-label="Blueballs primary navigation"
+          >
             <button
               className="bb-canonical-brand"
               type="button"
@@ -85,7 +88,9 @@ export default function CanonicalHeader({ children }: { children: ReactNode }) {
               type="button"
               aria-expanded={mobileOpen}
               aria-controls="bb-canonical-mobile-nav"
-              aria-label={mobileOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-label={
+                mobileOpen ? "Close navigation menu" : "Open navigation menu"
+              }
               onClick={() => setMobileOpen((open) => !open)}
             >
               <span />
