@@ -74,10 +74,20 @@ test("edge forwarding preserves caller credentials and never injects an operator
 test("growth events are owned by the public site edge, not the banking API", () => {
   assert.match(
     edgeSource,
-    /import\s*\{\s*handleGrowthEvent\s*\}\s*from\s*["']\.\/growth-events\.js["']/,
+    /import\s*\{[\s\S]*?handleGrowthEvent[\s\S]*?logServerGrowthEvent[\s\S]*?\}\s*from\s*["']\.\/growth-events\.js["']/,
   );
   assert.match(
     edgeSource,
     /url\.pathname\s*===\s*["']\/api\/events["'][\s\S]*?handleGrowthEvent\(request,\s*env\)/,
+  );
+});
+
+test("successful Builder lifecycle calls emit server-confirmed activation signals", () => {
+  assert.match(edgeSource, /builder_blueprint_created/);
+  assert.match(edgeSource, /builder_sandbox_provisioned/);
+  assert.match(edgeSource, /builder_test_payment/);
+  assert.match(
+    edgeSource,
+    /response\.ok\s*&&\s*growthEvent[\s\S]*?logServerGrowthEvent\(request,\s*env,\s*growthEvent/,
   );
 });
