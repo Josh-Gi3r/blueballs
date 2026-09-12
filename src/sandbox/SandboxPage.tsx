@@ -334,7 +334,9 @@ export default function SandboxPage() {
       window.setTimeout(() => setShareStatus(""), 2600);
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
-      setError("The Blueprint is ready to share, but this browser could not open the share action.");
+      setError(
+        "The Blueprint is ready to share, but this browser could not open the share action.",
+      );
     }
   }
 
@@ -768,7 +770,10 @@ export default function SandboxPage() {
                 <button className="sb-back" onClick={newProject}>
                   ← Start again
                 </button>
-                <button className="sb-back" onClick={() => void shareBlueprint()}>
+                <button
+                  className="sb-back"
+                  onClick={() => void shareBlueprint()}
+                >
                   Share Blueprint
                 </button>
                 <button className="sb-primary" onClick={provision}>
