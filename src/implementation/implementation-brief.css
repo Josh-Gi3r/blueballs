@@ -1,3 +1,8 @@
+.sb-blueprint-layout > .builder-provider-panel,
+.sb-blueprint-layout > .implementation-brief-panel {
+  grid-column: 1 / -1;
+}
+
 .implementation-brief-panel {
   width: min(1200px, 100%);
   margin: 14px auto 0;
