@@ -1,16 +1,18 @@
-name: Provider ecosystem
-description: Add, update or explore a provider listing, adapter or infrastructure connection.
+name: Provider partnership
+description: Explore an adapter, integration, launch, research collaboration or qualified-demand pilot with Blueballs.
 title: "[Provider] "
 body:
   - type: markdown
     attributes:
       value: |
-        ## Connect infrastructure to Blueballs
-        Use this form for provider-directory updates, adapter work, compatibility discussions or infrastructure collaboration.
+        ## Work with Blueballs
+        Use this form if you represent financial infrastructure and want to explore a deeper relationship with the Blueballs ecosystem.
 
-        A Blueballs listing does not imply a partnership or production integration. Relationship and technical status remain explicit in the directory.
+        Directory participation is not pay-to-rank. Commercial relationships, sponsored work and technical status are labelled separately, and payment does not buy an organic ranking or technical verification.
 
-        This is a public GitHub issue. Do not include credentials, customer information, confidential commercial terms or other sensitive data.
+        If you only need to claim, correct or add a provider profile, use the **Claim or update a provider profile** form instead.
+
+        This is a public GitHub issue. Keep the first brief non-confidential. Do not include credentials, customer information, pricing terms or other sensitive commercial information.
   - type: input
     id: provider
     attributes:
@@ -21,20 +23,22 @@ body:
   - type: dropdown
     id: request
     attributes:
-      label: What are you proposing?
+      label: What would you like to explore?
       options:
-        - Add or update a directory listing
-        - Build a Blueballs adapter
-        - Document compatibility
-        - Explore an integration
-        - Correct provider information
+        - Build or improve a Blueballs adapter
+        - Document or test compatibility
+        - Create a reference implementation or Blueprint
+        - Launch or research collaboration
+        - Qualified builder-demand pilot
+        - Design or implementation partnership
+        - Other infrastructure collaboration
     validations:
       required: true
   - type: textarea
     id: capabilities
     attributes:
-      label: Capabilities
-      description: Accounts, rails, cards, KYC/KYB, custody, stablecoins, FX, treasury, reconciliation or other infrastructure.
+      label: Infrastructure capabilities
+      description: Accounts, sponsor banking, rails, cards, KYC/KYB, custody, stablecoins, FX, treasury, reconciliation or other infrastructure.
     validations:
       required: true
   - type: input
@@ -50,14 +54,23 @@ body:
     validations:
       required: true
   - type: textarea
-    id: notes
+    id: outcome
     attributes:
-      label: What should Blueballs evaluate?
-      placeholder: Describe the listing, compatibility or adapter opportunity.
+      label: What outcome are you trying to achieve?
+      description: Keep this public-safe. For example, reach builders in a target market, create a reference integration, or validate compatibility with a Blueballs product flow.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Useful public links
+      description: Product pages, API documentation, market coverage or other public information Blueballs should review.
   - type: checkboxes
     id: public
     attributes:
       label: Public issue acknowledgement
       options:
-        - label: I have not included secrets, customer data or confidential information.
+        - label: I have not included secrets, customer data, private contact details, pricing terms or confidential information.
+          required: true
+        - label: I understand that commercial participation does not buy organic ranking or technical verification.
           required: true
