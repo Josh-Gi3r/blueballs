@@ -1,35 +1,53 @@
 # Vision
 
-Blueballs is the open-source operating system for teams building modern financial institutions: neobanks, embedded-finance products, stablecoin rails and institution-owned FX.
+Blueballs is building the open financial operating system for the next generation of financial institutions.
 
-The goal is simple: one codebase should give a capable team the financial core, product surfaces, provider boundaries and release tooling needed to move from idea to a serious institution-grade stack without inheriting a black-box platform.
+The thesis is simple: a modern bank, fintech, wallet, stablecoin product or payments company should be able to **own its financial core**, not just rent a collection of disconnected black boxes.
 
-## The product
+Blueballs brings the product layer, banking contracts, money movement, provider orchestration, FX market structure, settlement and release proof into one inspectable, forkable system.
 
-Blueballs has three connected surfaces:
+## Build the financial institution your market needs
 
-1. **Banking core.** A tenant-isolated API for onboarding, accounts, exact double-entry ledgering, cards, transfers, custody, business banking, approvals, webhooks and provider orchestration.
-2. **Canonical FX core.** A provider-neutral runtime for policy, exact pricing, private and institutional liquidity, route construction, reservation, treasury/principal risk, fiat evidence, execution and reconciliation.
-3. **Product operating layer.** Interactive product interfaces and a Sandbox Builder that make the financial architecture understandable and configurable from the same repository.
+Financial products are becoming software-defined, global and increasingly programmable. The winners will not all look like the same neobank template.
 
-The API, state machines and machine-readable contracts are the system boundary. The website and documentation make that system legible to founders, engineers, operators, institutions and reviewers.
+One market may need instant local rails and multicurrency cards. Another may need stablecoin settlement and institution-owned FX. Another may combine business banking, tokenized deposits, treasury liquidity and agentic controls.
 
-## Design principles
+Blueballs exists so capable teams can start from a serious financial architecture and shape the institution around the market, instead of reshaping the market around a vendor's platform.
 
-- **Financial correctness first.** Exact money, balanced books and atomic local commands are core architecture, not application conventions.
-- **Provider-neutral by design.** Banks, identity vendors, payment rails, issuers, liquidity venues and custodians connect through explicit versioned adapters.
-- **Policy before price.** FX capacity competes only after participant, credential, corridor and exposure policy pass.
-- **Reserve before firm.** A firm quote exists only after selected liquidity is reserved.
-- **Finality is explicit.** Token, bank, provider and custody edges retain their real settlement state and converge through reconciliation.
-- **Tenant isolation by construction.** Stable tenant principals own credentials, resources, events, provider work and idempotency state.
-- **Portable infrastructure.** The same core runs locally on Node/SQLite and at the edge on Cloudflare Durable Objects, with clear scale-out contracts.
-- **Open contracts, replaceable infrastructure.** Institutions can inspect every state machine and swap deployment adapters without forking the core product semantics.
-- **Executable assurance.** API contracts, migrations, restart/eviction, recovery, load, security and smart-contract invariants are part of the repository release gate.
-- **Public product quality.** Source, documentation, examples, comments and commit history should communicate the strength of the system as clearly as the code itself.
+## One system, three connected surfaces
+
+### Banking core
+
+A tenant-isolated financial core for onboarding, accounts, exact double-entry ledgering, cards, transfers, custody, business banking, approvals, webhooks, provider orchestration and operational evidence.
+
+### Institution-owned FX
+
+A provider-neutral control plane for policy, exact pricing, private and institutional liquidity, route construction, reservation, treasury/principal capacity, fiat evidence, execution and reconciliation.
+
+Blueballs is designed so an institution can operate its own market model rather than collapse every FX decision into one opaque venue.
+
+### Product operating layer
+
+Interactive product interfaces, market research surfaces and a Sandbox Builder that make financial architecture understandable and configurable before a team commits to a full deployment.
+
+The same repository can show the product, explain the architecture and expose the contracts behind it.
+
+## The Blueballs principles
+
+- **Own the core.** The institution should control the financial logic, infrastructure composition and customer experience.
+- **Exact money first.** Financial correctness is architecture, not an application convention.
+- **Policy before price.** Eligible FX liquidity competes only after participant, corridor, credential and exposure policy pass.
+- **Reserve before firm.** A firm quote exists only after selected capacity is reserved.
+- **Finality is explicit.** Bank, provider, custody and token settlement retain their real states until evidence closes the outcome.
+- **Provider-neutral by design.** Banks, rails, issuers, identity systems, custodians and liquidity venues connect through explicit adapters.
+- **Open contracts, replaceable infrastructure.** A team can inspect the state machines and change deployment infrastructure without rewriting the product semantics.
+- **Open source as leverage.** Builders should be able to inspect, fork, adapt and extend the stack instead of waiting for permission from a platform vendor.
+- **Executable proof.** Contracts, migrations, restart behavior, recovery, load, security and smart-contract invariants belong with the code.
+- **Public product quality.** The repository, website, examples, documentation, releases and commit history are part of the Blueballs experience.
 
 ## What Blueballs should feel like
 
-A team cloning Blueballs should discover a coherent financial system rather than a collection of disconnected examples:
+A team cloning Blueballs should discover a coherent financial system, not a collection of demos.
 
 ```text
 product experience
@@ -43,14 +61,35 @@ durable provider adapters
 institution-owned infrastructure
 ```
 
-Every new capability should extend that system coherently, with a public contract, deterministic verification and clear ownership.
+A founder should see what can be built.
+
+An engineer should see where the invariants live.
+
+A provider should see where an adapter fits.
+
+An institution should see a path from exploration to an owned deployment.
 
 ## Institution-owned deployment
 
-Blueballs supplies the financial software core and provider contracts. Institutions bring the licensed relationships, infrastructure credentials and jurisdiction-specific operating policy appropriate to the products they launch.
+Blueballs supplies the open financial software core and integration contracts. Institutions bring the regulated relationships, infrastructure credentials and jurisdiction-specific operating policy appropriate to the products they launch.
 
-That separation is a feature: the open-source core remains reusable while the institution keeps control of its banking relationships, providers, data and deployment.
+That is not a missing layer. It is the control boundary.
+
+The open-source core remains reusable while the institution keeps ownership of its providers, customer data, deployment, market structure and operating policy.
 
 ## Direction
 
-Blueballs should keep expanding toward a complete, composable financial institution platform: stronger product building, richer provider adapters, multi-shard operation, deeper programmable treasury and increasingly unified banking + FX workflows, while preserving the exact-money, isolation and finality invariants that make the core trustworthy.
+Blueballs will keep expanding toward a complete financial operating system:
+
+- richer provider and adapter ecosystems;
+- deeper global rail intelligence;
+- multi-shard institution operation;
+- programmable treasury and principal liquidity;
+- stablecoin and tokenized-money primitives;
+- more powerful Cards, Provider and FX intelligence surfaces;
+- agentic finance with narrow machine authority and deterministic auditability;
+- faster paths from product brief to running institution.
+
+The ambition is not to build another fintech starter kit.
+
+**The ambition is to make the open stack the most compelling place to start building a modern financial institution.**
