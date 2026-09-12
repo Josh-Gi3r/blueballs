@@ -1,0 +1,124 @@
+/* Header stability contract.
+ *
+ * The public header uses a 1200px shell. Desktop navigation must never wrap
+ * inside that shell: once space becomes tight we switch to the existing mobile
+ * menu as one deliberate state change instead of letting individual buttons
+ * jump between rows.
+ */
+
+@media (min-width: 1241px) {
+  .bb-site-header {
+    flex-wrap: nowrap !important;
+  }
+
+  .bb-site-brand {
+    min-width: max-content;
+    flex: 0 0 auto !important;
+  }
+
+  .bb-site-nav-desktop {
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1240px) {
+  .bb-site-header {
+    position: sticky;
+    top: 8px;
+    z-index: 40;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+    box-shadow: 0 10px 30px rgba(7, 20, 79, 0.08);
+  }
+
+  .bb-site-brand {
+    min-width: 0;
+    flex: 1 1 auto !important;
+  }
+
+  .bb-site-brand-tag {
+    display: none;
+  }
+
+  .bb-site-nav-desktop,
+  .bb-site-cta {
+    display: none !important;
+  }
+
+  .bb-mobile-menu-button {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 5px;
+    padding: 0;
+    border: 1px solid #d7dbe4;
+    border-radius: 11px;
+    background: #f7f8fb;
+    cursor: pointer;
+  }
+
+  .bb-mobile-menu-button span {
+    display: block;
+    width: 19px;
+    height: 2px;
+    border-radius: 99px;
+    background: #07144f;
+    transition:
+      transform 0.18s ease,
+      opacity 0.18s ease;
+  }
+
+  .bb-mobile-menu-button[aria-expanded="true"] span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+  }
+
+  .bb-mobile-menu-button[aria-expanded="true"] span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .bb-mobile-menu-button[aria-expanded="true"] span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+
+  .bb-mobile-nav {
+    display: grid;
+    width: 100%;
+    flex: 1 0 100%;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    padding-top: 10px;
+    border-top: 1px solid #e7eaf0;
+  }
+
+  .bb-mobile-nav button {
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid #e1e5ed;
+    border-radius: 10px;
+    background: #f7f8fb;
+    color: #4e576b;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .bb-mobile-nav button[aria-current="page"] {
+    border-color: #c9d9ff;
+    background: #edf3ff;
+    color: #07144f;
+    font-weight: 600;
+  }
+
+  .bb-mobile-nav .bb-mobile-nav-primary {
+    grid-column: 1 / -1;
+    border-color: #07144f;
+    background: #07144f;
+    color: #ffffff;
+    text-align: center;
+  }
+}
