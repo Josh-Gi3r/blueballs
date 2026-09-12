@@ -20,7 +20,7 @@
     "preview:upload": "pnpm build && wrangler versions upload -c wrangler.jsonc",
     "test:api": "pnpm --dir apps/api test:ci",
     "test:fx": "node scripts/test-fx.mjs",
-    "test:workers": "pnpm --dir packages/sqlite-compat test:ci && node --test workers/site/edge-routing.test.js && vitest run --config vitest.config.mts && vitest run --config vitest.api.config.mts && vitest run --config vitest.fx.config.mts",
+    "test:workers": "pnpm --dir packages/sqlite-compat test:ci && node --test workers/site/edge-routing.test.js workers/site/growth-events.test.js && vitest run --config vitest.config.mts && vitest run --config vitest.api.config.mts && vitest run --config vitest.fx.config.mts",
     "verify": "node scripts/release-proof.mjs",
     "verify:release": "node scripts/release-proof.mjs --require-clean --full",
     "verify:raw": "node scripts/verify.mjs",
