@@ -164,11 +164,19 @@
   font-size: 12px;
 }
 
-.implementation-empty p {
+.implementation-empty p,
+.implementation-provider-note {
   color: #9eabd0;
   font-size: 10px;
   line-height: 1.55;
+}
+
+.implementation-empty p {
   margin: 6px 0 0;
+}
+
+.implementation-provider-note {
+  margin: 12px 0 0;
 }
 
 .implementation-directory-link {
