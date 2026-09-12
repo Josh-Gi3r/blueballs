@@ -1,7 +1,4 @@
-import siteWorker, {
-  BuilderBudget,
-  NeobankBuilder,
-} from "./index.js";
+import siteWorker, { BuilderBudget, NeobankBuilder } from "./index.js";
 import { socialCardResponse, socialImageForPath } from "./social-cards.js";
 
 export { BuilderBudget, NeobankBuilder };
