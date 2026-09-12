@@ -24,10 +24,19 @@ const fxC = readFileSync(
   new URL("../src/fx/FinalFxSectionsC.tsx", import.meta.url),
   "utf8",
 );
+const contact = readFileSync(
+  new URL("../src/ContactPage.tsx", import.meta.url),
+  "utf8",
+);
+const crawler = readFileSync(
+  new URL("../workers/site/crawler-pages.js", import.meta.url),
+  "utf8",
+);
 const worker = readFileSync(
   new URL("../workers/site/index.js", import.meta.url),
   "utf8",
 );
+const index = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
 assert.match(
   publicSource,
@@ -37,13 +46,18 @@ assert.match(
 
 assert.match(
   readme,
-  /open-source operating system for modern financial institutions/i,
-  "README must lead with the Blueballs institution-platform position",
+  /Own the financial stack/i,
+  "README must lead with institution ownership rather than starter-template positioning",
+);
+assert.match(
+  readme,
+  /Build and operate your own FX market/i,
+  "README must surface the institution-owned FX position",
 );
 assert.match(
   readme,
   /adapter-driven production FX runtime/i,
-  "README must surface the production FX composition",
+  "README must surface production FX composition",
 );
 assert.match(
   fxA,
@@ -70,6 +84,31 @@ for (const stale of [
 }
 
 assert.match(
+  contact,
+  /Take Blueballs from open source to your market\./,
+  "the public contact route must convert design-partner and implementation interest",
+);
+assert.match(contact, /DESIGN PARTNER/);
+assert.match(contact, /IMPLEMENTATION/);
+assert.match(contact, /PROVIDERS/);
+assert.match(
+  crawler,
+  /Build and operate your own FX market\./,
+  "crawler content must carry the flagship FX position",
+);
+assert.match(crawler, /Take Blueballs from open source to your market\./);
+
+for (const metadata of [
+  /property="og:title"/,
+  /property="og:image"/,
+  /name="twitter:card" content="summary_large_image"/,
+]) {
+  assert.match(index, metadata, `share metadata missing: ${metadata}`);
+}
+assert.match(worker, /property="og:title"/);
+assert.match(worker, /name="twitter:title"/);
+
+assert.match(
   worker,
   /url\.pathname === "\/bulletin"[\s\S]*Response\.redirect\(new URL\("\/developers"[\s\S]*301/,
 );
@@ -79,5 +118,5 @@ assert.doesNotMatch(
 );
 
 console.log(
-  "page truth: source is linked, Blueballs positioning is capability-led, FX architecture copy is current, /bulletin is a 301",
+  "page truth: source is linked, ownership/FX positioning is current, build-with-us conversion exists, share metadata is present, /bulletin is a 301",
 );
