@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { trackGrowthEvent } from "./growth/events";
+import { navigatePath } from "./router-core";
 
 /** Minimal history-API router. Real URLs so every screen is linkable,
  * refreshable and back-button friendly — no framework needed.
@@ -19,21 +20,14 @@ export function usePath(): [string, (p: string) => void] {
   }, []);
 
   const go = useCallback((p: string) => {
-    if (p === window.location.pathname) {
-      window.scrollTo(0, 0);
-      return;
-    }
-
-    const sourcePath = window.location.pathname;
-    if (p === "/sandbox") {
-      trackGrowthEvent("builder_start", { source_path: sourcePath });
-    } else if (p === "/contact") {
-      trackGrowthEvent("commercial_contact_view", { source_path: sourcePath });
-    }
-
-    window.history.pushState({}, "", p);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-    window.scrollTo(0, 0);
+    navigatePath(p, {
+      pathname: window.location.pathname,
+      pushState: (destination) => window.history.pushState({}, "", destination),
+      broadcastLocationChange: () =>
+        window.dispatchEvent(new PopStateEvent("popstate")),
+      scrollToTop: () => window.scrollTo(0, 0),
+      track: trackGrowthEvent,
+    });
   }, []);
 
   return [path, go];
