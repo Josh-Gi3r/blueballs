@@ -8,6 +8,7 @@ const NAV = [
   ["Providers", "/ecosystem"],
   ["Sandbox", "/sandbox"],
   ["Developers", "/developers"],
+  ["Build with Blueballs", "/contact"],
 ];
 const PRODUCTS = [
   "Accounts",
@@ -75,61 +76,63 @@ const PAGES = {
   "/": {
     title: "Blueballs — build the financial institution your market needs",
     description:
-      "Open-source financial infrastructure. Enter from the landing cover into accounts, cards, transfers, wallets, ledger and FX.",
-    body: `<h1>Build the financial institution your market needs.</h1><p>Accounts, cards, transfers, wallets and FX in one open-source stack. Connect the providers your product needs.</p><p><a href="/home">Open the homepage</a> or <a href="/sandbox">try the sandbox</a>.</p>`,
+      "Open financial infrastructure for banking, institution-owned FX, provider orchestration and programmable financial products.",
+    body: `<h1>Build the financial institution your market needs.</h1><p>Banking, cards, payments, wallets, ledger, provider orchestration and institution-owned FX in one MIT-licensed stack.</p><p><a href="/home">Explore Blueballs</a>, <a href="/sandbox">build in the sandbox</a> or <a href="https://github.com/Josh-Gi3r/blueballs">inspect the source</a>.</p>`,
   },
   "/home": {
-    title: "Blueballs — open-source software for building a neobank",
+    title: "Blueballs — open financial operating system",
     description:
-      "Open-source software for building accounts, cards, transfers, onboarding, wallets, ledger and FX into your own financial product.",
-    body: `<h1>Open-source software for building a neobank.</h1><p>Blueballs gives you software for accounts, cards, transfers, onboarding, wallets, ledger, FX and other financial products. It is MIT licensed, self-hostable and built to be changed.</p><h2>Build the bank for your People.</h2><p>A company. A community. A city. An industry. A marketplace. Or something nobody has built yet.</p><h2>What is included</h2>${list(PRODUCTS)}<p><a href="/sandbox">Start with the hosted sandbox</a> or <a href="https://github.com/Josh-Gi3r/blueballs">view the source on GitHub</a>.</p>`,
+      "An MIT-licensed financial operating system for banking products, provider orchestration, stablecoin FX and programmable money movement.",
+    body: `<h1>Own the financial stack.</h1><p>Blueballs puts the product, ledger, provider composition and FX control plane in the hands of the institution building the experience. Clone it, inspect it, fork it and connect the infrastructure your market needs.</p><h2>Build the financial institution your market needs.</h2><p>A company. A community. A city. An industry. A marketplace. Or something nobody has built yet.</p><h2>What ships in Blueballs</h2>${list(PRODUCTS)}<p><a href="/sandbox">Build in the sandbox</a>, <a href="/developers">inspect the API</a> or <a href="/contact">build with Blueballs</a>.</p>`,
   },
   "/products": {
-    title: "Products — Blueballs",
+    title: "Financial products — Blueballs",
     description:
-      "Accounts, cards, transfers, onboarding, wallets, ledger, FX and other financial-product software included in Blueballs.",
-    body: `<h1>Build the financial products your bank needs.</h1><p>Start with accounts, cards, transfers, onboarding, wallets, FX, business banking and more. Use the pieces you need, change them for your product and connect the providers your production deployment requires.</p><h2>See it in a product</h2><p>Walk through onboarding, funding, spending and payouts to see how Blueballs can sit behind a financial product. Each step pairs the customer experience with the API call behind it.</p>${list(PRODUCTS)}<p><a href="/developers">See the API</a></p>`,
+      "Accounts, cards, transfers, onboarding, wallets, ledger, FX and financial-product primitives built on one open financial core.",
+    body: `<h1>Build the financial products your market needs.</h1><p>Start with accounts, cards, transfers, onboarding, wallets, FX, business banking and more. Keep one financial core while the customer experience, providers and market composition evolve around it.</p><h2>See the product and the contract together</h2><p>Walk through onboarding, funding, spending and payouts with the API call behind each experience.</p>${list(PRODUCTS)}<p><a href="/developers">Inspect the API</a> or <a href="/contact">build an implementation</a>.</p>`,
   },
   "/fx": {
-    title: "Stablecoin FX — Blueballs",
+    title: "Build and operate your own FX market — Blueballs",
     description:
-      "Open-source FX software for customer quotes, pricing policy, liquidity routing, treasury limits and settlement tracking.",
-    body: `<h1>Build FX into your financial product.</h1><p>Quote customers in familiar currencies while stablecoins, liquidity providers and treasury inventory can sit underneath. Blueballs covers pricing policy, source selection, reservations and settlement records.</p><p>BRL to EUR is the interactive browser simulation, not the scope of the product and not a call to the FX node.</p><h2>Included components</h2>${list(["FX node and JavaScript SDK", "Participant and corridor policy", "Market and principal pricing", "Liquidity routing", "Fiat settlement intents", "Settlement contracts", "Failure simulator"])}<p>The FX node ships with the stack. The browser demo runs on deterministic data, so every number it shows is one you can reproduce from source: <a href=\"https://github.com/Josh-Gi3r/blueballs\">github.com/Josh-Gi3r/blueballs</a>.</p>`,
+      "Open-source FX control plane for policy, pricing, liquidity, treasury, routing, reservations, execution and settlement.",
+    body: `<h1>Build and operate your own FX market.</h1><p>Blueballs treats stablecoin FX as an institution-owned market and control plane. Combine private orders, issuer inventory, professional makers, treasury or principal capacity and external venues behind one policy and lifecycle model.</p><h2>Included components</h2>${list(["Canonical FX node and JavaScript SDK", "Participant and corridor policy", "Exact market and principal pricing", "Multi-source liquidity routing", "Capacity reservation", "Fiat settlement evidence", "Atomic token settlement contracts", "Failure and reconciliation simulation"])}<p>The interactive architecture lab uses deterministic reference data so its behaviour is reproducible from source. Production deployments connect market, liquidity, fiat and execution infrastructure through the FX runtime adapter.</p><p><a href="/contact">Build an FX implementation</a> or <a href="https://github.com/Josh-Gi3r/blueballs">inspect the source</a>.</p>`,
   },
   "/cards": {
-    title: "Card programme research — Blueballs",
+    title: "The stablecoin card market, mapped — Blueballs",
     description:
-      "A sourced research directory of stablecoin and crypto card programmes; not the Blueballs Cards API and not connected integrations.",
-    body: `<h1>Card programme research.</h1><p>Compare public card-programme models, funding patterns, custody boundaries, networks and disclosed infrastructure. This page is research for product design; it is not the Blueballs Cards API, a recommendation, or evidence of a working integration.</p><h2>Status</h2><p>Every programme must carry a source URL, source date, jurisdiction and confidence label. Named companies remain Not connected unless separately evidenced.</p><p><a href="/developers">Inspect the sandbox Cards API</a></p>`,
+      "Independent, sourced market intelligence for stablecoin and crypto card programmes, funding models, custody, networks and infrastructure.",
+    body: `<h1>The stablecoin card market, mapped.</h1><p>Compare public card-programme models, funding patterns, custody boundaries, networks and disclosed infrastructure, then use the research to design your own card product on Blueballs.</p><h2>Research standard</h2><p>Each programme carries source, jurisdiction and confidence information. Relationship and technical status are shown explicitly so market research stays separate from claimed Blueballs integrations.</p><p><a href="/developers">Inspect the Blueballs Cards API</a> or <a href="/contact">build a card programme</a>.</p>`,
   },
   "/ecosystem": {
-    title: "Provider directory — Blueballs",
+    title: "Financial infrastructure provider directory — Blueballs",
     description:
-      "A directory of banking and financial-infrastructure providers, grouped by service and region.",
-    body: `<h1>Find the services your product needs.</h1><p>Compare companies that provide banking, identity, payments, cards, custody, liquidity and other financial infrastructure. Blueballs is the software layer; you choose the providers behind your product.</p>${list(PROVIDER_CATEGORIES)}<p>The directory is a research tool, not a ranking or recommendation. Listings do not imply a partnership or existing integration.</p>`,
+      "Compare banking, identity, payments, cards, custody, stablecoin, FX and operations infrastructure by capability and region.",
+    body: `<h1>Choose the infrastructure behind your product.</h1><p>Blueballs keeps the software core provider-neutral. Use the directory to compare banking, identity, payments, cards, custody, liquidity and other infrastructure while keeping provider relationships outside the canonical financial model.</p>${list(PROVIDER_CATEGORIES)}<p>Listings link to official sources. Relationship and technical status are shown explicitly; a listing does not by itself claim a Blueballs partnership or production integration.</p><p><a href="/contact">Build an adapter or add a provider</a>.</p>`,
   },
   "/sandbox": {
     title: "Build a fintech sandbox — Blueballs",
     description:
-      "Turn a financial-product brief into a structured blueprint, provision test users and balances, and run protected-ledger test payments.",
-    body: `<h1>Build a working fintech sandbox.</h1><p>Describe the people you serve, choose markets, currencies, capabilities and rails, then review a structured blueprint. Blueballs provisions isolated test customers, accounts and balances and lets you run a payment through the protected double-entry ledger.</p><h2>What the builder creates</h2>${list(["Structured product blueprint", "Tenant-isolated test environment", "Approved test customers", "Multi-currency sandbox accounts", "Seeded test balances", "Protected-ledger payment journeys"])}`,
+      "Turn a financial-product brief into a structured blueprint, isolated test environment and protected-ledger product journey.",
+    body: `<h1>Design the product. Provision the sandbox. Run the money flow.</h1><p>Describe the people you serve, choose markets, currencies, capabilities and rails, then turn the brief into an isolated Blueballs environment with test customers, accounts, balances and ledger-backed payment journeys.</p><h2>What the Builder creates</h2>${list(["Structured product blueprint", "Tenant-isolated test environment", "Approved test customers", "Multi-currency sandbox accounts", "Seeded test balances", "Protected-ledger payment journeys"])}<p><a href="/contact">Take the design into implementation</a>.</p>`,
   },
   "/developers": {
-    title: "Developers — Blueballs",
-    description: "Create a sandbox key and inspect the Blueballs API contract.",
-    body: `<h1>Build with Blueballs.</h1><p>Create a sandbox key without applying for access and inspect the contract now. Or run the whole stack yourself: <code>git clone https://github.com/Josh-Gi3r/blueballs.git &amp;&amp; pnpm install &amp;&amp; pnpm dev</code>.</p><p>The hosted sandbox creates development state. It does not move real money or call production providers.</p><h2>API families</h2>${list(API_FAMILIES)}<p><a href="/openapi.yaml">OpenAPI specification</a></p>`,
+    title: "Build with the Blueballs API",
+    description:
+      "Create a sandbox key, inspect the financial contracts and run the complete open-source banking and FX stack yourself.",
+    body: `<h1>Inspect it. Run it. Build on it.</h1><p>Create a sandbox key without applying for access and inspect the contract now. Or run the complete stack yourself: <code>git clone https://github.com/Josh-Gi3r/blueballs.git &amp;&amp; pnpm install &amp;&amp; pnpm dev</code>.</p><p>The hosted environment uses isolated test state. Production deployments connect their own provider adapters, credentials and operating policy around the same core contracts.</p><h2>API families</h2>${list(API_FAMILIES)}<p><a href="/openapi.yaml">OpenAPI specification</a> · <a href="/contact">Build an implementation</a></p>`,
   },
   "/contact": {
-    title: "Contact — Blueballs",
-    description: "Source, issues and security contact for Blueballs.",
-    body: `<h1>Contact Blueballs</h1><p>The source, the issue tracker and private vulnerability reporting are all open at <a href=\"https://github.com/Josh-Gi3r/blueballs\">github.com/Josh-Gi3r/blueballs</a>. The hosted sandbox and the API contract are on the developer page.</p>`,
+    title: "Build with Blueballs",
+    description:
+      "Design partner, implementation and provider routes for teams taking Blueballs from open source into a financial product or institution.",
+    body: `<h1>Take Blueballs from open source to your market.</h1><p>Blueballs is free to use. Teams that want the project involved in product design, architecture, provider adapters, deployment or operating design can start a public non-confidential brief.</p><h2>Ways to build together</h2>${list(["Design a financial product with Blueballs", "Implement and adapt the open-source stack", "Connect a financial-infrastructure provider", "Contribute code, adapters, research or new primitives"])}<p><a href="https://github.com/Josh-Gi3r/blueballs/issues/new?template=design_partner.yml">Start a design-partner brief</a> or <a href="https://github.com/Josh-Gi3r/blueballs/issues/new?template=implementation.yml">discuss an implementation</a>.</p>`,
   },
 };
 export const PUBLIC_PATHS = Object.keys(PAGES);
 export function crawlerDocument(pathname) {
   const page = PAGES[pathname] ?? PAGES["/"];
   const canonical = `${SITE}${pathname === "/" ? "" : pathname}`;
-  return `<div id="root" data-server-content="true"><header><a href="/">Blueballs</a><nav>${NAV.map(([label, path]) => `<a href="${path}">${label}</a>`).join(" ")}</nav></header><main>${page.body}</main><footer><p>Blueballs is MIT-licensed open-source software.</p></footer></div><script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": pathname === "/" ? "SoftwareApplication" : "WebPage", name: page.title, description: page.description, url: canonical, isPartOf: { "@type": "WebSite", name: "Blueballs", url: SITE } })}</script>`;
+  return `<div id="root" data-server-content="true"><header><a href="/">Blueballs</a><nav>${NAV.map(([label, path]) => `<a href="${path}">${label}</a>`).join(" ")}</nav></header><main>${page.body}</main><footer><p>Blueballs is an MIT-licensed open financial operating system.</p></footer></div><script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": pathname === "/" ? "SoftwareApplication" : "WebPage", name: page.title, description: page.description, url: canonical, isPartOf: { "@type": "WebSite", name: "Blueballs", url: SITE } })}</script>`;
 }
 export function pageMetadata(pathname) {
   return PAGES[pathname] ?? PAGES["/"];
@@ -144,7 +147,7 @@ export function sitemapXml() {
   return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries}</urlset>`;
 }
 export function llmsText(full = false) {
-  const intro = `# Blueballs\n\nBlueballs is free, MIT-licensed, self-hostable software for building neobanks and financial products. It includes software and sandbox APIs for accounts, cards, transfers, onboarding, ledger, wallets and FX. Production deployments connect the regulated providers they need.\n\n## Public pages\n${NAV.map(([label, path]) => `- [${label}](${SITE}${path})`).join("\n")}\n\n## Contract and source status\n- [OpenAPI specification](${SITE}/openapi.yaml)\n- [Source](https://github.com/Josh-Gi3r/blueballs) — MIT, clone and run it.\n`;
+  const intro = `# Blueballs\n\nBlueballs is a free, MIT-licensed, self-hostable financial operating system for banking products, provider orchestration, institution-owned stablecoin FX and programmable financial infrastructure. The repository combines product interfaces, banking and ledger contracts, provider boundaries, FX policy/pricing/routing, settlement primitives and release proof. Production deployments connect the regulated providers, credentials and jurisdiction-specific operating policy they require.\n\n## Public pages\n${NAV.map(([label, path]) => `- [${label}](${SITE}${path})`).join("\n")}\n\n## Contract and source status\n- [Banking OpenAPI specification](${SITE}/openapi.yaml)\n- [FX OpenAPI specification](${SITE}/openapi.fx.yaml)\n- [Source](https://github.com/Josh-Gi3r/blueballs) — MIT licensed. Clone, inspect, fork and run it.\n- [Build with Blueballs](${SITE}/contact) — design partner, implementation and provider routes.\n`;
   if (!full) return intro;
   return `${intro}\n## Page summaries\n${PUBLIC_PATHS.map((path) => {
     const page = PAGES[path];
