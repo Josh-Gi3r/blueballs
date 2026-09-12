@@ -1,0 +1,205 @@
+.implementation-brief-panel {
+  width: min(1200px, 100%);
+  margin: 14px auto 0;
+  border-radius: 18px;
+  background: #07144f;
+  color: #fff;
+  padding: clamp(22px, 4vw, 34px);
+  font-family: Archivo, system-ui, sans-serif;
+}
+
+.implementation-brief-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 28px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.implementation-brief-head > div:first-child {
+  max-width: 720px;
+}
+
+.implementation-brief-head span,
+.implementation-brief-grid article > span,
+.implementation-brief-foot > span {
+  color: #8fa5dc;
+  font: 9px "IBM Plex Mono", monospace;
+  letter-spacing: 0.14em;
+}
+
+.implementation-brief-head h3 {
+  margin: 8px 0 10px;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+}
+
+.implementation-brief-head p {
+  color: #c2cbe1;
+  margin: 0;
+  max-width: 68ch;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.implementation-brief-actions {
+  display: grid;
+  gap: 8px;
+  min-width: min(100%, 250px);
+}
+
+.implementation-brief-actions button,
+.implementation-brief-actions a {
+  border-radius: 10px;
+  padding: 11px 14px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.implementation-brief-actions button {
+  border: 1px solid #7182b4;
+  background: transparent;
+  color: #fff;
+}
+
+.implementation-brief-actions a {
+  border: 1px solid #fff;
+  background: #fff;
+  color: #07144f;
+}
+
+.implementation-brief-actions button:hover {
+  border-color: #fff;
+}
+
+.implementation-brief-actions a:hover {
+  background: #eaf1ff;
+}
+
+.implementation-brief-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.implementation-brief-grid article {
+  min-width: 0;
+  border: 1px solid #344373;
+  border-radius: 13px;
+  background: #0e1d58;
+  padding: 18px;
+}
+
+.implementation-brief-grid ol {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: implementation-step;
+  display: grid;
+  gap: 8px;
+}
+
+.implementation-brief-grid li {
+  counter-increment: implementation-step;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: start;
+  gap: 9px;
+  color: #e1e6f2;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.implementation-brief-grid li::before {
+  content: counter(implementation-step, decimal-leading-zero);
+  color: #74a9ff;
+  font: 9px "IBM Plex Mono", monospace;
+  padding-top: 2px;
+}
+
+.implementation-provider-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.implementation-provider-list > div {
+  border: 1px solid #344373;
+  border-radius: 9px;
+  background: #07144f;
+  padding: 10px 11px;
+  display: grid;
+  gap: 3px;
+}
+
+.implementation-provider-list strong {
+  font-size: 12px;
+}
+
+.implementation-provider-list small {
+  color: #9eabd0;
+  font-size: 9px;
+}
+
+.implementation-empty {
+  margin-top: 14px;
+  color: #dbe2f2;
+}
+
+.implementation-empty strong {
+  font-size: 12px;
+}
+
+.implementation-empty p {
+  color: #9eabd0;
+  font-size: 10px;
+  line-height: 1.55;
+  margin: 6px 0 0;
+}
+
+.implementation-directory-link {
+  border: 0;
+  background: transparent;
+  color: #72a8ff;
+  padding: 13px 0 0;
+  font: 700 9px "IBM Plex Mono", monospace;
+  cursor: pointer;
+}
+
+.implementation-brief-foot {
+  border-top: 1px solid #344373;
+  margin-top: 18px;
+  padding-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.implementation-brief-foot p {
+  margin: 0;
+  max-width: 760px;
+  color: #98a5c8;
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .implementation-brief-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .implementation-brief-actions {
+    width: 100%;
+  }
+}
