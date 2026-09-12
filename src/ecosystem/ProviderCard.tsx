@@ -61,7 +61,9 @@ export default function ProviderCard({
     });
 
   return (
-    <article className={`eco-provider-card${selected ? " is-shortlisted" : ""}`}>
+    <article
+      className={`eco-provider-card${selected ? " is-shortlisted" : ""}`}
+    >
       <div className="eco-provider-top">
         <a
           className="eco-provider-brand"
