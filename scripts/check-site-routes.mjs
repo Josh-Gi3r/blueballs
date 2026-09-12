@@ -146,8 +146,11 @@ assert.match(crawlerDocument("/sandbox"), /protected-ledger payment journeys/i);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/sandbox<\/loc>/);
 assert.equal(
   pageMetadata("/blueprint").title,
-  "Share and fork financial-product Blueprints — Blueballs",
+  "Financial product Blueprint library — Blueballs",
 );
+assert.match(crawlerDocument("/blueprint"), /Blueprint Library/i);
+assert.match(crawlerDocument("/blueprint"), /Creator Bank Singapore/i);
+assert.match(crawlerDocument("/blueprint"), /Institution-Owned FX Desk/i);
 assert.match(crawlerDocument("/blueprint"), /public-safe/i);
 assert.match(crawlerDocument("/blueprint"), /URL fragment/i);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/blueprint<\/loc>/);
@@ -177,5 +180,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: shared navigation is synchronized, Cards has one canonical market-intelligence surface, Blueprints are shareable and crawlable, and /contact is a first-class build route",
+  "site route contract: shared navigation is synchronized, Cards has one canonical market-intelligence surface, the Blueprint Library is public and crawlable, and /contact is a first-class build route",
 );
