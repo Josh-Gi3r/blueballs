@@ -1,0 +1,61 @@
+name: Design partner
+description: Explore a financial product, market or institution built on Blueballs.
+title: "[Design partner] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Build with Blueballs
+        Use this form when you want to explore a product or market with the Blueballs project.
+
+        This is a public GitHub issue. Do not include credentials, customer information, confidential commercial terms or other sensitive data.
+  - type: input
+    id: organisation
+    attributes:
+      label: Organisation or project
+      placeholder: Company, institution, startup or project name
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Stage
+      options:
+        - Exploring a new product
+        - Prototype or sandbox
+        - Preparing for implementation
+        - Existing product or institution
+    validations:
+      required: true
+  - type: textarea
+    id: product
+    attributes:
+      label: What are you building?
+      description: Describe the product, users and financial experience you want to create.
+      placeholder: A multi-currency business account for...
+    validations:
+      required: true
+  - type: input
+    id: markets
+    attributes:
+      label: Markets and currencies
+      placeholder: Singapore, Malaysia · SGD, MYR, USD
+  - type: textarea
+    id: scope
+    attributes:
+      label: Where could Blueballs help?
+      description: Banking, ledger, cards, payments, stablecoin FX, provider architecture, settlement, sandbox or another surface.
+    validations:
+      required: true
+  - type: textarea
+    id: timing
+    attributes:
+      label: Target outcome and timing
+      placeholder: What would a useful first milestone look like?
+  - type: checkboxes
+    id: public
+    attributes:
+      label: Public issue acknowledgement
+      options:
+        - label: I have not included secrets, customer data or confidential information.
+          required: true
