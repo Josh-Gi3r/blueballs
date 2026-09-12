@@ -12,8 +12,16 @@ import { getAgentByName } from "agents";
 export { NeobankBuilder } from "./neobank-builder.js";
 export { BuilderBudget } from "./builder-budget.js";
 
+const SOCIAL_IMAGE =
+  "https://blueballs.tech/city/front-cover/blueballs-front-cover-v1.png";
 const sourceKey = (request) =>
   request.headers.get("cf-connecting-ip") || "unknown-source";
+const escapeAttribute = (value) =>
+  String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 
 async function withinLimit(binding, key) {
   if (!binding?.limit) return true;
@@ -273,13 +281,53 @@ async function handleRequest(request, env) {
 
   const known = KNOWN_PAGES.has(url.pathname);
   const metadata = pageMetadata(url.pathname);
+  const canonical = `https://blueballs.tech${url.pathname === "/" ? "" : url.pathname}`;
+  const title = escapeAttribute(metadata.title);
+  const description = escapeAttribute(metadata.description);
+  const canonicalAttribute = escapeAttribute(canonical);
   let html = await assetResponse.text();
   html = html
-    .replace(/<title>.*?<\/title>/s, `<title>${metadata.title}</title>`)
+    .replace(/<title>.*?<\/title>/s, `<title>${title}</title>`)
+    .replace(
+      /<meta\s+name="description"[^>]*>/i,
+      `<meta name="description" content="${description}" />`,
+    )
+    .replace(
+      /<meta\s+property="og:title"[^>]*>/i,
+      `<meta property="og:title" content="${title}" />`,
+    )
+    .replace(
+      /<meta\s+property="og:description"[^>]*>/i,
+      `<meta property="og:description" content="${description}" />`,
+    )
+    .replace(
+      /<meta\s+property="og:url"[^>]*>/i,
+      `<meta property="og:url" content="${canonicalAttribute}" />`,
+    )
+    .replace(
+      /<meta\s+property="og:image"[^>]*>/i,
+      `<meta property="og:image" content="${SOCIAL_IMAGE}" />`,
+    )
+    .replace(
+      /<meta\s+property="og:image:alt"[^>]*>/i,
+      `<meta property="og:image:alt" content="${title}" />`,
+    )
+    .replace(
+      /<meta\s+name="twitter:title"[^>]*>/i,
+      `<meta name="twitter:title" content="${title}" />`,
+    )
+    .replace(
+      /<meta\s+name="twitter:description"[^>]*>/i,
+      `<meta name="twitter:description" content="${description}" />`,
+    )
+    .replace(
+      /<meta\s+name="twitter:image"[^>]*>/i,
+      `<meta name="twitter:image" content="${SOCIAL_IMAGE}" />`,
+    )
     .replace('<div id="root"></div>', crawlerDocument(url.pathname))
     .replace(
       "</head>",
-      `<meta name="description" content="${metadata.description}"><link rel="canonical" href="https://blueballs.tech${url.pathname === "/" ? "" : url.pathname}"><link rel="alternate" type="text/plain" href="/llms.txt" title="LLM overview"></head>`,
+      `<link rel="canonical" href="${canonicalAttribute}"><link rel="alternate" type="text/plain" href="/llms.txt" title="LLM overview"></head>`,
     );
 
   const headers = new Headers(assetResponse.headers);

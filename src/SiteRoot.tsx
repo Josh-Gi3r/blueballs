@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import App from "./App";
 import EcosystemPage from "./EcosystemPage";
 import CardsPage from "./CardsPage";
+import ContactPage from "./ContactPage";
 import { BrandLockup } from "./Brand";
 import { usePath } from "./router";
 import SandboxPage from "./sandbox/SandboxPage";
@@ -31,6 +32,7 @@ function DirectoryShell({
     ["Developers", "/developers"],
     ["Cards", "/cards"],
     ["Providers", "/ecosystem"],
+    ["Build with us", "/contact"],
   ] as const;
   const active = page === "cards" ? "/cards" : "/ecosystem";
   const ticker =
@@ -278,8 +280,8 @@ function DirectoryShell({
                 maxWidth: "36ch",
               }}
             >
-              MIT-licensed open-source software for building neobanks and
-              financial products.
+              MIT-licensed open financial operating system for banking, FX and
+              programmable financial products.
             </p>
             <div style={{ fontFamily: MONO, fontSize: 10.5, color: "#8F98AC" }}>
               © 2026 · MIT LICENCE
@@ -317,6 +319,12 @@ function DirectoryShell({
               className="eco-shell-link"
             >
               Providers
+            </button>
+            <button
+              onClick={() => navigate("/contact")}
+              className="eco-shell-link"
+            >
+              Build with us
             </button>
           </div>
           <div>
@@ -375,5 +383,6 @@ export default function SiteRoot() {
   if (path === "/cards")
     return <DirectoryShell page="cards" navigate={navigate} />;
   if (path === "/sandbox") return <SandboxPage />;
+  if (path === "/contact") return <ContactPage onNavigate={navigate} />;
   return <App />;
 }

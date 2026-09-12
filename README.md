@@ -18,7 +18,8 @@
   <a href="https://blueballs.tech/cards">Cards</a> ·
   <a href="https://blueballs.tech/ecosystem">Providers</a> ·
   <a href="https://blueballs.tech/sandbox">Build in the Sandbox</a> ·
-  <a href="https://blueballs.tech/developers">API</a>
+  <a href="https://blueballs.tech/developers">API</a> ·
+  <a href="https://blueballs.tech/contact">Build with Blueballs</a>
 </p>
 
 <p align="center">
@@ -258,7 +259,9 @@ Use the core as-is for exploration. Fork it for your product. Build a provider a
 
 The project is deliberately provider-neutral and jurisdiction-flexible so serious teams can perform the additional integration, security, operational and regulatory work their own deployment requires without fighting a black-box platform.
 
-**[Explore Blueballs](https://blueballs.tech)** · **[Build in the Sandbox](https://blueballs.tech/sandbox)** · **[Read the API](https://blueballs.tech/developers)**
+**Blueballs is free to use. If you want the project involved in product design, integration, deployment or operating architecture, [build with Blueballs](https://blueballs.tech/contact).**
+
+**[Explore Blueballs](https://blueballs.tech)** · **[Build in the Sandbox](https://blueballs.tech/sandbox)** · **[Read the API](https://blueballs.tech/developers)** · **[Build with Blueballs](https://blueballs.tech/contact)**
 
 ## Documentation
 

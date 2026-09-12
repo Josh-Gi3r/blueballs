@@ -84,6 +84,11 @@ assert.match(
 );
 assert.match(
   siteRoot,
+  /if \(path === "\/contact"\)[\s\S]{0,120}<ContactPage onNavigate=\{navigate\} \/>/,
+  "SiteRoot must own the commercial /contact page",
+);
+assert.match(
+  siteRoot,
   /\["Stablecoin FX", "\/fx"\][\s\S]{0,180}\["Developers", "\/developers"\][\s\S]{0,180}\["Cards", "\/cards"\][\s\S]{0,180}\["Providers", "\/ecosystem"\]/,
   "directory pages must keep the same primary menu sequence as the main site",
 );
@@ -118,17 +123,18 @@ for (const stalePath of [
 
 assert.equal(
   pageMetadata("/cards").title,
-  "Card programme research — Blueballs",
+  "The stablecoin card market, mapped — Blueballs",
 );
-assert.match(crawlerDocument("/cards"), /not the Blueballs Cards API/i);
-assert.match(crawlerDocument("/cards"), /Not connected/);
+assert.match(crawlerDocument("/cards"), /independent|research standard/i);
+assert.match(crawlerDocument("/cards"), /relationship and technical status/i);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/cards<\/loc>/);
 assert.equal(
   pageMetadata("/sandbox").title,
   "Build a fintech sandbox — Blueballs",
 );
-assert.match(crawlerDocument("/sandbox"), /protected double-entry ledger/i);
+assert.match(crawlerDocument("/sandbox"), /protected-ledger payment journeys/i);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/sandbox<\/loc>/);
+assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/contact<\/loc>/);
 assert.equal(
   canonicalRedirectUrl("http://blueballs.tech/sandbox", "blueballs.tech", true),
   null,
@@ -154,5 +160,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: shared navigation is synchronized and Cards has one canonical public implementation",
+  "site route contract: shared navigation is synchronized, Cards has one canonical market-intelligence surface, and /contact is a first-class build route",
 );

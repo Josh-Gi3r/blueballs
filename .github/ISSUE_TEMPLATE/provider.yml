@@ -1,0 +1,63 @@
+name: Provider ecosystem
+description: Add, update or explore a provider listing, adapter or infrastructure connection.
+title: "[Provider] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Connect infrastructure to Blueballs
+        Use this form for provider-directory updates, adapter work, compatibility discussions or infrastructure collaboration.
+
+        A Blueballs listing does not imply a partnership or production integration. Relationship and technical status remain explicit in the directory.
+
+        This is a public GitHub issue. Do not include credentials, customer information, confidential commercial terms or other sensitive data.
+  - type: input
+    id: provider
+    attributes:
+      label: Provider or infrastructure project
+      placeholder: Company or project name
+    validations:
+      required: true
+  - type: dropdown
+    id: request
+    attributes:
+      label: What are you proposing?
+      options:
+        - Add or update a directory listing
+        - Build a Blueballs adapter
+        - Document compatibility
+        - Explore an integration
+        - Correct provider information
+    validations:
+      required: true
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Capabilities
+      description: Accounts, rails, cards, KYC/KYB, custody, stablecoins, FX, treasury, reconciliation or other infrastructure.
+    validations:
+      required: true
+  - type: input
+    id: regions
+    attributes:
+      label: Regions or markets
+      placeholder: Global, US, UK, Europe, APAC...
+  - type: input
+    id: official
+    attributes:
+      label: Official product or documentation link
+      placeholder: https://...
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: What should Blueballs evaluate?
+      placeholder: Describe the listing, compatibility or adapter opportunity.
+  - type: checkboxes
+    id: public
+    attributes:
+      label: Public issue acknowledgement
+      options:
+        - label: I have not included secrets, customer data or confidential information.
+          required: true
