@@ -47,12 +47,26 @@ function referrerHost(request) {
   }
 }
 
+function sameOrigin(request) {
+  const origin = request.headers.get("origin");
+  if (!origin) return true;
+  try {
+    return new URL(origin).origin === new URL(request.url).origin;
+  } catch {
+    return false;
+  }
+}
+
 export async function handleGrowthEvent(request, env) {
   if (request.method !== "POST") {
     return new Response(null, {
       status: 405,
       headers: { allow: "POST", "cache-control": "no-store" },
     });
+  }
+
+  if (!sameOrigin(request)) {
+    return Response.json({ error: "Cross-origin events are not accepted." }, { status: 403 });
   }
 
   const declared = Number(request.headers.get("content-length") || 0);
