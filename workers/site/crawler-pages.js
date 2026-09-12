@@ -115,6 +115,12 @@ const PAGES = {
       "Turn a financial-product brief into a structured blueprint, isolated test environment and protected-ledger product journey.",
     body: `<h1>Design the product. Provision the sandbox. Run the money flow.</h1><p>Describe the people you serve, choose markets, currencies, capabilities and rails, then turn the brief into an isolated Blueballs environment with test customers, accounts, balances and ledger-backed payment journeys.</p><h2>What the Builder creates</h2>${list(["Structured product blueprint", "Tenant-isolated test environment", "Approved test customers", "Multi-currency sandbox accounts", "Seeded test balances", "Protected-ledger payment journeys"])}<p><a href="/contact">Take the design into implementation</a>.</p>`,
   },
+  "/blueprint": {
+    title: "Share and fork financial-product Blueprints — Blueballs",
+    description:
+      "Share public-safe product architecture, inspect provider matches and fork a financial-product Blueprint back into Blueballs Builder.",
+    body: `<h1>Share and fork financial-product architecture.</h1><p>Blueballs Blueprints capture the public-safe structure of a product: name, markets, currencies, capabilities, rails and an optional accent. Shared links can be inspected, matched against the provider directory and forked back into Builder.</p><h2>Public-safe by design</h2><p>The shared format excludes sandbox IDs, API keys, customers, balances, transactions, free-text audience descriptions and tenant state. The architecture payload lives in the URL fragment, which browsers do not send to the server as part of the HTTP request.</p><p><a href="/sandbox">Build a Blueprint</a> or <a href="/ecosystem">explore providers</a>.</p>`,
+  },
   "/developers": {
     title: "Build with the Blueballs API",
     description:
