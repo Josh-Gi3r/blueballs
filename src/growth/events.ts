@@ -9,7 +9,8 @@ export type GrowthEventName =
   | "provider_claim_start"
   | "provider_partnership_start"
   | "builder_start"
-  | "commercial_cta";
+  | "commercial_cta"
+  | "commercial_contact_view";
 
 type EventValue = string | number | boolean | null;
 type EventProperties = Record<string, EventValue>;
@@ -68,11 +69,11 @@ export function trackGrowthEvent(
 
   try {
     if (navigator.sendBeacon) {
-      navigator.sendBeacon(
+      const queued = navigator.sendBeacon(
         "/api/events",
         new Blob([payload], { type: "application/json" }),
       );
-      return;
+      if (queued) return;
     }
     void fetch("/api/events", {
       method: "POST",
