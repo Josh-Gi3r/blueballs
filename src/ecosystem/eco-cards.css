@@ -52,6 +52,11 @@
   box-shadow: 0 15px 32px rgba(50, 61, 104, 0.08);
   background: #fff;
 }
+.eco-provider-card.is-shortlisted {
+  border-color: #0647e8;
+  box-shadow: 0 0 0 1px rgba(6, 71, 232, 0.08);
+  background: #fff;
+}
 .eco-provider-featured {
   background: #fff;
 }
@@ -216,6 +221,38 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+.eco-provider-decision-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 14px;
+}
+.eco-provider-decision-actions button,
+.eco-provider-decision-actions a {
+  min-height: 34px;
+  border: 1px solid #cfd5e3;
+  border-radius: 9px;
+  background: #fff;
+  color: #07144f;
+  font: 600 9px "IBM Plex Mono", monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px 9px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.eco-provider-decision-actions button:hover,
+.eco-provider-decision-actions a:hover {
+  border-color: #0647e8;
+  color: #0647e8;
+}
+.eco-provider-decision-actions button.selected {
+  background: #0647e8;
+  border-color: #0647e8;
+  color: #fff;
+}
 .eco-provider-links {
   margin-top: 12px;
   padding-top: 10px;
@@ -263,4 +300,10 @@
     8.5px "IBM Plex Mono",
     monospace;
   color: #7f899e;
+}
+
+@media (max-width: 560px) {
+  .eco-provider-decision-actions {
+    grid-template-columns: 1fr;
+  }
 }

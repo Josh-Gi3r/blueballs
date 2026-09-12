@@ -97,7 +97,9 @@
   margin-top: 14px;
 }
 .eco-hero-actions button,
-.eco-bottom-actions button {
+.eco-hero-actions a,
+.eco-bottom-actions button,
+.eco-bottom-actions a {
   border: 1px solid var(--eco-ink);
   background: var(--eco-ink);
   color: #fff;
@@ -105,9 +107,15 @@
   padding: 13px 18px;
   font-size: 13px;
   font-weight: 550;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 .eco-hero-actions button:hover,
-.eco-bottom-actions button:hover {
+.eco-hero-actions a:hover,
+.eco-bottom-actions button:hover,
+.eco-bottom-actions a:hover {
   background: var(--eco-blue);
   border-color: var(--eco-blue);
 }

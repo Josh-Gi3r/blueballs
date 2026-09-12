@@ -1,0 +1,82 @@
+name: Claim or update a provider profile
+description: Claim, correct or enrich a financial-infrastructure profile in the Blueballs directory.
+title: "[Provider profile] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Claim or update your Blueballs profile
+        Blueballs maintains an independent directory of financial-infrastructure providers for builders researching their stack.
+
+        Claiming a profile lets a provider help keep factual information current. **A claimed profile is not a paid ranking, partnership, endorsement or technical verification.** Commercial relationships and technical status are labelled separately.
+
+        This issue is public. Do not post credentials, private contact details, customer information or confidential commercial terms.
+  - type: input
+    id: provider
+    attributes:
+      label: Provider name
+      placeholder: Company or infrastructure project
+    validations:
+      required: true
+  - type: dropdown
+    id: request
+    attributes:
+      label: Request
+      options:
+        - Claim an existing profile
+        - Correct an existing profile
+        - Add a provider that is missing
+        - Add or update capabilities and market coverage
+    validations:
+      required: true
+  - type: input
+    id: official
+    attributes:
+      label: Official provider URL
+      placeholder: https://provider.example
+    validations:
+      required: true
+  - type: input
+    id: docs
+    attributes:
+      label: Official technical documentation
+      placeholder: https://docs.provider.example
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Capabilities to list
+      description: Accounts, sponsor banking, KYC/KYB, payment rails, cards, custody, stablecoins, FX, open banking, treasury, reconciliation or other infrastructure.
+    validations:
+      required: true
+  - type: textarea
+    id: markets
+    attributes:
+      label: Markets and availability
+      description: List the regions or countries that should be reflected, with official source links where practical.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Source links
+      description: Provide official pages Blueballs can use to verify the requested changes.
+      placeholder: |
+        Product: https://...
+        Coverage: https://...
+        Sandbox: https://...
+    validations:
+      required: true
+  - type: textarea
+    id: representation
+    attributes:
+      label: Provider representation
+      description: If you represent the provider, link to a public company profile that identifies you or state that domain-email verification is available privately. Do not publish a private email address here.
+  - type: checkboxes
+    id: acknowledgements
+    attributes:
+      label: Acknowledgements
+      options:
+        - label: I understand that claiming a profile does not buy an organic ranking or technical verification.
+          required: true
+        - label: I have not included secrets, customer data, private contact details or confidential information.
+          required: true
