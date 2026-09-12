@@ -14,6 +14,7 @@ test("growth event intake accepts an allowlisted event and logs bounded structur
         method: "POST",
         headers: {
           "content-type": "application/json",
+          origin: "https://blueballs.tech",
           referer: "https://blueballs.tech/ecosystem?utm_source=test",
         },
         body: JSON.stringify({
@@ -56,6 +57,21 @@ test("growth event intake rejects unknown event names", async () => {
     env,
   );
   assert.equal(response.status, 400);
+});
+
+test("growth event intake rejects cross-origin browser submissions", async () => {
+  const response = await handleGrowthEvent(
+    new Request("https://blueballs.tech/api/events", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://example.com",
+      },
+      body: JSON.stringify({ name: "provider_directory_view" }),
+    }),
+    env,
+  );
+  assert.equal(response.status, 403);
 });
 
 test("growth event intake rejects non-POST requests", async () => {
