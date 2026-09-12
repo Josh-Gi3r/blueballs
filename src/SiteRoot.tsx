@@ -25,7 +25,6 @@ function DirectoryShell({
     setMobileNavOpen(false);
     navigate(path);
   };
-  // Keep the public header sequence identical to the main App header.
   const nav = [
     ["Home", "/home"],
     ["Products", "/products"],
@@ -33,6 +32,7 @@ function DirectoryShell({
     ["Developers", "/developers"],
     ["Cards", "/cards"],
     ["Providers", "/ecosystem"],
+    ["Blueprints", "/blueprint"],
     ["Build with us", "/contact"],
   ] as const;
   const active = page === "cards" ? "/cards" : "/ecosystem";
@@ -320,6 +320,12 @@ function DirectoryShell({
               className="eco-shell-link"
             >
               Providers
+            </button>
+            <button
+              onClick={() => navigate("/blueprint")}
+              className="eco-shell-link"
+            >
+              Blueprints
             </button>
             <button
               onClick={() => navigate("/contact")}
