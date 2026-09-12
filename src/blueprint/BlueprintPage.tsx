@@ -67,14 +67,19 @@ export default function BlueprintPage({ onNavigate }: BlueprintPageProps) {
           <button type="button" onClick={() => onNavigate("/home")}>
             <BrandLockup linked={false} />
           </button>
-          <span>SHARED BLUEPRINT</span>
+          <span>BLUEPRINTS</span>
         </header>
         <section className="shared-blueprint-invalid">
-          <span>BLUEPRINT LINK</span>
-          <h1>This Blueprint link is incomplete.</h1>
+          <span>SHAREABLE PRODUCT ARCHITECTURE</span>
+          <h1>
+            Turn a financial-product idea into something people can inspect and
+            fork.
+          </h1>
           <p>
-            Shared Blueprints carry only public-safe product architecture in the
-            link itself. Start in Builder to create a new one.
+            Blueballs Blueprints capture the public-safe structure of a product:
+            markets, currencies, capabilities and rails. Share the architecture,
+            inspect matching infrastructure, then fork it back into Builder
+            without exposing sandbox customers, balances, keys or transactions.
           </p>
           <button type="button" onClick={() => onNavigate("/sandbox")}>
             Build a Blueprint →
