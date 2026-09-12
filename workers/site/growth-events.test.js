@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { handleGrowthEvent } from "./growth-events.js";
+import {
+  handleGrowthEvent,
+  logServerGrowthEvent,
+} from "./growth-events.js";
 
 const env = { BLUEBALLS_GIT_SHA: "test-sha" };
 
@@ -42,6 +45,30 @@ test("growth event intake accepts an allowlisted event and logs bounded structur
     assert.equal(event.properties.ignored_nested, undefined);
     assert.equal(event.referrer_host, "blueballs.tech");
     assert.equal(event.source_commit, "test-sha");
+  } finally {
+    console.log = original;
+  }
+});
+
+test("server-confirmed Builder signals use canonical low-cardinality paths", () => {
+  const lines = [];
+  const original = console.log;
+  console.log = (line) => lines.push(line);
+  try {
+    const accepted = logServerGrowthEvent(
+      new Request(
+        "https://blueballs.tech/v2/builder/projects/project-secret/provision",
+      ),
+      env,
+      "builder_sandbox_provisioned",
+      { response_status: 200 },
+    );
+    assert.equal(accepted, true);
+    const event = JSON.parse(lines[0]);
+    assert.equal(event.name, "builder_sandbox_provisioned");
+    assert.equal(event.path, "/v2/builder/projects/:id/provision");
+    assert.equal(event.properties.response_status, 200);
+    assert.doesNotMatch(event.path, /project-secret/);
   } finally {
     console.log = original;
   }
