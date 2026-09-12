@@ -7,7 +7,10 @@ import {
   robotsText,
   sitemapXml,
 } from "./crawler-pages.js";
-import { handleGrowthEvent } from "./growth-events.js";
+import {
+  handleGrowthEvent,
+  logServerGrowthEvent,
+} from "./growth-events.js";
 import { runtimeForPath } from "../../spec/runtime-ownership.mjs";
 import { getAgentByName } from "agents";
 export { NeobankBuilder } from "./neobank-builder.js";
@@ -49,6 +52,16 @@ function internalRequest(request, headers) {
   next.delete("origin");
   for (const [name, value] of Object.entries(headers)) next.set(name, value);
   return new Request(request, { headers: next });
+}
+
+function builderGrowthEvent(request, pathname) {
+  if (request.method !== "POST") return null;
+  if (pathname === "/v2/builder/projects") return "builder_blueprint_created";
+  if (/^\/v2\/builder\/projects\/[^/]+\/provision$/.test(pathname))
+    return "builder_sandbox_provisioned";
+  if (/^\/v2\/builder\/projects\/[^/]+\/test-payments$/.test(pathname))
+    return "builder_test_payment";
+  return null;
 }
 
 export default {
@@ -237,7 +250,14 @@ async function handleRequest(request, env) {
   }
 
   if (url.pathname === "/v2" || url.pathname.startsWith("/v2/")) {
-    return env.API.fetch(internalRequest(request, {}));
+    const response = await env.API.fetch(internalRequest(request, {}));
+    const growthEvent = builderGrowthEvent(request, url.pathname);
+    if (response.ok && growthEvent) {
+      logServerGrowthEvent(request, env, growthEvent, {
+        response_status: response.status,
+      });
+    }
+    return response;
   }
 
   if (url.pathname === "/api/health") {
