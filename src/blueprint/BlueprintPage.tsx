@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { BrandLockup } from "../Brand";
 import ProviderMatchPanel from "../ecosystem/ProviderMatchPanel";
 import { trackGrowthEvent } from "../growth/events";
+import BlueprintLibrary from "./BlueprintLibrary";
 import { decodeBlueprintShare, encodeBlueprintShare } from "./share";
 import "./BlueprintPage.css";
 
@@ -23,10 +24,22 @@ function Chips({ items }: { items: string[] }) {
 
 export default function BlueprintPage({ onNavigate }: BlueprintPageProps) {
   const [copied, setCopied] = useState(false);
-  const blueprint = useMemo(
-    () => decodeBlueprintShare(window.location.hash),
-    [],
+  const [blueprint, setBlueprint] = useState(() =>
+    decodeBlueprintShare(window.location.hash),
   );
+
+  useEffect(() => {
+    const sync = () => {
+      setBlueprint(decodeBlueprintShare(window.location.hash));
+      setCopied(false);
+    };
+    window.addEventListener("popstate", sync);
+    window.addEventListener("hashchange", sync);
+    return () => {
+      window.removeEventListener("popstate", sync);
+      window.removeEventListener("hashchange", sync);
+    };
+  }, []);
 
   useEffect(() => {
     if (!blueprint) return;
@@ -68,22 +81,20 @@ export default function BlueprintPage({ onNavigate }: BlueprintPageProps) {
           </button>
           <span>BLUEPRINTS</span>
         </header>
-        <section className="shared-blueprint-invalid">
+        <section className="shared-blueprint-invalid shared-blueprint-library-hero">
           <span>SHAREABLE PRODUCT ARCHITECTURE</span>
-          <h1>
-            Turn a financial-product idea into something people can inspect and
-            fork.
-          </h1>
+          <h1>Start from a product. Fork the architecture.</h1>
           <p>
-            Blueballs Blueprints capture the public-safe structure of a product:
-            markets, currencies, capabilities and rails. Share the architecture,
-            inspect matching infrastructure, then fork it back into Builder
-            without exposing sandbox customers, balances, keys or transactions.
+            Blueballs Blueprints capture the public-safe structure of a financial
+            product: markets, currencies, capabilities and rails. Inspect an
+            example, see matching infrastructure, generate an implementation
+            brief, then fork the architecture into your own Builder workspace.
           </p>
           <button type="button" onClick={() => onNavigate("/sandbox")}>
             Build a Blueprint →
           </button>
         </section>
+        <BlueprintLibrary onNavigate={onNavigate} />
       </main>
     );
   }
@@ -103,6 +114,9 @@ export default function BlueprintPage({ onNavigate }: BlueprintPageProps) {
         </button>
         <div>
           <span>SHARED BLUEPRINT</span>
+          <button type="button" onClick={() => onNavigate("/blueprint")}>
+            Library
+          </button>
           <button type="button" onClick={copyLink}>
             {copied ? "Link copied ✓" : "Copy link"}
           </button>
