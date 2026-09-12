@@ -30,7 +30,10 @@ const wranglerSource = readFileSync(
   new URL("../../wrangler.jsonc", import.meta.url),
   "utf8",
 );
-const indexHtml = readFileSync(new URL("../../index.html", import.meta.url), "utf8");
+const indexHtml = readFileSync(
+  new URL("../../index.html", import.meta.url),
+  "utf8",
+);
 
 function pngDimensions(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -58,37 +61,49 @@ test("every public product route has the intended social card", () => {
   );
 });
 
-test("all seven social card endpoints return immutable 1200x630 PNGs", async () => {
-  const paths = socialCardAssetPaths();
-  assert.equal(paths.length, 7);
-  assert.equal(new Set(paths).size, 7);
+test(
+  "all seven social card endpoints return immutable 1200x630 PNGs",
+  async () => {
+    const paths = socialCardAssetPaths();
+    assert.equal(paths.length, 7);
+    assert.equal(new Set(paths).size, 7);
 
-  for (const path of paths) {
-    const response = socialCardResponse(path);
-    assert.ok(response, `missing social card response for ${path}`);
-    assert.equal(response.headers.get("content-type"), "image/png");
-    assert.match(response.headers.get("cache-control") ?? "", /immutable/);
-    assert.deepEqual(pngDimensions(await response.arrayBuffer()), {
-      width: 1200,
-      height: 630,
-    });
-  }
-});
+    for (const path of paths) {
+      const response = socialCardResponse(path);
+      assert.ok(response, `missing social card response for ${path}`);
+      assert.equal(response.headers.get("content-type"), "image/png");
+      assert.match(response.headers.get("cache-control") ?? "", /immutable/);
+      assert.deepEqual(pngDimensions(await response.arrayBuffer()), {
+        width: 1200,
+        height: 630,
+      });
+    }
+  },
+);
 
-test("the deployed site entrypoint serves cards and rewrites both OG and X images", () => {
-  assert.match(wranglerSource, /"main": "\.\/workers\/site\/social-wrapper\.js"/);
-  assert.match(wrapperSource, /socialCardResponse\(url\.pathname\)/);
-  assert.match(wrapperSource, /socialImageForPath\(url\.pathname\)/);
-  assert.match(wrapperSource, /property="og:image"/);
-  assert.match(wrapperSource, /name="twitter:image"/);
-  assert.match(wrapperSource, /og:image:width/);
-  assert.match(wrapperSource, /content="1200"/);
-  assert.match(wrapperSource, /content="630"/);
-});
+test(
+  "the deployed site entrypoint serves cards and rewrites both OG and X images",
+  () => {
+    assert.match(
+      wranglerSource,
+      /"main": "\.\/workers\/site\/social-wrapper\.js"/,
+    );
+    assert.match(wrapperSource, /socialCardResponse\(url\.pathname\)/);
+    assert.match(wrapperSource, /socialImageForPath\(url\.pathname\)/);
+    assert.match(wrapperSource, /property="og:image"/);
+    assert.match(wrapperSource, /name="twitter:image"/);
+    assert.match(wrapperSource, /og:image:width/);
+    assert.match(wrapperSource, /content="1200"/);
+    assert.match(wrapperSource, /content="630"/);
+  },
+);
 
-test("the static HTML fallback uses the launch-card contract, not the retired city cover", () => {
-  assert.match(indexHtml, /https:\/\/blueballs\.tech\/social\/home\.png/);
-  assert.match(indexHtml, /property="og:image:width" content="1200"/);
-  assert.match(indexHtml, /property="og:image:height" content="630"/);
-  assert.doesNotMatch(indexHtml, /blueballs-front-cover-v1\.png/);
-});
+test(
+  "the static HTML fallback uses the launch-card contract, not the retired city cover",
+  () => {
+    assert.match(indexHtml, /https:\/\/blueballs\.tech\/social\/home\.png/);
+    assert.match(indexHtml, /property="og:image:width" content="1200"/);
+    assert.match(indexHtml, /property="og:image:height" content="630"/);
+    assert.doesNotMatch(indexHtml, /blueballs-front-cover-v1\.png/);
+  },
+);
