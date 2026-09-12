@@ -71,8 +71,13 @@ export default function ProofPage({ onNavigate }: ProofPageProps) {
     trackGrowthEvent("proof_page_view", { catalogue_operations: TOTAL_ENDPOINTS });
     void fetch("/api/health", { cache: "no-store" })
       .then(async (response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return (await response.json()) as Health;
+        const body = await response
+          .json()
+          .catch(() => null);
+        if (!body || typeof body !== "object") {
+          throw new Error(`Health response was not JSON: HTTP ${response.status}`);
+        }
+        return body as Health;
       })
       .then((body) => {
         if (!alive) return;
@@ -92,8 +97,11 @@ export default function ProofPage({ onNavigate }: ProofPageProps) {
   const liveStatus = useMemo(() => {
     if (healthState === "loading") return "Checking live deployment…";
     if (healthState === "error") return "Live parity unavailable";
-    return liveConsistent ? "One source SHA across the stack" : "Mixed deployment detected";
-  }, [healthState, liveConsistent]);
+    if (liveConsistent) return "One source SHA across the stack";
+    return health?.status === "degraded"
+      ? "Degraded or mixed deployment detected"
+      : "Mixed deployment detected";
+  }, [health?.status, healthState, liveConsistent]);
   const commitUrl = sourceUrl(health?.source_commit);
 
   return (
@@ -147,7 +155,11 @@ export default function ProofPage({ onNavigate }: ProofPageProps) {
           <article>
             <span>SITE</span>
             <b>{shortSha(health?.source_commit)}</b>
-            <small>{healthState === "ready" ? health?.status ?? "unknown" : healthState}</small>
+            <small>
+              {healthState === "ready"
+                ? health?.status ?? "unknown"
+                : healthState}
+            </small>
           </article>
           <article>
             <span>BANKING</span>
@@ -162,12 +174,16 @@ export default function ProofPage({ onNavigate }: ProofPageProps) {
             <span>FX</span>
             <b>{shortSha(health?.fx_source_commit)}</b>
             <small>
-              {typeof health?.fx_api === "number" ? `HTTP ${health.fx_api}` : healthState}
+              {typeof health?.fx_api === "number"
+                ? `HTTP ${health.fx_api}`
+                : healthState}
             </small>
           </article>
           <article className="proof-live-convergence">
             <span>DEPLOYMENT CONSISTENCY</span>
-            <b>{healthState === "ready" ? (liveConsistent ? "YES" : "NO") : "—"}</b>
+            <b>
+              {healthState === "ready" ? (liveConsistent ? "YES" : "NO") : "—"}
+            </b>
             <small>site + banking + FX exact-source convergence</small>
           </article>
         </div>
@@ -175,7 +191,8 @@ export default function ProofPage({ onNavigate }: ProofPageProps) {
           <p>
             These are live deployment facts, not a cached badge. The health
             endpoint compares source commits reported by the currently running
-            components.
+            components, including degraded responses when they still return
+            structured health evidence.
           </p>
           {commitUrl && (
             <a
@@ -228,7 +245,9 @@ export default function ProofPage({ onNavigate }: ProofPageProps) {
       <section className="proof-close">
         <div>
           <span>INSPECTABLE BY DESIGN</span>
-          <h2>Use the proof. Fork the system. Change what your institution needs.</h2>
+          <h2>
+            Use the proof. Fork the system. Change what your institution needs.
+          </h2>
           <p>
             Release proof is generated for an exact checkout and tied to its
             commit. The scripts, tests and deployment checks are part of the MIT-
@@ -241,7 +260,9 @@ export default function ProofPage({ onNavigate }: ProofPageProps) {
             href="https://github.com/Josh-Gi3r/blueballs"
             target="_blank"
             rel="noreferrer"
-            onClick={() => trackGrowthEvent("proof_source_open", { surface: "repo" })}
+            onClick={() =>
+              trackGrowthEvent("proof_source_open", { surface: "repo" })
+            }
           >
             Inspect the source ↗
           </a>
