@@ -5,6 +5,7 @@ import CardsPage from "./CardsPage";
 import ContactPage from "./ContactPage";
 import { BrandLockup } from "./Brand";
 import BlueprintPage from "./blueprint/BlueprintPage";
+import ProofPage from "./proof/ProofPage";
 import { usePath } from "./router";
 import SandboxPage from "./sandbox/SandboxPage";
 
@@ -33,6 +34,7 @@ function DirectoryShell({
     ["Cards", "/cards"],
     ["Providers", "/ecosystem"],
     ["Blueprints", "/blueprint"],
+    ["Proof", "/proof"],
     ["Build with us", "/contact"],
   ] as const;
   const active = page === "cards" ? "/cards" : "/ecosystem";
@@ -327,6 +329,9 @@ function DirectoryShell({
             >
               Blueprints
             </button>
+            <button onClick={() => navigate("/proof")} className="eco-shell-link">
+              Proof
+            </button>
             <button
               onClick={() => navigate("/contact")}
               className="eco-shell-link"
@@ -390,6 +395,7 @@ export default function SiteRoot() {
   if (path === "/cards")
     return <DirectoryShell page="cards" navigate={navigate} />;
   if (path === "/blueprint") return <BlueprintPage onNavigate={navigate} />;
+  if (path === "/proof") return <ProofPage onNavigate={navigate} />;
   if (path === "/sandbox") return <SandboxPage />;
   if (path === "/contact") return <ContactPage onNavigate={navigate} />;
   return <App />;

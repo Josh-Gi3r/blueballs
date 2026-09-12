@@ -17,6 +17,8 @@ export type GrowthEventName =
   | "implementation_brief_view"
   | "implementation_brief_copy"
   | "implementation_intake_start"
+  | "proof_page_view"
+  | "proof_source_open"
   | "builder_start"
   | "commercial_cta"
   | "commercial_contact_view";

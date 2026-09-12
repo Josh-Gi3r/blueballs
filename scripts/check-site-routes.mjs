@@ -48,6 +48,11 @@ assert.match(
 );
 assert.match(
   worker,
+  /KNOWN_PAGES[\s\S]*"\/proof"/,
+  "/proof must be an allowed HTML route",
+);
+assert.match(
+  worker,
   /fonts\.googleapis\.com/,
   "CSP must allow the site's loaded webfonts",
 );
@@ -94,6 +99,11 @@ assert.match(
 );
 assert.match(
   siteRoot,
+  /if \(path === "\/proof"\)[\s\S]{0,120}<ProofPage onNavigate=\{navigate\} \/>/,
+  "SiteRoot must own the canonical /proof page",
+);
+assert.match(
+  siteRoot,
   /if \(path === "\/contact"\)[\s\S]{0,120}<ContactPage onNavigate=\{navigate\} \/>/,
   "SiteRoot must own the commercial /contact page",
 );
@@ -101,6 +111,11 @@ assert.match(
   siteRoot,
   /\["Stablecoin FX", "\/fx"\][\s\S]{0,180}\["Developers", "\/developers"\][\s\S]{0,180}\["Cards", "\/cards"\][\s\S]{0,180}\["Providers", "\/ecosystem"\]/,
   "directory pages must keep the same primary menu sequence as the main site",
+);
+assert.match(
+  siteRoot,
+  /\["Blueprints", "\/blueprint"\][\s\S]{0,120}\["Proof", "\/proof"\]/,
+  "directory navigation must expose Blueprint and Proof surfaces",
 );
 assert.match(
   brand,
@@ -154,6 +169,14 @@ assert.match(crawlerDocument("/blueprint"), /Institution-Owned FX Desk/i);
 assert.match(crawlerDocument("/blueprint"), /public-safe/i);
 assert.match(crawlerDocument("/blueprint"), /URL fragment/i);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/blueprint<\/loc>/);
+assert.equal(
+  pageMetadata("/proof").title,
+  "Technical proof and deployment parity — Blueballs",
+);
+assert.match(crawlerDocument("/proof"), /Financial infrastructure should show its work/i);
+assert.match(crawlerDocument("/proof"), /181-operation/i);
+assert.match(crawlerDocument("/proof"), /BLUEBALLS_GIT_SHA/);
+assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/proof<\/loc>/);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/contact<\/loc>/);
 assert.equal(
   canonicalRedirectUrl("http://blueballs.tech/sandbox", "blueballs.tech", true),
@@ -180,5 +203,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: shared navigation is synchronized, Cards has one canonical market-intelligence surface, the Blueprint Library is public and crawlable, and /contact is a first-class build route",
+  "site route contract: shared navigation is synchronized, Cards has one canonical market-intelligence surface, Blueprints and Proof are public/crawlable product surfaces, and /contact is a first-class build route",
 );
