@@ -17,7 +17,10 @@ const IMPLEMENTATION_INTAKE =
   "https://github.com/Josh-Gi3r/blueballs/issues/new?template=implementation.yml";
 
 type ImplementationBriefPanelProps = {
-  blueprint: ImplementationBlueprint & { brand?: { accent?: string } };
+  blueprint: ImplementationBlueprint & {
+    brand?: { accent?: string };
+    accent?: string;
+  };
   source: "builder" | "shared_blueprint";
   onNavigate: (path: string) => void;
 };
@@ -60,7 +63,12 @@ export default function ImplementationBriefPanel({
       workstreams: brief.workstreams.length,
       capabilities: blueprint.capabilities.length,
     });
-  }, [blueprint.capabilities.length, brief.workstreams.length, providers.length, source]);
+  }, [
+    blueprint.capabilities.length,
+    brief.workstreams.length,
+    providers.length,
+    source,
+  ]);
 
   async function copyBrief() {
     try {
@@ -139,6 +147,11 @@ export default function ImplementationBriefPanel({
               </p>
             </div>
           )}
+          <p className="implementation-provider-note">
+            Shortlisted providers are user-selected. Inclusion here does not
+            imply a Blueballs recommendation, partnership or production
+            integration.
+          </p>
           <button
             type="button"
             className="implementation-directory-link"
