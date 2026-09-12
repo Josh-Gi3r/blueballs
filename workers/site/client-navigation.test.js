@@ -32,37 +32,43 @@ test("same-route navigation only resets scroll", () => {
   assert.deepEqual(browser.events, []);
 });
 
-test("cross-shell navigation pushes a real URL then broadcasts location change", () => {
-  const browser = runtime("/home");
-  const result = navigatePath("/cards", browser.value);
+test(
+  "cross-shell navigation pushes a real URL then broadcasts location change",
+  () => {
+    const browser = runtime("/home");
+    const result = navigatePath("/cards", browser.value);
 
-  assert.equal(result.changed, true);
-  assert.equal(result.growthEvent, null);
-  assert.deepEqual(browser.actions, [
-    ["pushState", "/cards"],
-    ["popstate"],
-    ["scroll", 0, 0],
-  ]);
-  assert.deepEqual(browser.events, []);
-});
+    assert.equal(result.changed, true);
+    assert.equal(result.growthEvent, null);
+    assert.deepEqual(browser.actions, [
+      ["pushState", "/cards"],
+      ["popstate"],
+      ["scroll", 0, 0],
+    ]);
+    assert.deepEqual(browser.events, []);
+  },
+);
 
-test("Builder navigation attributes the source path before changing location", () => {
-  const browser = runtime("/blueprint");
-  const result = navigatePath("/sandbox", browser.value);
+test(
+  "Builder navigation attributes the source path before changing location",
+  () => {
+    const browser = runtime("/blueprint");
+    const result = navigatePath("/sandbox", browser.value);
 
-  assert.equal(result.growthEvent, "builder_start");
-  assert.deepEqual(browser.events, [
-    {
-      name: "builder_start",
-      properties: { source_path: "/blueprint" },
-    },
-  ]);
-  assert.deepEqual(browser.actions, [
-    ["pushState", "/sandbox"],
-    ["popstate"],
-    ["scroll", 0, 0],
-  ]);
-});
+    assert.equal(result.growthEvent, "builder_start");
+    assert.deepEqual(browser.events, [
+      {
+        name: "builder_start",
+        properties: { source_path: "/blueprint" },
+      },
+    ]);
+    assert.deepEqual(browser.actions, [
+      ["pushState", "/sandbox"],
+      ["popstate"],
+      ["scroll", 0, 0],
+    ]);
+  },
+);
 
 test("commercial navigation attributes the source path", () => {
   const browser = runtime("/proof");
