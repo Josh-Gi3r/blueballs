@@ -13,6 +13,9 @@ artifacts/
 .wrangler/
 .dev.vars*
 
+# Generated banking API contract
+public/openapi.yaml
+
 # Foundry / FX contracts
 packages/fx-contracts/lib/
 packages/fx-contracts/out/
