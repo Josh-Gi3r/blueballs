@@ -28,7 +28,7 @@ export function usePath(): [string, (p: string) => void] {
     if (p === "/sandbox") {
       trackGrowthEvent("builder_start", { source_path: sourcePath });
     } else if (p === "/contact") {
-      trackGrowthEvent("commercial_cta", { source_path: sourcePath });
+      trackGrowthEvent("commercial_contact_view", { source_path: sourcePath });
     }
 
     window.history.pushState({}, "", p);
