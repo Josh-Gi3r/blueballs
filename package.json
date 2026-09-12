@@ -1,7 +1,7 @@
 {
   "name": "blueballs",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "packageManager": "pnpm@11.21.0",
   "description": "Blueballs - the open financial operating system for modern banking, stablecoin FX and programmable financial products",

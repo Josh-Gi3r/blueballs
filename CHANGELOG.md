@@ -6,7 +6,13 @@ Tagged releases follow semantic versioning.
 
 ## [Unreleased]
 
-This cycle takes Blueballs far beyond the initial public release: a harder banking core, a real provider orchestration boundary, institution-owned FX production composition, stronger settlement contracts, reusable financial-product Blueprints and public, source-linked release proof.
+No unreleased changes yet.
+
+## [0.2.0] - 2026-09-13
+
+**Own the financial stack.**
+
+Blueballs v0.2 takes the first public release much further: a harder banking core, durable provider orchestration, institution-owned FX production composition, stronger settlement contracts, reusable financial-product Blueprints, provider decision tooling, share/fork distribution loops and public, source-linked release proof.
 
 ### Banking core
 
@@ -48,6 +54,8 @@ This cycle takes Blueballs far beyond the initial public release: a harder banki
 - **The Blueprint Library** adds eight reusable product architectures across creator banking, freelancer finance, stablecoin treasury, remittance, cards, merchant settlement, community wallets and institution-owned FX.
 - **Implementation briefs** convert a Blueprint and user-selected provider shortlist into concrete workstreams and a copyable public-safe handoff for a technical team or Blueballs implementation engagement.
 - **Builder activation and demand signals** distinguish page intent from completed Blueprints, provisioned sandboxes, test payments, provider decisions, Blueprint distribution and implementation-intake starts using bounded first-party events.
+- **Canonical public navigation** gives full product shells one stable nine-route IA while keeping Blueprint and Sandbox contextual controls intact.
+- **Route-specific social launch cards** give Home, FX, Cards, Providers, Blueprints, Sandbox and Proof their own 1200×630 OG/X artwork with executable route and dimension checks.
 
 ### Release proof
 
@@ -74,5 +82,6 @@ Blueballs opened with a complete product surface, a 181-operation banking contra
 - Node.js, Docker and Cloudflare runtimes;
 - OpenAPI contracts, executable examples and local verification commands.
 
-[Unreleased]: https://github.com/Josh-Gi3r/blueballs/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Josh-Gi3r/blueballs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Josh-Gi3r/blueballs/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Josh-Gi3r/blueballs/releases/tag/v0.1.0
