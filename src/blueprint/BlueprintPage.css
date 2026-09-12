@@ -231,6 +231,10 @@
   align-items: flex-start;
 }
 
+.shared-blueprint-library-hero {
+  min-height: 46vh;
+}
+
 .shared-blueprint-invalid h1 {
   font-size: clamp(38px, 6vw, 70px);
   letter-spacing: -0.05em;
@@ -282,5 +286,9 @@
 
   .shared-blueprint-privacy {
     grid-template-columns: 1fr;
+  }
+
+  .shared-blueprint-library-hero {
+    min-height: auto;
   }
 }
