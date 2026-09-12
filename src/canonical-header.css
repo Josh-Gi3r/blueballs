@@ -1,0 +1,217 @@
+.bb-canonical-frame {
+  min-height: 100vh;
+  background: #e8eaef;
+}
+
+.bb-canonical-header-wrap {
+  padding: 16px 16px 0;
+}
+
+.bb-canonical-header {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border: 1px solid #d7dbe4;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(7, 20, 79, 0.05);
+}
+
+.bb-canonical-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #07144f;
+  cursor: pointer;
+}
+
+.bb-canonical-brand > span:last-child {
+  padding-left: 10px;
+  border-left: 1px solid #d7dbe4;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #7a8296;
+  white-space: nowrap;
+}
+
+.bb-canonical-nav {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1px;
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.bb-canonical-nav button,
+.bb-canonical-mobile-nav button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.bb-canonical-nav button {
+  flex: 0 0 auto;
+  padding: 9px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #5b6376;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.bb-canonical-nav button:hover,
+.bb-canonical-nav button[aria-current="page"] {
+  background: #f0f2f7;
+  color: #07144f;
+}
+
+.bb-canonical-nav button[aria-current="page"] {
+  font-weight: 600;
+}
+
+.bb-canonical-cta {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid #07144f;
+  border-radius: 10px;
+  background: #07144f;
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bb-canonical-menu-button,
+.bb-canonical-mobile-nav {
+  display: none;
+}
+
+/* The canonical frame owns the full public header on these routes. Legacy
+ * page headers stay in their components for contextual/standalone reuse but
+ * are removed from layout here so there is exactly one visible primary nav. */
+.bb-canonical-frame--full .bb-canonical-content .bb-site-header,
+.bb-canonical-frame--full .bb-canonical-content .proof-header {
+  display: none !important;
+}
+
+.bb-canonical-frame--contact .bb-canonical-content > div > div > header {
+  display: none !important;
+}
+
+@media (max-width: 1280px) {
+  .bb-canonical-header {
+    min-height: 64px;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .bb-canonical-brand {
+    flex: 1 1 auto;
+  }
+
+  .bb-canonical-brand > span:last-child,
+  .bb-canonical-nav,
+  .bb-canonical-cta {
+    display: none;
+  }
+
+  .bb-canonical-menu-button {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 5px;
+    padding: 0;
+    border: 1px solid #d7dbe4;
+    border-radius: 11px;
+    background: #f7f8fb;
+    cursor: pointer;
+  }
+
+  .bb-canonical-menu-button span {
+    display: block;
+    width: 19px;
+    height: 2px;
+    border-radius: 99px;
+    background: #07144f;
+    transition:
+      transform 0.18s ease,
+      opacity 0.18s ease;
+  }
+
+  .bb-canonical-menu-button[aria-expanded="true"] span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+  }
+
+  .bb-canonical-menu-button[aria-expanded="true"] span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .bb-canonical-menu-button[aria-expanded="true"] span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+
+  .bb-canonical-mobile-nav {
+    display: grid;
+    width: 100%;
+    flex: 1 0 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    padding-top: 10px;
+    border-top: 1px solid #e7eaf0;
+  }
+
+  .bb-canonical-mobile-nav button {
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid #e1e5ed;
+    border-radius: 10px;
+    background: #f7f8fb;
+    color: #4e576b;
+    text-align: left;
+  }
+
+  .bb-canonical-mobile-nav button[aria-current="page"] {
+    border-color: #c9d9ff;
+    background: #edf3ff;
+    color: #07144f;
+    font-weight: 600;
+  }
+
+  .bb-canonical-mobile-nav .bb-canonical-mobile-cta {
+    grid-column: 1 / -1;
+    border-color: #07144f;
+    background: #07144f;
+    color: #ffffff;
+    text-align: center;
+    font-weight: 600;
+  }
+}
+
+@media (max-width: 640px) {
+  .bb-canonical-header-wrap {
+    padding: 10px 10px 0;
+  }
+
+  .bb-canonical-mobile-nav {
+    grid-template-columns: 1fr;
+  }
+}
