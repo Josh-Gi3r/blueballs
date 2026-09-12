@@ -42,6 +42,7 @@ const KNOWN_PAGES = new Set([
   "/fx",
   "/cards",
   "/ecosystem",
+  "/blueprint",
   "/sandbox",
   "/developers",
   "/contact",
