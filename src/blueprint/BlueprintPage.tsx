@@ -144,7 +144,11 @@ export default function BlueprintPage({ onNavigate }: BlueprintPageProps) {
         </article>
       </section>
 
-      <ProviderMatchPanel blueprint={blueprint} onNavigate={onNavigate} />
+      <ProviderMatchPanel
+        blueprint={blueprint}
+        source="shared_blueprint"
+        onNavigate={onNavigate}
+      />
 
       <section className="shared-blueprint-privacy">
         <div>
