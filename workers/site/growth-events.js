@@ -1,4 +1,4 @@
-const ALLOWED_EVENTS = new Set([
+const CLIENT_EVENTS = new Set([
   "provider_directory_view",
   "provider_filter",
   "provider_search",
@@ -11,6 +11,12 @@ const ALLOWED_EVENTS = new Set([
   "builder_start",
   "commercial_cta",
   "commercial_contact_view",
+]);
+
+const SERVER_EVENTS = new Set([
+  "builder_blueprint_created",
+  "builder_sandbox_provisioned",
+  "builder_test_payment",
 ]);
 
 const MAX_BODY_BYTES = 4096;
@@ -57,6 +63,34 @@ function sameOrigin(request) {
   }
 }
 
+function writeGrowthEvent(request, env, event) {
+  const output = {
+    type: "blueballs_growth_event",
+    name: event.name,
+    path: cleanString(event.path, 160) || new URL(request.url).pathname,
+    session_id: cleanString(event.session_id, 80) || null,
+    attribution: cleanProperties(event.attribution),
+    properties: cleanProperties(event.properties),
+    country: cleanString(request.cf?.country, 8) || null,
+    referrer_host: referrerHost(request),
+    source_commit: cleanString(env.BLUEBALLS_GIT_SHA, 64) || "development",
+  };
+  console.log(JSON.stringify(output));
+  return output;
+}
+
+export function logServerGrowthEvent(request, env, name, properties = {}) {
+  if (!SERVER_EVENTS.has(name)) return false;
+  writeGrowthEvent(request, env, {
+    name,
+    path: new URL(request.url).pathname,
+    session_id: null,
+    attribution: {},
+    properties,
+  });
+  return true;
+}
+
 export async function handleGrowthEvent(request, env) {
   if (request.method !== "POST") {
     return new Response(null, {
@@ -66,7 +100,10 @@ export async function handleGrowthEvent(request, env) {
   }
 
   if (!sameOrigin(request)) {
-    return Response.json({ error: "Cross-origin events are not accepted." }, { status: 403 });
+    return Response.json(
+      { error: "Cross-origin events are not accepted." },
+      { status: 403 },
+    );
   }
 
   const declared = Number(request.headers.get("content-length") || 0);
@@ -87,28 +124,17 @@ export async function handleGrowthEvent(request, env) {
   }
 
   const name = cleanString(body?.name, 64);
-  if (!ALLOWED_EVENTS.has(name)) {
+  if (!CLIENT_EVENTS.has(name)) {
     return Response.json({ error: "Unknown event." }, { status: 400 });
   }
 
-  const attribution = cleanProperties(body?.attribution);
-  const event = {
-    type: "blueballs_growth_event",
+  writeGrowthEvent(request, env, {
     name,
-    path: cleanString(body?.path, 160) || "/",
-    session_id: cleanString(body?.session_id, 80) || null,
-    attribution,
-    properties: cleanProperties(body?.properties),
-    country: cleanString(request.cf?.country, 8) || null,
-    referrer_host: referrerHost(request),
-    source_commit: cleanString(env.BLUEBALLS_GIT_SHA, 64) || "development",
-  };
-
-  // The Site Worker already has Cloudflare observability enabled. Structured
-  // JSON makes these events queryable immediately without introducing user PII,
-  // cookies or a third-party analytics dependency. A future Analytics Engine or
-  // warehouse sink can consume the same stable event schema.
-  console.log(JSON.stringify(event));
+    path: body?.path,
+    session_id: body?.session_id,
+    attribution: body?.attribution,
+    properties: body?.properties,
+  });
 
   return new Response(null, {
     status: 204,
@@ -116,4 +142,4 @@ export async function handleGrowthEvent(request, env) {
   });
 }
 
-export { ALLOWED_EVENTS };
+export { CLIENT_EVENTS, SERVER_EVENTS };
