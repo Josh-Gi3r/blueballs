@@ -67,13 +67,15 @@ const MARKET_REGIONS: Record<string, string[]> = {
 };
 
 // Keys use the canonical values emitted by the Builder API, not display labels.
+// Rail evidence must appear explicitly in provider product/capability text;
+// geographic availability is scored separately and is never treated as proof.
 const RAIL_TERMS: Record<string, string[]> = {
   ach: ["ach"],
-  sepa: ["sepa", "europe"],
-  sepa_instant: ["sepa instant", "sepa", "europe"],
-  faster_payments: ["faster payments", "uk"],
-  paynow: ["paynow", "singapore"],
-  wire: ["wire", "wires", "cross-border"],
+  sepa: ["sepa"],
+  sepa_instant: ["sepa instant"],
+  faster_payments: ["faster payments"],
+  paynow: ["paynow"],
+  wire: ["wire", "wires"],
 };
 
 function normalize(value: string) {
@@ -84,14 +86,13 @@ function unique<T>(values: T[]) {
   return [...new Set(values)];
 }
 
-function providerText(provider: Provider) {
+function providerProductText(provider: Provider) {
   return [
     provider.name,
     provider.kind,
     provider.provides,
     ...provider.capabilities,
     ...provider.modules,
-    ...provider.regions,
   ]
     .join(" ")
     .toLowerCase();
@@ -138,7 +139,7 @@ function scoreProvider(
     score -= 3;
   }
 
-  const text = providerText(provider);
+  const text = providerProductText(provider);
   const matchedRails = input.rails.filter((rail) =>
     (RAIL_TERMS[rail] ?? [normalize(rail)]).some((term) =>
       text.includes(normalize(term)),
