@@ -1,6 +1,7 @@
+import type { CSSProperties } from "react";
+import { trackGrowthEvent } from "../growth/events";
 import { encodeBlueprintShare } from "./share";
 import { BLUEPRINT_TEMPLATES, type BlueprintTemplate } from "./templates";
-import { trackGrowthEvent } from "../growth/events";
 import "./BlueprintLibrary.css";
 
 type BlueprintLibraryProps = {
@@ -15,7 +16,9 @@ function openPath(
   const hash = encodeBlueprintShare(template);
   if (!hash) return;
   trackGrowthEvent(
-    destination === "inspect" ? "blueprint_template_open" : "blueprint_template_fork",
+    destination === "inspect"
+      ? "blueprint_template_open"
+      : "blueprint_template_fork",
     {
       template: template.id,
       category: template.category,
@@ -48,7 +51,7 @@ export default function BlueprintLibrary({ onNavigate }: BlueprintLibraryProps) 
         {BLUEPRINT_TEMPLATES.map((template) => (
           <article
             key={template.id}
-            style={{ "--template-accent": template.accent } as React.CSSProperties}
+            style={{ "--template-accent": template.accent } as CSSProperties}
           >
             <div className="blueprint-template-top">
               <span>{template.category}</span>
