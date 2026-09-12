@@ -17,7 +17,6 @@ type ShareableBlueprintInput = {
   brand?: { accent?: string };
 };
 
-export const BLUEPRINT_FORK_KEY = "blueballs_blueprint_fork";
 const MAX_HASH_LENGTH = 5000;
 const MAX_NAME_LENGTH = 80;
 const MAX_ITEMS = 16;
@@ -31,15 +30,20 @@ function cleanString(value: unknown, max: number) {
 
 function cleanArray(value: unknown) {
   if (!Array.isArray(value)) return [] as string[];
-  return [...new Set(value.map((item) => cleanString(item, MAX_ITEM_LENGTH)).filter(Boolean))].slice(
-    0,
-    MAX_ITEMS,
-  );
+  return [
+    ...new Set(
+      value
+        .map((item) => cleanString(item, MAX_ITEM_LENGTH))
+        .filter(Boolean),
+    ),
+  ].slice(0, MAX_ITEMS);
 }
 
 function cleanAccent(value: unknown) {
   const accent = cleanString(value, 7);
-  return /^#[0-9a-fA-F]{6}$/.test(accent) ? accent.toUpperCase() : undefined;
+  return /^#[0-9a-fA-F]{6}$/.test(accent)
+    ? accent.toUpperCase()
+    : undefined;
 }
 
 export function sanitizeSharedBlueprint(
@@ -81,10 +85,9 @@ export function decodeBlueprintShare(hash: string): SharedBlueprint | null {
   if (!hash.startsWith(prefix)) return null;
 
   try {
-    const parsed = JSON.parse(decodeURIComponent(hash.slice(prefix.length))) as Record<
-      string,
-      unknown
-    >;
+    const parsed = JSON.parse(
+      decodeURIComponent(hash.slice(prefix.length)),
+    ) as Record<string, unknown>;
     if (parsed.v !== 1) return null;
     return sanitizeSharedBlueprint(parsed);
   } catch {
@@ -96,26 +99,4 @@ export function createBlueprintShareUrl(input: ShareableBlueprintInput) {
   const hash = encodeBlueprintShare(input);
   if (!hash || typeof window === "undefined") return "";
   return `${window.location.origin}/blueprint${hash}`;
-}
-
-export function stashBlueprintFork(blueprint: SharedBlueprint) {
-  if (typeof window === "undefined") return false;
-  try {
-    window.sessionStorage.setItem(BLUEPRINT_FORK_KEY, JSON.stringify(blueprint));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function consumeBlueprintFork() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(BLUEPRINT_FORK_KEY);
-    if (!raw) return null;
-    window.sessionStorage.removeItem(BLUEPRINT_FORK_KEY);
-    return sanitizeSharedBlueprint(JSON.parse(raw) as Record<string, unknown>);
-  } catch {
-    return null;
-  }
 }
