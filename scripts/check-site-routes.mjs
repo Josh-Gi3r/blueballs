@@ -17,6 +17,10 @@ const preview = readFileSync(
   "utf8",
 );
 const router = readFileSync(new URL("../src/router.ts", import.meta.url), "utf8");
+const routerCore = readFileSync(
+  new URL("../src/router-core.ts", import.meta.url),
+  "utf8",
+);
 const brand = readFileSync(new URL("../src/Brand.tsx", import.meta.url), "utf8");
 const siteRoot = readFileSync(
   new URL("../src/SiteRoot.tsx", import.meta.url),
@@ -70,12 +74,28 @@ assert.match(
   "the site must set a permissions policy",
 );
 
-// Cross-shell navigation is one location contract: both SiteRoot and page-level
-// route consumers observe the same History API transition through usePath().
+// Cross-shell navigation is one location contract: usePath delegates all writes
+// to the executable router core, which pushes a real URL, broadcasts the change
+// and resets scroll. Its behavior is covered by client-navigation.test.js.
 assert.match(
   router,
-  /history\.pushState\([\s\S]*dispatchEvent\(new PopStateEvent\("popstate"\)\)/,
-  "client navigation must broadcast popstate after pushState",
+  /navigatePath\(p,[\s\S]*pathname: window\.location\.pathname/,
+  "usePath must delegate navigation to the shared router core",
+);
+assert.match(
+  routerCore,
+  /runtime\.pushState\(destination\);[\s\S]*runtime\.broadcastLocationChange\(\);[\s\S]*runtime\.scrollToTop\(\);/,
+  "client navigation must push the URL, broadcast the location change and reset scroll",
+);
+assert.match(
+  routerCore,
+  /destination === "\/sandbox"[\s\S]*growthEvent = "builder_start"/,
+  "Sandbox navigation must retain Builder attribution",
+);
+assert.match(
+  routerCore,
+  /destination === "\/contact"[\s\S]*growthEvent = "commercial_contact_view"/,
+  "commercial navigation must retain source attribution",
 );
 assert.match(
   siteRoot,
@@ -203,5 +223,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: shared navigation is synchronized, Cards has one canonical market-intelligence surface, Blueprints and Proof are public/crawlable product surfaces, and /contact is a first-class build route",
+  "site route contract: executable client navigation stays synchronized, Cards has one canonical market-intelligence surface, Blueprints and Proof are public/crawlable product surfaces, and /contact is a first-class build route",
 );
