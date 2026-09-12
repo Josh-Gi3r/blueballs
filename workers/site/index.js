@@ -1,4 +1,3 @@
-import { BANK_OPENAPI_YAML } from "./openapi.generated.js";
 import { canonicalRedirectUrl } from "./canonical-url.js";
 import {
   crawlerDocument,
@@ -171,11 +170,16 @@ async function handleRequest(request, env) {
   }
 
   if (url.pathname === "/openapi.yaml") {
-    return new Response(BANK_OPENAPI_YAML, {
-      headers: {
-        "content-type": "application/yaml; charset=utf-8",
-        "cache-control": "public, max-age=300",
-      },
+    const asset = await env.ASSETS.fetch(
+      new Request(new URL("/openapi.yaml", url), request),
+    );
+    const headers = new Headers(asset.headers);
+    headers.set("content-type", "application/yaml; charset=utf-8");
+    headers.set("cache-control", "public, max-age=300");
+    return new Response(asset.body, {
+      status: asset.status,
+      statusText: asset.statusText,
+      headers,
     });
   }
 
