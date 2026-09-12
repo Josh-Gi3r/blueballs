@@ -10,7 +10,10 @@ const css = readFileSync(
   new URL("../../src/canonical-header.css", import.meta.url),
   "utf8",
 );
-const main = readFileSync(new URL("../../src/main.tsx", import.meta.url), "utf8");
+const main = readFileSync(
+  new URL("../../src/main.tsx", import.meta.url),
+  "utf8",
+);
 
 const NAV_SEQUENCE = [
   ["Home", "/home"],
@@ -35,24 +38,29 @@ test("canonical public IA has one exact order", () => {
   assert.match(header, /onClick=\{\(\) => go\("\/sandbox"\)\}/);
 });
 
-test("full product shells use the canonical header while contextual products keep theirs", () => {
-  for (const path of [
-    "/home",
-    "/products",
-    "/fx",
-    "/developers",
-    "/cards",
-    "/ecosystem",
-    "/proof",
-    "/contact",
-  ]) {
-    assert.match(header, new RegExp(`"${path.replaceAll("/", "\\/")}"`));
-  }
+test(
+  "full product shells use the canonical header while contextual products keep theirs",
+  () => {
+    for (const path of [
+      "/home",
+      "/products",
+      "/fx",
+      "/developers",
+      "/cards",
+      "/ecosystem",
+      "/proof",
+      "/contact",
+    ]) {
+      assert.match(header, new RegExp(`"${path.replaceAll("/", "\\/")}"`));
+    }
 
-  const fullSet = header.match(/FULL_PUBLIC_HEADER_PATHS = new Set\(\[([\s\S]*?)\]\);/)?.[1] ?? "";
-  assert.doesNotMatch(fullSet, /"\/blueprint"/);
-  assert.doesNotMatch(fullSet, /"\/sandbox"/);
-});
+    const fullSet =
+      header.match(/FULL_PUBLIC_HEADER_PATHS = new Set\(\[([\s\S]*?)\]\);/)?.[1] ??
+      "";
+    assert.doesNotMatch(fullSet, /"\/blueprint"/);
+    assert.doesNotMatch(fullSet, /"\/sandbox"/);
+  },
+);
 
 test("legacy full headers are removed from layout under the canonical frame", () => {
   assert.match(css, /\.bb-canonical-frame--full[\s\S]*\.bb-site-header/);
@@ -63,20 +71,26 @@ test("legacy full headers are removed from layout under the canonical frame", ()
   );
 });
 
-test("desktop nav never wraps and mobile takeover happens at a deliberate breakpoint", () => {
-  assert.match(css, /\.bb-canonical-nav \{[\s\S]*white-space: nowrap;/);
-  assert.match(css, /@media \(max-width: 1280px\)/);
-  assert.match(
-    css,
-    /\.bb-canonical-nav,[\s\S]*\.bb-canonical-cta \{[\s\S]*display: none;/,
-  );
-  assert.match(
-    css,
-    /\.bb-canonical-menu-button \{[\s\S]*display: inline-flex;/,
-  );
-});
+test(
+  "desktop nav never wraps and mobile takeover happens at a deliberate breakpoint",
+  () => {
+    assert.match(css, /\.bb-canonical-nav \{[\s\S]*white-space: nowrap;/);
+    assert.match(css, /@media \(max-width: 1280px\)/);
+    assert.match(
+      css,
+      /\.bb-canonical-nav,[\s\S]*\.bb-canonical-cta \{[\s\S]*display: none;/,
+    );
+    assert.match(
+      css,
+      /\.bb-canonical-menu-button \{[\s\S]*display: inline-flex;/,
+    );
+  },
+);
 
 test("the application root owns the canonical header exactly once", () => {
   assert.match(main, /import CanonicalHeader from "\.\/CanonicalHeader"/);
-  assert.match(main, /<CanonicalHeader>[\s\S]*<SiteRoot \/>[\s\S]*<\/CanonicalHeader>/);
+  assert.match(
+    main,
+    /<CanonicalHeader>[\s\S]*<SiteRoot \/>[\s\S]*<\/CanonicalHeader>/,
+  );
 });
