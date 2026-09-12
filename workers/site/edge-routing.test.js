@@ -4,6 +4,7 @@ import test from "node:test";
 import { FAMILIES } from "../../src/endpoints.ts";
 import {
   FX_NODE_PATH_PREFIXES,
+  FX_NODE_PRIVATE_PATH_PREFIXES,
   runtimeForPath,
 } from "../../spec/runtime-ownership.mjs";
 
@@ -46,14 +47,31 @@ test("the production Site Worker consumes the shared ownership contract directly
   assert.doesNotMatch(edgeSource, /FX_NODE_PATHS|FX_PATHS|fxPaths/);
 });
 
-test("every canonical FX edge prefix is represented by the public catalogue", () => {
+test("every public FX edge prefix is represented by the public catalogue", () => {
   const concrete = FAMILIES.flatMap((family) => family.endpoints).map((endpoint) =>
     concretePath(endpoint.path),
   );
   for (const prefix of FX_NODE_PATH_PREFIXES) {
     assert.ok(
       concrete.some((path) => path === prefix || path.startsWith(`${prefix}/`)),
-      `${prefix} is owned by FX but has no public catalogue operation`,
+      `${prefix} is publicly owned by FX but has no public catalogue operation`,
+    );
+  }
+});
+
+test("operator-only FX edge prefixes route to FX without leaking into the public catalogue", () => {
+  const concrete = FAMILIES.flatMap((family) => family.endpoints).map((endpoint) =>
+    concretePath(endpoint.path),
+  );
+
+  assert.deepEqual(FX_NODE_PRIVATE_PATH_PREFIXES, ["/v2/fx/ops"]);
+  for (const prefix of FX_NODE_PRIVATE_PATH_PREFIXES) {
+    assert.equal(runtimeForPath(`${prefix}/quotes/test/confirmed`), "fx");
+    assert.equal(runtimeForPath(`${prefix}/quotes/test/failed`), "fx");
+    assert.equal(
+      concrete.some((path) => path === prefix || path.startsWith(`${prefix}/`)),
+      false,
+      `${prefix} must remain an operator-only FX route family`,
     );
   }
 });
