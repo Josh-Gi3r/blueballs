@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname;
@@ -117,6 +117,13 @@ assert.doesNotMatch(
   /"\/bulletin"/,
 );
 
+const proofContract = execFileSync(
+  process.execPath,
+  ["scripts/check-proof-page.mjs"],
+  { cwd: root, encoding: "utf8" },
+);
+assert.match(proofContract, /proof page contract:/i);
+
 console.log(
-  "page truth: source is linked, ownership/FX positioning is current, build-with-us conversion exists, share metadata is present, /bulletin is a 301",
+  "page truth: source is linked, ownership/FX positioning is current, build-with-us conversion exists, public proof matches repository gates, share metadata is present, /bulletin is a 301",
 );
