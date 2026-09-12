@@ -9,6 +9,7 @@ const verify = read("./verify.mjs");
 const release = read("./release-proof.mjs");
 const deploy = read("./deploy-cloudflare.mjs");
 const proofPage = read("../src/proof/ProofPage.tsx");
+const packageManifest = read("../package.json");
 
 assert.match(
   verify,
@@ -43,8 +44,19 @@ assert.match(
 );
 assert.match(proof, /Durable Object eviction behaviour/i);
 
+assert.match(
+  packageManifest,
+  /"security:dependencies": "pnpm audit --audit-level high"/,
+  "release dependency auditing must cover the full dependency graph",
+);
+assert.doesNotMatch(
+  packageManifest,
+  /"security:dependencies": "[^"]*--prod[^"]*"/,
+  "build and development tooling must not be excluded from release dependency auditing",
+);
+
 for (const gate of [
-  "tracked secrets and production dependency audit",
+  "tracked secrets and full dependency audit",
   "CycloneDX dependency inventory",
   "financial restart and chaos suite",
   "disposable banking and FX load proof",
@@ -53,7 +65,7 @@ for (const gate of [
   assert.match(release, new RegExp(gate, "i"), `release gate missing: ${gate}`);
 }
 for (const claim of [
-  "Tracked-secret and dependency audit",
+  "Tracked-secret and full dependency audit",
   "CycloneDX dependency inventory",
   "Restart and chaos suite",
   "Disposable banking and FX load proof",
@@ -104,5 +116,5 @@ assert.doesNotMatch(
 );
 
 console.log(
-  "proof page contract: public verification claims match repository gates and live parity comes from /api/health",
+  "proof page contract: public verification claims match repository gates, all dependencies are audited, and live parity comes from /api/health",
 );
