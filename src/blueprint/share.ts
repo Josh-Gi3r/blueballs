@@ -41,9 +41,7 @@ function cleanArray(value: unknown) {
 
 function cleanAccent(value: unknown) {
   const accent = cleanString(value, 7);
-  return /^#[0-9a-fA-F]{6}$/.test(accent)
-    ? accent.toUpperCase()
-    : undefined;
+  return /^#[0-9a-fA-F]{6}$/.test(accent) ? accent.toUpperCase() : undefined;
 }
 
 export function sanitizeSharedBlueprint(
