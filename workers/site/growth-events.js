@@ -12,6 +12,8 @@ const CLIENT_EVENTS = new Set([
   "blueprint_share",
   "blueprint_public_view",
   "blueprint_fork_start",
+  "blueprint_template_open",
+  "blueprint_template_fork",
   "implementation_brief_view",
   "implementation_brief_copy",
   "implementation_intake_start",
