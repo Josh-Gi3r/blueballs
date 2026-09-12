@@ -4,44 +4,113 @@
 </h1>
 
 <p align="center">
-  <strong>The open-source operating system for modern financial institutions.</strong>
+  <strong>Build the financial institution your market needs.</strong>
+</p>
+
+<p align="center">
+  The open-source operating system for modern banking, stablecoin FX and programmable financial products.
 </p>
 
 <p align="center">
   <a href="https://blueballs.tech">Website</a> ·
   <a href="https://blueballs.tech/products">Products</a> ·
-  <a href="https://blueballs.tech/fx">FX</a> ·
+  <a href="https://blueballs.tech/fx">FX Market</a> ·
   <a href="https://blueballs.tech/cards">Cards</a> ·
-  <a href="https://blueballs.tech/sandbox">Sandbox</a> ·
+  <a href="https://blueballs.tech/ecosystem">Providers</a> ·
+  <a href="https://blueballs.tech/sandbox">Build in the Sandbox</a> ·
   <a href="https://blueballs.tech/developers">API</a>
 </p>
 
 <p align="center">
-  <img src="docs/assets/readme/home-hero.png" alt="Blueballs city cover reading Build the financial institution your market needs" width="100%" />
+  <img src="docs/assets/readme/home-hero.png" alt="Blueballs — Build the financial institution your market needs" width="100%" />
 </p>
 
-Blueballs is an MIT-licensed, self-hostable financial-infrastructure stack for building neobanks, embedded-finance products and institution-owned money movement. It combines product interfaces, a 181-operation banking API, exact double-entry accounting, provider orchestration, product configuration, policy-aware FX, optional atomic token settlement and deployment tooling in one repository.
+## Own the financial stack
 
-The architecture starts from financial invariants rather than UI flows: exact money, atomic local commands, retry-safe external effects, tenant isolation, explicit finality, durable reconciliation and machine-verifiable contracts.
+Most financial products are assembled around black boxes: a banking platform owns the ledger, another vendor owns cards, another owns FX, another owns orchestration, and the institution is left integrating everybody else's abstractions.
+
+**Blueballs flips that model.**
+
+Blueballs is an MIT-licensed, self-hostable financial operating system that puts the core architecture back in the hands of the institution building the product. One repository combines a **181-operation banking API**, exact double-entry accounting, provider orchestration, card and payment primitives, institution-owned stablecoin FX, programmable settlement, product-building interfaces and deterministic release tooling.
+
+Clone it. Inspect it. Fork it. Connect the providers you want. Shape the products your market needs. Keep the financial logic, infrastructure choices and customer experience under your control.
+
+> **One codebase for the product, the money, the providers, the market and the proof.**
 
 ## What ships in Blueballs
 
-- **181-operation banking API** covering customers, accounts, transfers, cards, onboarding, receiving details, business operations, custody, approvals, webhooks and platform controls.
-- **Exact double-entry ledger** with balances derived from postings and customer overdraft protection enforced at the posting boundary.
-- **Atomic financial commands** spanning resource state, ledger postings, durable events/outboxes, idempotency and audit correlation.
-- **Provider orchestration layer** with durable jobs, leases, stable external idempotency, retries, explicit ambiguity and reconciliation.
-- **Provider-backed payments, cards, receiving details, identity and custody** through a versioned capability contract.
-- **Signed provider-originated settlement** for inbound account credits and custody deposits, with transport replay and provider-reference deduplication.
-- **Encrypted durable provider/webhook payloads** using AES-256-GCM keyrings and rotation IDs.
-- **Scoped machine credentials and named-human attribution** with request-bound signed actor assertions for IAM/BFF integrations.
-- **Policy-aware FX engine** for private orders, institutional liquidity, treasury/principal capacity, exact pricing, route construction and reservation.
-- **Adapter-driven production FX runtime** for institution-owned liquidity, fiat evidence and execution providers.
-- **Blueballs AtomicRouter contracts** for institution-authorized signed taker intent, maker-signed liquidity, cancellation, segregated vault accounting and atomic token settlement.
-- **Reference monetary engine** for reserve-backed instruments, settlement receipts and coverage accounting.
-- **Sandbox Builder and product interfaces** for designing and exercising tenant-isolated financial products.
-- **Node.js/SQLite and Cloudflare Workers/Durable Objects runtimes** using the same banking contracts.
-- **OpenAPI, SDK and conformance contracts** generated and checked against runtime behaviour.
-- **Release engineering toolkit** covering restart/eviction, migrations, backup/restore, load/chaos, dependency inventory, container scanning and exact-checkout evidence.
+| Surface | What Blueballs gives you |
+| --- | --- |
+| **Banking** | 181 operations across customers, onboarding, accounts, receiving details, transfers, cards, wallets, business banking, approvals, custody, webhooks and platform controls |
+| **Ledger** | Exact double-entry accounting with balances derived from postings, atomic command boundaries and overdraft protection at the posting layer |
+| **Providers** | A provider-neutral orchestration layer with durable jobs, idempotency, retries, encrypted payloads, explicit finality and reconciliation |
+| **FX** | Policy-aware pricing, private and institutional liquidity, route construction, reservations, treasury/principal capacity, fiat evidence and execution adapters |
+| **Settlement** | Optional Blueballs AtomicRouter contracts for signed taker intent, maker liquidity, cancellation, segregated vault accounting and atomic token settlement |
+| **Money primitives** | A reference monetary engine for reserve-backed instruments, settlement receipts and coverage accounting |
+| **Product layer** | Interactive banking, cards, provider and FX experiences plus a Sandbox Builder for designing and exercising financial products |
+| **Runtime** | Node.js/SQLite and Cloudflare Workers/Durable Objects using shared financial contracts |
+| **Developer platform** | Generated OpenAPI, SDK contracts, provider conformance boundaries and executable examples |
+| **Release proof** | Exact-checkout verification covering lifecycle tests, restart/eviction, migrations, recovery, load/chaos, dependency inventory and container scanning |
+
+## Not another neobank template
+
+Blueballs is built around financial invariants, not screenshots.
+
+```text
+product experience
+      ↓
+banking + FX contracts
+      ↓
+ledger / policy / routing / settlement
+      ↓
+durable provider adapters
+      ↓
+institution-owned infrastructure
+```
+
+The UI is a product surface. The API is a contract. The ledger is authoritative. External side effects are durable. Provider ambiguity becomes reconciliation. FX capacity passes policy before price. Firm quotes reserve capacity before execution.
+
+That means Blueballs can be adapted into a consumer neobank, business account, card programme, wallet, remittance product, embedded-finance stack, stablecoin product or institution-owned FX platform without replacing the core financial model every time the interface changes.
+
+## Build and operate your own FX market
+
+Stablecoin FX should not have to mean sending every trade to one opaque venue.
+
+Blueballs treats FX as an institution-owned market and control plane.
+
+It can combine:
+
+- customer and private orders;
+- issuer inventory;
+- professional market makers;
+- treasury liquidity;
+- institution principal capacity;
+- external execution venues;
+- fiat settlement evidence;
+- optional atomic token settlement.
+
+Liquidity becomes eligible **after policy**. Routes compete on exact economics. A quote becomes firm **after capacity is reserved**. Submission, provider acceptance and settlement finality stay distinct until evidence closes the trade.
+
+Production deployments plug in their own market, liquidity, banking and execution relationships through the FX runtime adapter while Blueballs retains the canonical policy, routing and lifecycle contract.
+
+```bash
+FX_NODE_MODE=production \
+FX_NODE_PRODUCTION_ADAPTER=@institution/blueballs-fx-runtime \
+FX_NODE_API_KEY='32-or-more-characters' \
+node apps/fx-node/src/cli.js
+```
+
+Explore the interactive market at **[blueballs.tech/fx](https://blueballs.tech/fx)**.
+
+## Design a bank before writing the bank
+
+The **Blueballs Sandbox Builder** turns product strategy into something executable.
+
+Start with a brief, define the audience and markets, choose currencies, capabilities and rails, shape the product, then exercise the same banking contracts that power the rest of the repository.
+
+The hosted Builder can help turn an idea into a focused product blueprint without giving an AI model arbitrary authority over customer money.
+
+**[Build in the Sandbox →](https://blueballs.tech/sandbox)**
 
 ## Explore the product
 
@@ -52,6 +121,22 @@ The architecture starts from financial invariants rather than UI flows: exact mo
 | [![Card programme builder](docs/assets/readme/cards.png)](https://blueballs.tech/cards) | [![Banking API documentation](docs/assets/readme/developers.png)](https://blueballs.tech/developers) |
 
 [![Sandbox Builder](docs/assets/readme/sandbox.png)](https://blueballs.tech/sandbox)
+
+## Provider-neutral by design
+
+Blueballs is the software core. Institutions bring the regulated relationships, credentials and jurisdiction-specific operating policy appropriate to the products they launch.
+
+Banks, payment rails, receiving-account providers, card processors, identity systems, custodians, stablecoin infrastructure and liquidity venues connect behind explicit adapter contracts rather than leaking provider-specific behavior through the product model.
+
+That separation is leverage:
+
+- change a provider without rewriting the customer-facing banking contract;
+- keep commercial relationships outside the open-source kernel;
+- operate different provider compositions by market;
+- expose compatibility without pretending every listed provider is a Blueballs partner;
+- build institution-specific infrastructure without forking the financial semantics.
+
+Explore the **[Blueballs Provider Directory](https://blueballs.tech/ecosystem)**.
 
 ## Quickstart
 
@@ -87,67 +172,53 @@ Individual services are available through `pnpm dev:site`, `pnpm dev:api` and `p
 
 ```text
 blueballs/
-├─ src/                 product website and interactive interfaces
+├─ src/                 public product and interactive interfaces
 ├─ apps/api/            banking API, ledger and provider orchestration
 ├─ apps/fx-node/        canonical FX runtime
 ├─ packages/fx-*/       policy, pricing, liquidity, fiat, monetary, SDK and contracts
 ├─ workers/             Cloudflare Worker / Durable Object runtimes
 ├─ spec/                machine-readable banking and FX contracts
-├─ docs/                deployment, integration and operations guides
+├─ docs/                integration, deployment and operating guides
 └─ examples/            executable integrations
 ```
 
-Blueballs is one coherent monorepo. Banking, FX, contracts, product interfaces and edge runtimes share machine-readable ownership and compatibility contracts rather than maintaining independent copies of financial semantics.
+Blueballs is one coherent monorepo. Banking, FX, settlement, product interfaces and edge runtimes share machine-readable ownership and compatibility contracts instead of maintaining parallel financial semantics.
 
 ### Banking command model
 
 ```text
 request
   → authenticated principal / authorization
+  → lifecycle and contract preflight
   → domain transition
   → ledger postings
-  → event + durable outboxes
+  → durable events + outboxes
   → idempotency result
   → audit/correlation evidence
   → commit
 ```
 
-Every local financial command commits as one SQLite transaction. External effects begin from durable provider intents and complete through explicit provider evidence and reconciliation.
-
-### Production provider composition
-
-Banking integrations speak one provider-neutral gateway protocol. Payment rails, card processors, identity systems, receiving-account providers and custodians can be swapped without changing customer-facing banking contracts.
-
-FX production composition is equally adapter-driven:
-
-```bash
-FX_NODE_MODE=production \
-FX_NODE_PRODUCTION_ADAPTER=@institution/blueballs-fx-runtime \
-FX_NODE_API_KEY='32-or-more-characters' \
-node apps/fx-node/src/cli.js
-```
-
-The deployment adapter supplies live market/liquidity, quote lifecycle, fiat evidence and execution while Blueballs retains the canonical policy, routing and finality contract.
+Every local financial command commits as one authoritative unit of work. External effects begin from durable provider intent and complete through explicit provider evidence and reconciliation.
 
 ## Financial invariants
 
 - Monetary API values cross boundaries as decimal strings and authoritative calculations use integer minor or atomic units.
-- Ledger transactions must balance exactly.
+- Ledger transactions balance exactly.
 - Customer account postings cannot leave the account below zero.
-- Tenant resources, events and idempotency records are scoped to a stable tenant principal.
-- Restricted API keys cannot mint credentials with greater authority than they hold.
-- Signed human attribution is bound to the exact credential, method, path, query and body.
-- External provider work is durable before submission and uses a stable job ID across retries/reconciliation.
+- Tenant resources, events and idempotency records belong to a stable tenant principal.
+- Restricted credentials cannot delegate authority they do not hold.
+- Signed human attribution is bound to the credential, method, path, query and body.
+- External provider work is durable before submission and retains a stable idempotency identity across retries and reconciliation.
 - Provider transport evidence and business finality must agree before money becomes final.
 - Inbound provider settlements require independent signed evidence and replay protection.
 - FX liquidity passes policy before competing on price.
 - A firm FX quote exists only after selected capacity is reserved.
-- Submitted FX routes remain in explicit settlement/reconciliation state until final evidence arrives.
-- Token atomicity is scoped to the actual AtomicRouter transaction; external fiat/provider edges retain their own finality.
+- Submitted FX routes remain in explicit settlement or reconciliation state until final evidence arrives.
+- Atomic token settlement is scoped to the actual AtomicRouter transaction; external fiat and provider edges retain their own finality.
 
-## Verification
+## Proof lives with the code
 
-Blueballs keeps the release authority in the repository so any institution can reproduce it from an exact checkout.
+Blueballs keeps its assurance model inside the repository so builders, institutions and reviewers can reproduce it from the exact checkout they are evaluating.
 
 Standard engineering gate:
 
@@ -162,9 +233,11 @@ pnpm install --frozen-lockfile
 pnpm verify:release
 ```
 
-The full profile exercises build/types, lint/format, all banking API lifecycle coverage, FX suites, Cloudflare runtime/eviction tests, OpenAPI/SDK contracts, Foundry fuzz/invariants, Compose, secret/dependency checks, CycloneDX inventory, restart/chaos, disposable banking+FX load proof and reference-container vulnerability scanning. It writes machine-readable evidence under `artifacts/` tied to the exact commit and lockfile.
+The full profile exercises build/types, lint/format, the banking lifecycle catalogue, FX suites, Cloudflare runtime/eviction behavior, OpenAPI and SDK contracts, Foundry fuzz/invariants, Compose, secret/dependency checks, CycloneDX inventory, restart/chaos, disposable banking + FX load proof and reference-container vulnerability scanning.
 
-Focused commands include:
+Machine-readable evidence is tied to the exact commit, Git tree and lockfile.
+
+Focused commands:
 
 ```bash
 pnpm test:api
@@ -177,35 +250,38 @@ pnpm security:container
 pnpm sbom
 ```
 
+## Build on Blueballs
+
+Blueballs is open source because financial infrastructure should be inspectable, adaptable and ownable.
+
+Use the core as-is for exploration. Fork it for your product. Build a provider adapter. Extend a rail. Add a market. Design a new financial instrument. Bring Blueballs into an institution-owned deployment.
+
+The project is deliberately provider-neutral and jurisdiction-flexible so serious teams can perform the additional integration, security, operational and regulatory work their own deployment requires without fighting a black-box platform.
+
+**[Explore Blueballs](https://blueballs.tech)** · **[Build in the Sandbox](https://blueballs.tech/sandbox)** · **[Read the API](https://blueballs.tech/developers)**
+
 ## Documentation
 
 | Document | Purpose |
 | --- | --- |
-| [VISION.md](VISION.md) | Product direction |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Components, ownership and extension points |
-| [PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md) | Engineering assurance and release invariants |
-| [docs/OPERATION-MODES.md](docs/OPERATION-MODES.md) | Banking runtime modes |
-| [docs/IAM.md](docs/IAM.md) | Machine credentials, human assertions, step-up and approvals |
-| [docs/SCALING.md](docs/SCALING.md) | Single-writer shards and scale-out architecture |
+| [VISION.md](VISION.md) | Where Blueballs is going |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, ownership and extension points |
+| [PRODUCTION-HARDENING.md](PRODUCTION-HARDENING.md) | Executable engineering assurance |
 | [SANDBOX.md](SANDBOX.md) | Sandbox Builder |
 | [apps/api/README.md](apps/api/README.md) | Banking runtime |
 | [apps/fx-node/README.md](apps/fx-node/README.md) | FX runtime and production composition |
 | [packages/fx-sdk/README.md](packages/fx-sdk/README.md) | JavaScript FX SDK |
 | [docs/PROVIDER-GATEWAY.md](docs/PROVIDER-GATEWAY.md) | Banking provider protocol |
 | [docs/PROVIDER-CONFORMANCE.md](docs/PROVIDER-CONFORMANCE.md) | Provider adapter conformance |
-| [docs/PROVIDER-INBOUND.md](docs/PROVIDER-INBOUND.md) | Provider-originated settlement |
-| [spec/fx/ADAPTERS.md](spec/fx/ADAPTERS.md) | FX production adapter contracts |
-| [OPERATIONS.md](OPERATIONS.md) | Deployment and operations entry point |
-| [docs/PRODUCTION-OPERATIONS.md](docs/PRODUCTION-OPERATIONS.md) | HA, RPO/RTO and rotation standards |
-| [docs/LOAD-CHAOS.md](docs/LOAD-CHAOS.md) | Load, soak, restart and chaos procedures |
-| [docs/SECURITY-VERIFICATION.md](docs/SECURITY-VERIFICATION.md) | Security verification profile |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow |
-| [SECURITY.md](SECURITY.md) | Security policy and reporting |
-
-## Build your institution on your infrastructure
-
-Blueballs provides the financial core, contracts and integration boundaries; institutions plug in their own licensed relationships, credentials and jurisdiction-specific operating policy without forking the core architecture.
+| [spec/fx/ADAPTERS.md](spec/fx/ADAPTERS.md) | FX production adapter contract |
+| [docs/IAM.md](docs/IAM.md) | Machine credentials, human attribution and approvals |
+| [docs/SCALING.md](docs/SCALING.md) | Authoritative shards and scale-out architecture |
+| [OPERATIONS.md](OPERATIONS.md) | Deployment and operations |
+| [SECURITY.md](SECURITY.md) | Security engineering and disclosure |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Build with the project |
 
 ## License
 
-MIT. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT. Build with it.
+
+See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
