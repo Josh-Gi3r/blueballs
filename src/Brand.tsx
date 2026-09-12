@@ -101,7 +101,10 @@ export function BrandLockup({
         >
           BLUEPRINTS
         </a>
-        <span aria-hidden="true" style={{ color: inverse ? "#66708A" : "#A7AEBB" }}>
+        <span
+          aria-hidden="true"
+          style={{ color: inverse ? "#66708A" : "#A7AEBB" }}
+        >
           ·
         </span>
         <a
