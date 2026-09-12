@@ -22,44 +22,44 @@ export type ImplementationBrief = {
 type Rule = {
   capabilities: string[];
   workstream: string;
-  surface: string;
+  surfaces: string[];
 };
 
 const RULES: Rule[] = [
   {
     capabilities: ["onboarding"],
     workstream: "Identity, onboarding and compliance policy",
-    surface: "Payments, accounts or cards",
+    surfaces: ["Onboarding, identity or compliance"],
   },
   {
     capabilities: ["accounts", "business", "savings"],
     workstream: "Account, balance and financial-product configuration",
-    surface: "Banking API and ledger",
+    surfaces: ["Banking API and ledger"],
   },
   {
     capabilities: ["transfers", "payment_links"],
     workstream: "Payment rails, destinations and money-movement workflows",
-    surface: "Payments, accounts or cards",
+    surfaces: ["Payments, accounts or cards"],
   },
   {
     capabilities: ["cards"],
     workstream: "Card programme architecture and provider adapter",
-    surface: "Payments, accounts or cards",
+    surfaces: ["Payments, accounts or cards"],
   },
   {
     capabilities: ["fx"],
     workstream: "FX pricing, liquidity, treasury and settlement",
-    surface: "Stablecoin FX and treasury",
+    surfaces: ["Stablecoin FX and treasury", "Settlement contracts"],
   },
   {
     capabilities: ["wallets"],
     workstream: "Wallet, custody and digital-asset operating model",
-    surface: "Provider adapters and orchestration",
+    surfaces: ["Wallets or custody", "Provider adapters and orchestration"],
   },
   {
     capabilities: ["webhooks"],
     workstream: "Events, webhooks, reconciliation and operational controls",
-    surface: "Deployment, operations or hardening",
+    surfaces: ["Deployment, operations or hardening"],
   },
 ];
 
@@ -94,7 +94,7 @@ export function buildImplementationBrief(
       "Sandbox-to-production architecture, deployment and operating handover",
     ]),
     surfaces: unique([
-      ...matched.map((rule) => rule.surface),
+      ...matched.flatMap((rule) => rule.surfaces),
       "Provider adapters and orchestration",
       "Sandbox and product experience",
       "Deployment, operations or hardening",
