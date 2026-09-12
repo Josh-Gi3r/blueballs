@@ -22,6 +22,10 @@ const routerCore = readFileSync(
   "utf8",
 );
 const brand = readFileSync(new URL("../src/Brand.tsx", import.meta.url), "utf8");
+const canonicalHeader = readFileSync(
+  new URL("../src/CanonicalHeader.tsx", import.meta.url),
+  "utf8",
+);
 const siteRoot = readFileSync(
   new URL("../src/SiteRoot.tsx", import.meta.url),
   "utf8",
@@ -142,15 +146,25 @@ assert.match(
   /href="\/home"/,
   "interior brand links must return to the canonical site home",
 );
-assert.match(
+assert.doesNotMatch(
   brand,
-  /href="\/blueprint"/,
-  "the full shared brand lockup must expose the Blueprint Library",
+  /href="\/(blueprint|proof|cards|ecosystem|contact)"/,
+  "the brand must stay brand-only; product navigation belongs in the canonical header",
 );
 assert.match(
-  brand,
-  /href="\/proof"/,
-  "the full shared brand lockup must expose public Proof",
+  canonicalHeader,
+  /\["Home", "\/home"\],[\s\S]*?\["Products", "\/products"\],[\s\S]*?\["Stablecoin FX", "\/fx"\],[\s\S]*?\["Developers", "\/developers"\],[\s\S]*?\["Cards", "\/cards"\],[\s\S]*?\["Providers", "\/ecosystem"\],[\s\S]*?\["Blueprints", "\/blueprint"\],[\s\S]*?\["Proof", "\/proof"\],[\s\S]*?\["Build with us", "\/contact"\]/,
+  "the canonical public header must retain the agreed nine-route IA and order",
+);
+assert.match(
+  canonicalHeader,
+  /FULL_PUBLIC_HEADER_PATHS[\s\S]*"\/home"[\s\S]*"\/products"[\s\S]*"\/fx"[\s\S]*"\/developers"[\s\S]*"\/cards"[\s\S]*"\/ecosystem"[\s\S]*"\/proof"[\s\S]*"\/contact"/,
+  "full public product shells must use the canonical header",
+);
+assert.doesNotMatch(
+  canonicalHeader,
+  /FULL_PUBLIC_HEADER_PATHS[\s\S]*"\/blueprint"[\s\S]*"\/sandbox"/,
+  "Blueprint and Sandbox keep their intentional contextual headers",
 );
 
 // Keep one public Cards implementation and one loaded Cards stylesheet.
@@ -233,5 +247,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: executable client navigation stays synchronized, Blueprints and Proof are discoverable from the shared brand, Cards has one canonical market-intelligence surface, and /contact is a first-class build route",
+  "site route contract: executable navigation is synchronized, the canonical nine-route public IA owns full product headers, contextual Blueprint/Sandbox headers remain intentional, Cards has one market-intelligence surface, and /contact remains first-class",
 );
