@@ -6,6 +6,7 @@ const NAV = [
   ["Stablecoin FX", "/fx"],
   ["Cards", "/cards"],
   ["Providers", "/ecosystem"],
+  ["Blueprints", "/blueprint"],
   ["Sandbox", "/sandbox"],
   ["Developers", "/developers"],
   ["Build with Blueballs", "/contact"],
@@ -69,6 +70,16 @@ const PROVIDER_CATEGORIES = [
   "Open banking and account verification",
   "Reconciliation, operations and security",
 ];
+const BLUEPRINTS = [
+  "Creator Bank Singapore",
+  "Freelancer Current Account",
+  "Stablecoin Treasury",
+  "SEA Remittance Network",
+  "Stablecoin Card Programme",
+  "Merchant Settlement Network",
+  "Community Wallet",
+  "Institution-Owned FX Desk",
+];
 function list(items) {
   return `<ul>${items.map((item) => `<li>${item}</li>`).join("")}</ul>`;
 }
@@ -83,13 +94,13 @@ const PAGES = {
     title: "Blueballs — open financial operating system",
     description:
       "An MIT-licensed financial operating system for banking products, provider orchestration, stablecoin FX and programmable money movement.",
-    body: `<h1>Own the financial stack.</h1><p>Blueballs puts the product, ledger, provider composition and FX control plane in the hands of the institution building the experience. Clone it, inspect it, fork it and connect the infrastructure your market needs.</p><h2>Build the financial institution your market needs.</h2><p>A company. A community. A city. An industry. A marketplace. Or something nobody has built yet.</p><h2>What ships in Blueballs</h2>${list(PRODUCTS)}<p><a href="/sandbox">Build in the sandbox</a>, <a href="/developers">inspect the API</a> or <a href="/contact">build with Blueballs</a>.</p>`,
+    body: `<h1>Own the financial stack.</h1><p>Blueballs puts the product, ledger, provider composition and FX control plane in the hands of the institution building the experience. Clone it, inspect it, fork it and connect the infrastructure your market needs.</p><h2>Build the financial institution your market needs.</h2><p>A company. A community. A city. An industry. A marketplace. Or something nobody has built yet.</p><h2>What ships in Blueballs</h2>${list(PRODUCTS)}<p><a href="/blueprint">Explore product Blueprints</a>, <a href="/sandbox">build in the sandbox</a>, <a href="/developers">inspect the API</a> or <a href="/contact">build with Blueballs</a>.</p>`,
   },
   "/products": {
     title: "Financial products — Blueballs",
     description:
       "Accounts, cards, transfers, onboarding, wallets, ledger, FX and financial-product primitives built on one open financial core.",
-    body: `<h1>Build the financial products your market needs.</h1><p>Start with accounts, cards, transfers, onboarding, wallets, FX, business banking and more. Keep one financial core while the customer experience, providers and market composition evolve around it.</p><h2>See the product and the contract together</h2><p>Walk through onboarding, funding, spending and payouts with the API call behind each experience.</p>${list(PRODUCTS)}<p><a href="/developers">Inspect the API</a> or <a href="/contact">build an implementation</a>.</p>`,
+    body: `<h1>Build the financial products your market needs.</h1><p>Start with accounts, cards, transfers, onboarding, wallets, FX, business banking and more. Keep one financial core while the customer experience, providers and market composition evolve around it.</p><h2>See the product and the contract together</h2><p>Walk through onboarding, funding, spending and payouts with the API call behind each experience.</p>${list(PRODUCTS)}<p><a href="/blueprint">Fork a product Blueprint</a>, <a href="/developers">inspect the API</a> or <a href="/contact">build an implementation</a>.</p>`,
   },
   "/fx": {
     title: "Build and operate your own FX market — Blueballs",
@@ -113,13 +124,13 @@ const PAGES = {
     title: "Build a fintech sandbox — Blueballs",
     description:
       "Turn a financial-product brief into a structured blueprint, isolated test environment and protected-ledger product journey.",
-    body: `<h1>Design the product. Provision the sandbox. Run the money flow.</h1><p>Describe the people you serve, choose markets, currencies, capabilities and rails, then turn the brief into an isolated Blueballs environment with test customers, accounts, balances and ledger-backed payment journeys.</p><h2>What the Builder creates</h2>${list(["Structured product blueprint", "Tenant-isolated test environment", "Approved test customers", "Multi-currency sandbox accounts", "Seeded test balances", "Protected-ledger payment journeys"])}<p><a href="/contact">Take the design into implementation</a>.</p>`,
+    body: `<h1>Design the product. Provision the sandbox. Run the money flow.</h1><p>Describe the people you serve, choose markets, currencies, capabilities and rails, then turn the brief into an isolated Blueballs environment with test customers, accounts, balances and ledger-backed payment journeys.</p><h2>What the Builder creates</h2>${list(["Structured product blueprint", "Tenant-isolated test environment", "Approved test customers", "Multi-currency sandbox accounts", "Seeded test balances", "Protected-ledger payment journeys"])}<p><a href="/blueprint">Start from a public Blueprint</a> or <a href="/contact">take a design into implementation</a>.</p>`,
   },
   "/blueprint": {
-    title: "Share and fork financial-product Blueprints — Blueballs",
+    title: "Financial product Blueprint library — Blueballs",
     description:
-      "Share public-safe product architecture, inspect provider matches and fork a financial-product Blueprint back into Blueballs Builder.",
-    body: `<h1>Share and fork financial-product architecture.</h1><p>Blueballs Blueprints capture the public-safe structure of a product: name, markets, currencies, capabilities, rails and an optional accent. Shared links can be inspected, matched against the provider directory and forked back into Builder.</p><h2>Public-safe by design</h2><p>The shared format excludes sandbox IDs, API keys, customers, balances, transactions, free-text audience descriptions and tenant state. The architecture payload lives in the URL fragment, which browsers do not send to the server as part of the HTTP request.</p><p><a href="/sandbox">Build a Blueprint</a> or <a href="/ecosystem">explore providers</a>.</p>`,
+      "Inspect and fork public Blueprints for creator banking, treasury, cards, remittance, merchant finance, community wallets and institutional FX.",
+    body: `<h1>Start from a product. Fork the architecture.</h1><p>The Blueballs Blueprint Library turns reusable financial-product architecture into a distribution layer for the open-source stack. Inspect an example, compare matching infrastructure, generate an implementation brief and fork the structure back into Builder.</p><h2>Public Blueprints</h2>${list(BLUEPRINTS)}<h2>Public-safe by design</h2><p>Shared Blueprints contain only name, markets, currencies, capabilities, rails and an optional accent. They exclude sandbox IDs, API keys, customers, balances, transactions, free-text audience descriptions and tenant state. Shared architecture lives in the URL fragment, which browsers do not send to the server as part of the HTTP request.</p><p><a href="/sandbox">Build from scratch</a> or <a href="/ecosystem">explore providers</a>.</p>`,
   },
   "/developers": {
     title: "Build with the Blueballs API",
