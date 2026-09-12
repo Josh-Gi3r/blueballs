@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { trackGrowthEvent } from "../growth/events";
 import { CATEGORY_MAP, type Provider } from "./data";
+
+const REPO = "https://github.com/Josh-Gi3r/blueballs";
 
 function domainFor(url: string) {
   try {
@@ -35,10 +38,30 @@ function ProviderLogo({ provider }: { provider: Provider }) {
   );
 }
 
-export default function ProviderCard({ provider }: { provider: Provider }) {
+type ProviderCardProps = {
+  provider: Provider;
+  selected: boolean;
+  onToggleShortlist: (provider: Provider) => void;
+};
+
+export default function ProviderCard({
+  provider,
+  selected,
+  onToggleShortlist,
+}: ProviderCardProps) {
   const primary = CATEGORY_MAP[provider.categories[0]];
+  const claimHref = `${REPO}/issues/new?template=provider_claim.yml&title=${encodeURIComponent(
+    `[Provider profile] ${provider.name}`,
+  )}`;
+  const trackOutbound = (destination: "website" | "docs") =>
+    trackGrowthEvent("provider_outbound", {
+      provider: provider.id,
+      destination,
+      category: provider.categories[0],
+    });
+
   return (
-    <article className="eco-provider-card">
+    <article className={`eco-provider-card${selected ? " is-shortlisted" : ""}`}>
       <div className="eco-provider-top">
         <a
           className="eco-provider-brand"
@@ -46,6 +69,7 @@ export default function ProviderCard({ provider }: { provider: Provider }) {
           target="_blank"
           rel="noreferrer"
           aria-label={`${provider.name} official website`}
+          onClick={() => trackOutbound("website")}
         >
           <ProviderLogo provider={provider} />
           <div>
@@ -93,11 +117,41 @@ export default function ProviderCard({ provider }: { provider: Provider }) {
           <b>{provider.regions.join(" · ")}</b>
         </div>
       </div>
+      <div className="eco-provider-decision-actions">
+        <button
+          type="button"
+          className={selected ? "selected" : ""}
+          aria-pressed={selected}
+          onClick={() => onToggleShortlist(provider)}
+        >
+          {selected ? "Shortlisted ✓" : "Add to shortlist"}
+        </button>
+        <a
+          href={claimHref}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() =>
+            trackGrowthEvent("provider_claim_start", { provider: provider.id })
+          }
+        >
+          Claim / update profile
+        </a>
+      </div>
       <div className="eco-provider-links">
-        <a href={provider.docsUrl} target="_blank" rel="noreferrer">
+        <a
+          href={provider.docsUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => trackOutbound("docs")}
+        >
           Technical docs <span>↗</span>
         </a>
-        <a href={provider.url} target="_blank" rel="noreferrer">
+        <a
+          href={provider.url}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => trackOutbound("website")}
+        >
           Company <span>↗</span>
         </a>
       </div>
