@@ -30,7 +30,7 @@
     "stress:release": "node scripts/release-load.mjs",
     "stress:chaos": "node --test apps/api/test/financial-restart-boundaries.test.js apps/api/test/webhook-outbox.test.js apps/api/test/recovery.test.js && pnpm test:fx && vitest run --config vitest.api.config.mts workers/api/test/financial-eviction.test.js",
     "security:secrets": "node scripts/scan-secrets.mjs",
-    "security:dependencies": "pnpm audit --prod --audit-level high",
+    "security:dependencies": "pnpm audit --audit-level high",
     "security:release": "pnpm security:secrets && pnpm security:dependencies && pnpm lint",
     "security:container": "docker build --pull=false -f Dockerfile.reference -t blueballs/reference:security . && docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.66.0 image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed blueballs/reference:security",
     "sbom": "node scripts/dependency-inventory.mjs",
@@ -54,19 +54,19 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.22.0",
-    "@redocly/cli": "2.46.2",
+    "@redocly/cli": "2.51.2",
     "@types/node": "^24.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
-    "eslint": "10.8.0",
-    "globals": "17.10.0",
+    "eslint": "10.10.0",
+    "globals": "17.12.0",
     "openapi-typescript": "7.13.0",
     "prettier": "3.9.6",
     "typescript": "^5.6.3",
     "vite": "^6.4.3",
     "vitest": "^4.1.11",
-    "wrangler": "^4.120.1"
+    "wrangler": "^4.130.0"
   },
   "engines": {
     "node": ">=24.15.0 <25",

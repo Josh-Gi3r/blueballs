@@ -81,7 +81,7 @@ if (!preconditionFailure) {
 
   if (verification.status === 0 && full) {
     releaseChecks.push(
-      executeGate("tracked secrets and production dependency audit", "pnpm", [
+      executeGate("tracked secrets and full dependency audit", "pnpm", [
         "security:release",
       ]),
     );
