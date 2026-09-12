@@ -13,11 +13,12 @@ const CLIENT_EVENTS = new Set([
   "commercial_contact_view",
 ]);
 
-const SERVER_EVENTS = new Set([
-  "builder_blueprint_created",
-  "builder_sandbox_provisioned",
-  "builder_test_payment",
+const SERVER_EVENT_PATHS = new Map([
+  ["builder_blueprint_created", "/v2/builder/projects"],
+  ["builder_sandbox_provisioned", "/v2/builder/projects/:id/provision"],
+  ["builder_test_payment", "/v2/builder/projects/:id/test-payments"],
 ]);
+const SERVER_EVENTS = new Set(SERVER_EVENT_PATHS.keys());
 
 const MAX_BODY_BYTES = 4096;
 const MAX_PROPERTIES = 12;
@@ -83,7 +84,7 @@ export function logServerGrowthEvent(request, env, name, properties = {}) {
   if (!SERVER_EVENTS.has(name)) return false;
   writeGrowthEvent(request, env, {
     name,
-    path: new URL(request.url).pathname,
+    path: SERVER_EVENT_PATHS.get(name),
     session_id: null,
     attribution: {},
     properties,
