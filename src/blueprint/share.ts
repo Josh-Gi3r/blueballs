@@ -100,3 +100,11 @@ export function createBlueprintShareUrl(input: ShareableBlueprintInput) {
   if (!hash || typeof window === "undefined") return "";
   return `${window.location.origin}/blueprint${hash}`;
 }
+
+// The Builder uses the same fragment contract for forks. This intentionally
+// reads without mutating browser state, so React Strict Mode can call the lazy
+// initializer more than once without consuming or changing the result.
+export function consumeBlueprintFork() {
+  if (typeof window === "undefined") return null;
+  return decodeBlueprintShare(window.location.hash);
+}
