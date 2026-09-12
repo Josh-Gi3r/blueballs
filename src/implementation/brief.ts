@@ -128,6 +128,8 @@ export function implementationBriefMarkdown(
     "## Shortlisted infrastructure",
     bulletList(providerLines, "No provider shortlist yet"),
     "",
+    "Provider shortlist reflects user-selected infrastructure from the Blueballs directory. Inclusion is not a recommendation, partnership claim or production-integration claim.",
+    "",
     "## Proposed implementation workstreams",
     bulletList(brief.workstreams),
     "",
