@@ -81,7 +81,7 @@ export default function BlueprintPage({ onNavigate }: BlueprintPageProps) {
           </button>
           <span>BLUEPRINTS</span>
         </header>
-        <section className="shared-blueprint-invalid">
+        <section className="shared-blueprint-invalid shared-blueprint-library-hero">
           <span>SHAREABLE PRODUCT ARCHITECTURE</span>
           <h1>Start from a product. Fork the architecture.</h1>
           <p>
