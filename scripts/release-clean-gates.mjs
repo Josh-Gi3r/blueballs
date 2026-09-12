@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import zlib from "node:zlib";
 
 function replaceOnce(path, from, to) {
   const source = fs.readFileSync(path, "utf8");
@@ -99,98 +100,155 @@ replaceOnce(
   `/production deployments[\\s\\S]{0,320}FX runtime adapter/i,`,
 );
 
-// 5. Repair the single corrupted generated cards social image. A candidate is
-// accepted only if deleting exactly one base64 character yields a complete PNG
-// with valid CRCs and the required 1200x630 dimensions.
+// 5. Replace the corrupt Cards social asset with a deterministic route-specific
+// 1200×630 PNG generated entirely from code. This makes the image reproducible,
+// dependency-free, and structurally verifiable instead of accepting damaged bytes.
 const cardsPath = "workers/site/social-assets/cards.js";
-const cardsSource = fs.readFileSync(cardsPath, "utf8");
-const cardsMatch = cardsSource.match(/^export default "([A-Za-z0-9+/=_-]+)";\s*$/s);
-assert.ok(cardsMatch, "cards social asset wrapper is not canonical");
-const encoded = cardsMatch[1];
+const WIDTH = 1200;
+const HEIGHT = 630;
+const pixels = Buffer.alloc(WIDTH * HEIGHT * 4);
 
-const crcTable = new Uint32Array(256);
+function setPixel(x, y, r, g, b, a = 255) {
+  if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return;
+  const offset = (y * WIDTH + x) * 4;
+  pixels[offset] = r;
+  pixels[offset + 1] = g;
+  pixels[offset + 2] = b;
+  pixels[offset + 3] = a;
+}
+function fillRect(x, y, width, height, color) {
+  for (let yy = y; yy < y + height; yy += 1) {
+    for (let xx = x; xx < x + width; xx += 1) {
+      setPixel(xx, yy, ...color);
+    }
+  }
+}
+function strokeRect(x, y, width, height, thickness, color) {
+  fillRect(x, y, width, thickness, color);
+  fillRect(x, y + height - thickness, width, thickness, color);
+  fillRect(x, y, thickness, height, color);
+  fillRect(x + width - thickness, y, thickness, height, color);
+}
+function drawCard(x, y, width, height, fill, accent) {
+  fillRect(x + 18, y + 18, width, height, [2, 8, 14, 105]);
+  fillRect(x, y, width, height, fill);
+  strokeRect(x, y, width, height, 4, accent);
+  fillRect(x + 34, y + 42, 72, 54, accent);
+  fillRect(x + 34, y + 122, width - 68, 8, [238, 244, 248, 220]);
+  fillRect(x + 34, y + 150, Math.floor(width * 0.55), 8, [126, 148, 164, 220]);
+  fillRect(x + 34, y + height - 56, 90, 10, accent);
+  fillRect(x + width - 126, y + height - 56, 92, 10, [238, 244, 248, 185]);
+}
+
+for (let y = 0; y < HEIGHT; y += 1) {
+  const mix = y / HEIGHT;
+  const r = Math.round(5 + 4 * mix);
+  const g = Math.round(15 + 10 * mix);
+  const b = Math.round(26 + 17 * mix);
+  fillRect(0, y, WIDTH, 1, [r, g, b, 255]);
+}
+for (let x = 0; x < WIDTH; x += 60) {
+  fillRect(x, 0, 1, HEIGHT, [24, 48, 67, 90]);
+}
+for (let y = 0; y < HEIGHT; y += 60) {
+  fillRect(0, y, WIDTH, 1, [24, 48, 67, 90]);
+}
+fillRect(0, 0, 14, HEIGHT, [40, 203, 177, 255]);
+fillRect(14, 0, 5, HEIGHT, [58, 125, 255, 255]);
+
+const FONT = {
+  A: ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
+  B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
+  C: ["01111", "10000", "10000", "10000", "10000", "10000", "01111"],
+  D: ["11110", "10001", "10001", "10001", "10001", "10001", "11110"],
+  E: ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
+  L: ["10000", "10000", "10000", "10000", "10000", "10000", "11111"],
+  R: ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
+  S: ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
+  U: ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
+};
+function drawText(text, x, y, scale, color, spacing = 2) {
+  let cursor = x;
+  for (const char of text) {
+    if (char === " ") {
+      cursor += scale * 4;
+      continue;
+    }
+    const glyph = FONT[char];
+    assert.ok(glyph, `missing pixel glyph: ${char}`);
+    for (let gy = 0; gy < glyph.length; gy += 1) {
+      for (let gx = 0; gx < glyph[gy].length; gx += 1) {
+        if (glyph[gy][gx] === "1") {
+          fillRect(cursor + gx * scale, y + gy * scale, scale, scale, color);
+        }
+      }
+    }
+    cursor += (5 + spacing) * scale;
+  }
+}
+
+drawText("BLUEBALLS", 86, 116, 8, [129, 151, 168, 255], 1);
+drawText("CARDS", 82, 230, 18, [242, 247, 250, 255], 1);
+fillRect(86, 392, 330, 8, [40, 203, 177, 255]);
+fillRect(86, 426, 245, 8, [58, 125, 255, 255]);
+fillRect(86, 490, 190, 5, [92, 115, 133, 255]);
+fillRect(86, 512, 270, 5, [92, 115, 133, 255]);
+
+drawCard(690, 112, 360, 225, [17, 39, 57, 255], [40, 203, 177, 255]);
+drawCard(744, 188, 360, 225, [19, 33, 63, 255], [58, 125, 255, 255]);
+drawCard(798, 264, 320, 205, [27, 31, 48, 255], [191, 106, 255, 255]);
+
+const CRC_TABLE = new Uint32Array(256);
 for (let n = 0; n < 256; n += 1) {
   let c = n;
   for (let k = 0; k < 8; k += 1) {
     c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
   }
-  crcTable[n] = c >>> 0;
+  CRC_TABLE[n] = c >>> 0;
 }
 function crc32(buffer) {
   let c = 0xffffffff;
   for (const byte of buffer) {
-    c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8);
+    c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
   }
   return (c ^ 0xffffffff) >>> 0;
 }
-function validPng(buffer) {
-  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  if (buffer.length < 33 || !buffer.subarray(0, 8).equals(signature)) return false;
-
-  let offset = 8;
-  let width = null;
-  let height = null;
-  let first = true;
-  while (offset + 12 <= buffer.length) {
-    const length = buffer.readUInt32BE(offset);
-    const typeStart = offset + 4;
-    const dataStart = offset + 8;
-    const crcOffset = dataStart + length;
-    const next = crcOffset + 4;
-    if (next > buffer.length) return false;
-
-    const type = buffer.subarray(typeStart, dataStart).toString("ascii");
-    if (!/^[A-Za-z]{4}$/.test(type)) return false;
-    if (
-      buffer.readUInt32BE(crcOffset) !==
-      crc32(buffer.subarray(typeStart, crcOffset))
-    ) {
-      return false;
-    }
-
-    if (first) {
-      if (type !== "IHDR" || length !== 13) return false;
-      width = buffer.readUInt32BE(dataStart);
-      height = buffer.readUInt32BE(dataStart + 4);
-      first = false;
-    }
-    offset = next;
-    if (type === "IEND") {
-      return (
-        length === 0 &&
-        offset === buffer.length &&
-        width === 1200 &&
-        height === 630
-      );
-    }
-  }
-  return false;
+function chunk(type, data = Buffer.alloc(0)) {
+  const typeBuffer = Buffer.from(type, "ascii");
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])), 0);
+  return Buffer.concat([length, typeBuffer, data, crc]);
 }
 
-const repaired = [];
-for (let index = 0; index < encoded.length; index += 1) {
-  const candidate = encoded.slice(0, index) + encoded.slice(index + 1);
-  if (candidate.length % 4 !== 0) continue;
-  try {
-    atob(candidate);
-  } catch {
-    continue;
-  }
-  if (validPng(Buffer.from(candidate, "base64"))) {
-    repaired.push({ index, removed: encoded[index], candidate });
-  }
+const raw = Buffer.alloc((WIDTH * 4 + 1) * HEIGHT);
+for (let y = 0; y < HEIGHT; y += 1) {
+  const rowOffset = y * (WIDTH * 4 + 1);
+  raw[rowOffset] = 0;
+  pixels.copy(raw, rowOffset + 1, y * WIDTH * 4, (y + 1) * WIDTH * 4);
 }
-assert.equal(
-  repaired.length,
-  1,
-  `expected one canonical cards PNG repair, found ${repaired.length}`,
-);
-fs.writeFileSync(
-  cardsPath,
-  `export default ${JSON.stringify(repaired[0].candidate)};\n`,
-);
-console.log(
-  `repaired ${cardsPath} at base64 index ${repaired[0].index}; removed ${JSON.stringify(repaired[0].removed)}`,
-);
+const ihdr = Buffer.alloc(13);
+ihdr.writeUInt32BE(WIDTH, 0);
+ihdr.writeUInt32BE(HEIGHT, 4);
+ihdr[8] = 8;
+ihdr[9] = 6;
+ihdr[10] = 0;
+ihdr[11] = 0;
+ihdr[12] = 0;
+const png = Buffer.concat([
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  chunk("IHDR", ihdr),
+  chunk("IDAT", zlib.deflateSync(raw, { level: 9 })),
+  chunk("IEND"),
+]);
+
+assert.equal(png.readUInt32BE(16), WIDTH);
+assert.equal(png.readUInt32BE(20), HEIGHT);
+const encodedCard = png.toString("base64");
+assert.equal(encodedCard.length % 4, 0);
+assert.equal(Buffer.from(atob(encodedCard), "binary").length, png.length);
+fs.writeFileSync(cardsPath, `export default ${JSON.stringify(encodedCard)};\n`);
+console.log(`generated ${cardsPath}: ${png.length} PNG bytes`);
 
 console.log("v0.2 release hardening edits applied");
