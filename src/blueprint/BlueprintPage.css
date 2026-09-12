@@ -1,0 +1,286 @@
+.shared-blueprint-page {
+  --blueprint-accent: #0868ff;
+  min-height: 100vh;
+  background: #e8eaef;
+  color: #07144f;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: Archivo, system-ui, sans-serif;
+}
+
+.shared-blueprint-header,
+.shared-blueprint-hero,
+.shared-blueprint-architecture,
+.shared-blueprint-invalid,
+.shared-blueprint-privacy {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+}
+
+.shared-blueprint-header {
+  background: #fff;
+  border: 1px solid #d7dbe4;
+  border-radius: 14px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.shared-blueprint-header > button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.shared-blueprint-header > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shared-blueprint-header span,
+.shared-blueprint-hero > div > span,
+.shared-blueprint-architecture article > span,
+.shared-blueprint-invalid > span,
+.shared-blueprint-privacy span {
+  color: #727b90;
+  font: 9px "IBM Plex Mono", monospace;
+  letter-spacing: 0.14em;
+}
+
+.shared-blueprint-header > div > button {
+  border: 1px solid #cfd5e3;
+  background: #fff;
+  color: #07144f;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.shared-blueprint-hero {
+  border-radius: 20px;
+  background: #07144f;
+  color: #fff;
+  padding: clamp(28px, 5vw, 58px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 34px;
+  position: relative;
+  overflow: hidden;
+}
+
+.shared-blueprint-hero::after {
+  content: "";
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  right: -90px;
+  top: -110px;
+  border-radius: 50%;
+  background: var(--blueprint-accent);
+  opacity: 0.28;
+  filter: blur(2px);
+}
+
+.shared-blueprint-hero > div,
+.shared-blueprint-hero > button {
+  position: relative;
+  z-index: 1;
+}
+
+.shared-blueprint-hero > div {
+  max-width: 760px;
+}
+
+.shared-blueprint-hero > div > span {
+  color: #aeb8d6;
+}
+
+.shared-blueprint-hero h1 {
+  font-size: clamp(42px, 7vw, 80px);
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+  margin: 16px 0 18px;
+  max-width: 13ch;
+}
+
+.shared-blueprint-hero p {
+  color: #c7cddd;
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 65ch;
+  margin: 0;
+}
+
+.shared-blueprint-hero > button,
+.shared-blueprint-invalid > button {
+  min-width: 230px;
+  border: 1px solid #fff;
+  border-radius: 12px;
+  background: #fff;
+  color: #07144f;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shared-blueprint-hero > button small {
+  color: #6e7689;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.shared-blueprint-architecture {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.shared-blueprint-architecture article {
+  background: #fff;
+  border: 1px solid #d7dbe4;
+  border-radius: 14px;
+  padding: 19px;
+}
+
+.shared-blueprint-architecture article.wide {
+  grid-column: span 2;
+}
+
+.shared-blueprint-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.shared-blueprint-chips span {
+  border: 1px solid #dce1eb;
+  border-radius: 999px;
+  padding: 6px 8px;
+  background: #f7f8fb;
+  color: #26335d;
+  font-size: 10px;
+  text-transform: capitalize;
+}
+
+.shared-blueprint-empty {
+  display: block;
+  margin-top: 11px;
+  color: #8b93a3;
+  font-size: 11px;
+}
+
+.shared-blueprint-page > .builder-provider-panel {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+}
+
+.shared-blueprint-privacy {
+  border: 1px solid #d7dbe4;
+  border-radius: 14px;
+  background: #fff;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 26px;
+  align-items: start;
+}
+
+.shared-blueprint-privacy > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.shared-blueprint-privacy strong {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.shared-blueprint-privacy p {
+  margin: 0;
+  color: #60687a;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.shared-blueprint-invalid {
+  min-height: 65vh;
+  border: 1px solid #d7dbe4;
+  border-radius: 18px;
+  background: #fff;
+  padding: clamp(30px, 6vw, 70px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.shared-blueprint-invalid h1 {
+  font-size: clamp(38px, 6vw, 70px);
+  letter-spacing: -0.05em;
+  line-height: 1;
+  margin: 14px 0;
+  max-width: 13ch;
+}
+
+.shared-blueprint-invalid p {
+  max-width: 60ch;
+  color: #60687a;
+  line-height: 1.6;
+  margin-bottom: 22px;
+}
+
+.shared-blueprint-invalid > button {
+  min-width: auto;
+  background: #07144f;
+  color: #fff;
+  border-color: #07144f;
+}
+
+@media (max-width: 760px) {
+  .shared-blueprint-header {
+    align-items: flex-start;
+  }
+
+  .shared-blueprint-header > div {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .shared-blueprint-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .shared-blueprint-hero > button {
+    width: 100%;
+  }
+
+  .shared-blueprint-architecture {
+    grid-template-columns: 1fr;
+  }
+
+  .shared-blueprint-architecture article.wide {
+    grid-column: auto;
+  }
+
+  .shared-blueprint-privacy {
+    grid-template-columns: 1fr;
+  }
+}

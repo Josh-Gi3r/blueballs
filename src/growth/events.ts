@@ -9,6 +9,9 @@ export type GrowthEventName =
   | "provider_claim_start"
   | "provider_partnership_start"
   | "blueprint_provider_matches_view"
+  | "blueprint_share"
+  | "blueprint_public_view"
+  | "blueprint_fork_start"
   | "builder_start"
   | "commercial_cta"
   | "commercial_contact_view";

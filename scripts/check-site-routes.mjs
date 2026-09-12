@@ -43,6 +43,11 @@ assert.match(
 );
 assert.match(
   worker,
+  /KNOWN_PAGES[\s\S]*"\/blueprint"/,
+  "/blueprint must be an allowed HTML route",
+);
+assert.match(
+  worker,
   /fonts\.googleapis\.com/,
   "CSP must allow the site's loaded webfonts",
 );
@@ -81,6 +86,11 @@ assert.match(
   siteRoot,
   /if \(path === "\/ecosystem"\)[\s\S]{0,120}<DirectoryShell page="ecosystem" navigate=\{navigate\} \/>/,
   "SiteRoot must own the canonical /ecosystem page",
+);
+assert.match(
+  siteRoot,
+  /if \(path === "\/blueprint"\)[\s\S]{0,120}<BlueprintPage onNavigate=\{navigate\} \/>/,
+  "SiteRoot must own the canonical /blueprint page",
 );
 assert.match(
   siteRoot,
@@ -134,6 +144,13 @@ assert.equal(
 );
 assert.match(crawlerDocument("/sandbox"), /protected-ledger payment journeys/i);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/sandbox<\/loc>/);
+assert.equal(
+  pageMetadata("/blueprint").title,
+  "Share and fork financial-product Blueprints — Blueballs",
+);
+assert.match(crawlerDocument("/blueprint"), /public-safe/i);
+assert.match(crawlerDocument("/blueprint"), /URL fragment/i);
+assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/blueprint<\/loc>/);
 assert.match(sitemapXml(), /<loc>https:\/\/blueballs\.tech\/contact<\/loc>/);
 assert.equal(
   canonicalRedirectUrl("http://blueballs.tech/sandbox", "blueballs.tech", true),
@@ -160,5 +177,5 @@ assert.match(preview, /wrangler\.api\.jsonc/);
 assert.match(preview, /wrangler\.fx\.jsonc/);
 assert.match(preview, /LOCAL_DEV:true/);
 console.log(
-  "site route contract: shared navigation is synchronized, Cards has one canonical market-intelligence surface, and /contact is a first-class build route",
+  "site route contract: shared navigation is synchronized, Cards has one canonical market-intelligence surface, Blueprints are shareable and crawlable, and /contact is a first-class build route",
 );

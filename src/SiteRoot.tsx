@@ -4,6 +4,7 @@ import EcosystemPage from "./EcosystemPage";
 import CardsPage from "./CardsPage";
 import ContactPage from "./ContactPage";
 import { BrandLockup } from "./Brand";
+import BlueprintPage from "./blueprint/BlueprintPage";
 import { usePath } from "./router";
 import SandboxPage from "./sandbox/SandboxPage";
 
@@ -382,6 +383,7 @@ export default function SiteRoot() {
     return <DirectoryShell page="ecosystem" navigate={navigate} />;
   if (path === "/cards")
     return <DirectoryShell page="cards" navigate={navigate} />;
+  if (path === "/blueprint") return <BlueprintPage onNavigate={navigate} />;
   if (path === "/sandbox") return <SandboxPage />;
   if (path === "/contact") return <ContactPage onNavigate={navigate} />;
   return <App />;

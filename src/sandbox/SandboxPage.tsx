@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { BrandLockup } from "../Brand";
 import { call, ensureKey } from "../api";
+import {
+  consumeBlueprintFork,
+  createBlueprintShareUrl,
+} from "../blueprint/share";
 import ProviderMatchPanel from "../ecosystem/ProviderMatchPanel";
+import { trackGrowthEvent } from "../growth/events";
 import "./sandbox.css";
 
 type Blueprint = {
@@ -85,6 +90,25 @@ const INITIAL: FormState = {
   rails: ["paynow", "wire"],
   brand: { accent: "#0868FF", personality: "clear, credible and human" },
 };
+
+function initialForm(): FormState {
+  const fork = consumeBlueprintFork();
+  if (!fork) return INITIAL;
+  return {
+    ...INITIAL,
+    name: fork.name,
+    markets: fork.markets.length ? fork.markets : INITIAL.markets,
+    currencies: fork.currencies.length ? fork.currencies : INITIAL.currencies,
+    capabilities: fork.capabilities.length
+      ? fork.capabilities
+      : INITIAL.capabilities,
+    rails: fork.rails.length ? fork.rails : INITIAL.rails,
+    brand: {
+      ...INITIAL.brand,
+      accent: fork.accent ?? INITIAL.brand.accent,
+    },
+  };
+}
 
 const PRESETS = [
   {
@@ -193,12 +217,13 @@ function errorDetail(body: unknown, fallback: string) {
 }
 
 export default function SandboxPage() {
-  const [form, setForm] = useState<FormState>(INITIAL);
+  const [form, setForm] = useState<FormState>(initialForm);
   const [project, setProject] = useState<SandboxProject | null>(null);
   const [projects, setProjects] = useState<SandboxProject[]>([]);
   const [stage, setStage] = useState(0);
   const [busy, setBusy] = useState("Connecting to the sandbox…");
   const [error, setError] = useState("");
+  const [shareStatus, setShareStatus] = useState("");
   const [payment, setPayment] = useState({
     from_account: "",
     amount: "125.00",
@@ -278,6 +303,41 @@ export default function SandboxPage() {
     setProjects((items) => [next, ...items]);
     setStage(1);
     window.history.replaceState({}, "", `/sandbox?project=${next.id}`);
+  }
+
+  async function shareBlueprint() {
+    if (!project) return;
+    const url = createBlueprintShareUrl(project.blueprint);
+    if (!url) {
+      setError("This Blueprint could not be turned into a public share link.");
+      return;
+    }
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${project.blueprint.name} — Blueballs Blueprint`,
+          text: "Open this financial-product architecture in Blueballs.",
+          url,
+        });
+        setShareStatus("Blueprint shared");
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareStatus("Share link copied ✓");
+      }
+      trackGrowthEvent("blueprint_share", {
+        source: "builder",
+        markets: project.blueprint.markets.length,
+        capabilities: project.blueprint.capabilities.length,
+        rails: project.blueprint.rails.length,
+      });
+      window.setTimeout(() => setShareStatus(""), 2600);
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === "AbortError") return;
+      setError(
+        "The Blueprint is ready to share, but this browser could not open the share action.",
+      );
+    }
   }
 
   async function talkToBuilder() {
@@ -385,6 +445,7 @@ export default function SandboxPage() {
     setProject(null);
     setStage(0);
     setError("");
+    setShareStatus("");
     window.history.replaceState({}, "", "/sandbox");
   }
 
@@ -709,10 +770,19 @@ export default function SandboxPage() {
                 <button className="sb-back" onClick={newProject}>
                   ← Start again
                 </button>
+                <button
+                  className="sb-back"
+                  onClick={() => void shareBlueprint()}
+                >
+                  Share Blueprint
+                </button>
                 <button className="sb-primary" onClick={provision}>
                   Build the sandbox <span>→</span>
                 </button>
               </div>
+              {shareStatus && (
+                <small className="sb-share-status">{shareStatus}</small>
+              )}
             </section>
             <section className="sb-blueprint-grid">
               <article>
