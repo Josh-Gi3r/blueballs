@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "packageManager": "pnpm@11.21.0",
-  "description": "Blueballs - open-source infrastructure for building and operating modern financial institutions",
+  "description": "Blueballs - the open financial operating system for modern banking, stablecoin FX and programmable financial products",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:site": "vite",
