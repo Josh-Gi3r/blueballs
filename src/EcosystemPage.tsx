@@ -6,7 +6,7 @@ import "./EcosystemPage.css";
 const MONO = "'IBM Plex Mono', monospace";
 type EcosystemPageProps = { onNavigate: (path: string) => void };
 const FILLER_COPY = [
-  ["DIRECTORY", "Provider candidates."],
+  ["DIRECTORY", "Provider landscape."],
   ["OPEN SOURCE", "Free to fork and self-host."],
   ["SOURCES", "Links to official websites."],
 ] as const;
@@ -187,7 +187,7 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
             {filtered.length} {filtered.length === 1 ? "listing" : "listings"}
           </span>
           <span>
-            Reviewed against official provider information · 12 Aug 2026
+            Reviewed against official provider information · 20 Aug 2026
           </span>
         </div>
         <div className="eco-provider-grid">
@@ -222,18 +222,19 @@ export default function EcosystemPage({ onNavigate }: EcosystemPageProps) {
           <button
             type="button"
             className="secondary"
-            onClick={() => onNavigate("/fx")}
+            onClick={() => onNavigate("/contact")}
           >
-            See Stablecoin FX
+            Build an adapter
           </button>
         </div>
       </section>
       <div className="eco-disclaimer">
         <span style={{ fontFamily: MONO }}>ABOUT THIS DIRECTORY</span>
         <p>
-          Access and sandbox details were checked against official provider
-          information on 12 Aug 2026. Products and availability change, so check
-          the provider's current documentation before building.
+          Listings link to official provider sources and show relationship and
+          technical status explicitly. Access and sandbox details were reviewed
+          on 20 Aug 2026. Products and availability change, so check the
+          provider's current documentation before building.
         </p>
       </div>
     </div>
