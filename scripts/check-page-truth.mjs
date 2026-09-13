@@ -1,16 +1,45 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join, relative } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname;
-const tracked = execFileSync("git", ["ls-files", "src", "workers/site"], {
-  cwd: root,
-  encoding: "utf8",
-})
-  .trim()
-  .split("\n");
+
+function walkFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((entry) => {
+      const absolute = join(directory, entry.name);
+      if (entry.isDirectory()) return walkFiles(absolute);
+      if (!entry.isFile()) return [];
+      return [relative(root, absolute).split("\\").join("/")];
+    });
+}
+
+function listPublicSourceFiles() {
+  if (existsSync(join(root, ".git"))) {
+    try {
+      return execFileSync("git", ["ls-files", "src", "workers/site"], {
+        cwd: root,
+        encoding: "utf8",
+      })
+        .trim()
+        .split("\n")
+        .filter(Boolean);
+    } catch {
+      // Fall through to the source-snapshot inventory below. The assertions are
+      // identical; only file enumeration changes when VCS metadata is absent.
+    }
+  }
+
+  return ["src", "workers/site"].flatMap((directory) =>
+    walkFiles(join(root, directory)),
+  );
+}
+
+const tracked = listPublicSourceFiles();
+assert.ok(tracked.length > 0, "public source inventory must not be empty");
 const publicSource = tracked
   .filter((file) => existsSync(join(root, file)))
   .map((file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8"))
