@@ -56,16 +56,12 @@ replaceOnce(
 );
 
 // Builder responses already expose plan/resources/updated_at. Keep the published
-// schema aligned with the stable runtime shape rather than rejecting those fields.
+// schema aligned with the stable runtime shape while preserving backwards-compatible
+// examples that do not include those extension fields.
 replaceOnce(
   "spec/banking/openapi/contracts.mjs",
   `      environment: { type: ["object", "null"], additionalProperties: true },\n      customers: {`,
   `      environment: { type: ["object", "null"], additionalProperties: true },\n      plan: { type: "object", additionalProperties: true },\n      resources: { type: "object", additionalProperties: true },\n      updated_at: { $ref: "#/components/schemas/Timestamp" },\n      customers: {`,
-);
-replaceOnce(
-  "spec/banking/openapi/contracts.mjs",
-  `      "blueprint",\n      "build",\n      "customers",`,
-  `      "blueprint",\n      "build",\n      "plan",\n      "resources",\n      "updated_at",\n      "customers",`,
 );
 
 // This test checks the operator boundary. Use the current production appetite
