@@ -47,6 +47,14 @@ replaceOnce(
   `const { db, emit, inRequestScope, post } = await import("../src/lib.js");\nconst commands = db.quotes;`,
 );
 
+// Ledger balance rows expose a stable row id at runtime. Keep it optional in the
+// public schema so existing examples remain compatible while strict responses pass.
+replaceOnce(
+  "spec/banking/openapi/contracts.mjs",
+  `  LedgerBalance: object(\n    {\n      account: { $ref: "#/components/schemas/Identifier" },`,
+  `  LedgerBalance: object(\n    {\n      id: { $ref: "#/components/schemas/Identifier" },\n      account: { $ref: "#/components/schemas/Identifier" },`,
+);
+
 // Statements deliberately serialize omitted date bounds as null. Publish that
 // nullable shape instead of turning valid responses into contract-violation 500s.
 replaceOnce(
