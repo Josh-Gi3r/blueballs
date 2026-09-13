@@ -64,8 +64,8 @@ replaceOnce(
 );
 replaceOnce(
   "spec/banking/openapi/contracts.mjs",
-  `      "environment",\n      "customers",`,
-  `      "environment",\n      "plan",\n      "resources",\n      "updated_at",\n      "customers",`,
+  `      "blueprint",\n      "build",\n      "customers",`,
+  `      "blueprint",\n      "build",\n      "plan",\n      "resources",\n      "updated_at",\n      "customers",`,
 );
 
 // This test checks the operator boundary. Use the current production appetite
